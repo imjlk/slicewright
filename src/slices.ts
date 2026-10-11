@@ -6,7 +6,8 @@ export interface SliceInsets {
   readonly bottom: number;
 }
 
-export type SliceMode = 'nine' | 'three';
+/** `three` keeps the height (Phaser's three-slice); `three-vertical` keeps the width. */
+export type SliceMode = 'nine' | 'three' | 'three-vertical' | 'multi';
 
 /** Phaser's stretchable center rectangle, in frame coordinates. */
 export interface Scale9Borders {
@@ -51,7 +52,7 @@ export function isThreeSlice(insets: SliceInsets): boolean {
 
 /**
  * @evidence docs/spec.md#phaser-scale9borders Converts insets into Phaser's center rectangle.
- * @evidenceReview docs/spec.md#phaser-scale9borders #649e388 Checked this code against the section line by line and ran convertsToPhaserBorders green with pnpm test.
+ * @evidenceReview docs/spec.md#phaser-scale9borders #bb888dc Checked this code against the section line by line and ran convertsToPhaserBorders green with pnpm test.
  */
 export function insetsToScale9Borders(
   insets: SliceInsets,
@@ -68,7 +69,7 @@ export function insetsToScale9Borders(
 
 /**
  * @evidence docs/spec.md#phaser-scale9borders Converts Phaser's center rectangle back into insets, as Phaser's NineSlice does.
- * @evidenceReview docs/spec.md#phaser-scale9borders #649e388 Checked this code against the section line by line and ran convertsToPhaserBorders green with pnpm test.
+ * @evidenceReview docs/spec.md#phaser-scale9borders #bb888dc Checked this code against the section line by line and ran convertsToPhaserBorders green with pnpm test.
  */
 export function scale9BordersToInsets(
   borders: Scale9Borders,

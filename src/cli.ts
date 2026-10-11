@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { readFileSync, writeFileSync } from 'node:fs';
-import { basename, dirname, relative, resolve } from 'node:path';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join, relative, resolve } from 'node:path';
 
 import { cli, define } from 'gunshi';
 
@@ -8,6 +8,7 @@ import { defaultChromaOptions, removeChroma } from './chroma.js';
 import {
   defaultInspectOptions,
   inspectRaster,
+  type Finding,
   type InspectOptions,
   type InspectReport,
 } from './inspect.js';
@@ -15,10 +16,12 @@ import { normalizeRaster } from './normalize.js';
 import { createSingleFrameAtlas, inspectAtlas } from './phaser.js';
 import { decodePng, encodePng } from './png.js';
 import { buildPromptPlan, promptBackgrounds, uiKinds } from './prompt.js';
+import type { SliceLayout } from './layout.js';
 import type { Raster } from './raster.js';
 import { renderPreviewSheet } from './render.js';
 import { resizeRaster, targetSize } from './resize.js';
 import { parseBorders, parseInsets, scale9BordersToInsets } from './slices.js';
+import { exportForTarget, sliceTargets } from './targets/index.js';
 
 /** Exit codes: 0 ok, 1 error findings, 2 usage or input failure. */
 const findingsFailed = 1;
@@ -54,9 +57,15 @@ const sliceArgs = {
   },
   mode: {
     type: 'enum',
-    choices: ['auto', 'nine', 'three'],
+    choices: ['auto', 'nine', 'three', 'three-vertical'],
     default: 'auto',
-    description: 'Slice mode',
+    description: 'Slice mode: three keeps the height, three-vertical keeps the width',
+  },
+  regions: {
+    type: 'enum',
+    choices: ['single', 'multi'],
+    default: 'single',
+    description: 'multi keeps every long stretch run on an axis (Android nine-patch style)',
   },
   tile: {
     type: 'enum',
@@ -83,6 +92,7 @@ const chromaKeyChoices = ['auto', 'green', 'magenta'] as const;
 const image = { type: 'positional', description: 'PNG image' } as const;
 
 interface SliceValues {
+  readonly regions: string;
   readonly insets?: string | undefined;
   readonly borders?: string | undefined;
   readonly mode: string;
@@ -136,10 +146,7 @@ const preview = define({
     const raster = readPng(ctx.values.input);
     const settings = inspectOptions(ctx.values, raster);
     const report = inspectRaster(raster, settings);
-    const sheet = renderPreviewSheet(raster, report.insets, report.mode, {
-      tileX: report.tile.x,
-      tileY: report.tile.y,
-    });
+    const sheet = renderPreviewSheet(raster, report.layout);
     writeFileSync(ctx.values.out, encodePng(sheet.raster));
     print({
       image: ctx.values.input,
@@ -269,7 +276,18 @@ const normalize = define({
     },
     'no-crop': { type: 'boolean', description: 'Keep transparent margins' },
     atlas: { type: 'string', description: 'Also write a one-frame atlas JSON here' },
-    name: { type: 'string', description: 'Frame name for --atlas; defaults to the file name' },
+    name: {
+      type: 'string',
+      description: 'Asset name for --atlas and --target; defaults to the file name',
+    },
+    target: {
+      type: 'string',
+      description: `Also export for these targets, comma separated: ${Object.keys(sliceTargets).join(', ')}`,
+    },
+    'image-ref': {
+      type: 'string',
+      description: 'How --target files refer to the image; defaults to its path from the output',
+    },
     ...sizeArgs,
     ...sliceArgs,
   },
@@ -298,10 +316,131 @@ const normalize = define({
       );
       writeFileSync(atlasOut, `${JSON.stringify(json, null, 2)}\n`);
     }
-    print({ image: input, out, atlas: atlasOut, steps: result.steps, ...summary(result.report) });
-    failOnErrors(result.report.ok);
+    const exports = targetList(ctx.values.target).map((id) =>
+      writeExport(id, {
+        name: ctx.values.name ?? basename(out).replace(/\.png$/i, ''),
+        outDir: dirname(out),
+        imagePath: out,
+        imageRef: ctx.values['image-ref'],
+        raster: result.raster,
+        layout: result.report.layout,
+      }),
+    );
+    print({
+      image: input,
+      out,
+      atlas: atlasOut,
+      steps: result.steps,
+      ...summary(result.report),
+      ...(exports.length === 0 ? {} : { exports }),
+    });
+    failOnErrors(result.report.ok && exports.every((item) => item.ok));
   },
 });
+
+const targets = define({
+  name: 'targets',
+  description: 'List export targets and what each can represent',
+  run: () => {
+    print(
+      Object.values(sliceTargets).map(({ id, label, capabilities }) => ({
+        id,
+        label,
+        capabilities,
+      })),
+    );
+  },
+});
+
+const exportCommand = define({
+  name: 'export',
+  description: 'Export the slice layout for one or more engine targets',
+  args: {
+    input: image,
+    target: {
+      type: 'string',
+      required: true,
+      description: `Targets, comma separated: ${Object.keys(sliceTargets).join(', ')}`,
+    },
+    'out-dir': { type: 'string', default: '.', description: 'Directory for the exported files' },
+    'image-ref': {
+      type: 'string',
+      description: 'How the exported files refer to the image; defaults to its path from --out-dir',
+    },
+    name: { type: 'string', description: 'Asset name; defaults to the file name' },
+    ...sliceArgs,
+  },
+  run: (ctx) => {
+    const { input } = ctx.values;
+    const raster = readPng(input);
+    const report = inspectRaster(raster, inspectOptions(ctx.values, raster));
+    const exports = targetList(ctx.values.target).map((id) =>
+      writeExport(id, {
+        name: ctx.values.name ?? basename(input).replace(/\.png$/i, ''),
+        outDir: ctx.values['out-dir'],
+        imagePath: input,
+        imageRef: ctx.values['image-ref'],
+        raster,
+        layout: report.layout,
+      }),
+    );
+    print({ image: input, ...summary(report), exports });
+    failOnErrors(report.ok && exports.every((item) => item.ok));
+  },
+});
+
+function targetList(value: string | undefined): string[] {
+  if (value === undefined) {
+    return [];
+  }
+  const ids = value
+    .split(',')
+    .map((id) => id.trim())
+    .filter((id) => id.length > 0);
+  for (const id of ids) {
+    if (sliceTargets[id] === undefined) {
+      throw new UsageError(
+        `Unknown target "${id}". Known targets: ${Object.keys(sliceTargets).join(', ')}.`,
+      );
+    }
+  }
+  return ids;
+}
+
+function writeExport(
+  id: string,
+  options: {
+    readonly name: string;
+    readonly outDir: string;
+    readonly imagePath: string;
+    readonly imageRef?: string | undefined;
+    readonly raster: Raster;
+    readonly layout: SliceLayout;
+  },
+): { target: string; ok: boolean; files: string[]; usage: string; findings: readonly Finding[] } {
+  mkdirSync(options.outDir, { recursive: true });
+  const imageRef =
+    options.imageRef ??
+    (relative(resolve(options.outDir), resolve(options.imagePath)) || basename(options.imagePath));
+  const result = exportForTarget(id, {
+    name: options.name,
+    imageRef,
+    raster: options.raster,
+    layout: options.layout,
+  });
+  const files = result.files.map((file) => {
+    const path = join(options.outDir, file.path);
+    writeFileSync(path, file.contents);
+    return path;
+  });
+  return {
+    target: id,
+    ok: !result.findings.some((finding) => finding.severity === 'error'),
+    files,
+    usage: result.usage,
+    findings: result.findings,
+  };
+}
 
 /** Insets given as borders need the final image size, so they are resolved against `raster`. */
 function inspectOptions(values: SliceValues, raster: Raster | undefined): InspectOptions {
@@ -320,7 +459,11 @@ function inspectOptions(values: SliceValues, raster: Raster | undefined): Inspec
   const tile = values.tile ?? '';
   return {
     ...matchOptions(values),
-    mode: values.mode === 'nine' || values.mode === 'three' ? values.mode : 'auto',
+    mode:
+      values.mode === 'nine' || values.mode === 'three' || values.mode === 'three-vertical'
+        ? values.mode
+        : 'auto',
+    regions: values.regions === 'multi' ? 'multi' : 'single',
     tile: { x: tile.includes('x'), y: tile.includes('y') },
     ...(insets === undefined ? {} : { insets }),
   };
@@ -423,7 +566,18 @@ try {
   await cli(process.argv.slice(2), main, {
     name: 'slicewright',
     version,
-    subCommands: { prompt, inspect, preview, frame, atlas, key, resize, normalize },
+    subCommands: {
+      prompt,
+      inspect,
+      preview,
+      frame,
+      atlas,
+      key,
+      resize,
+      normalize,
+      export: exportCommand,
+      targets,
+    },
     // stdout carries JSON only; gunshi's banner would break parsing.
     renderHeader: null,
   });

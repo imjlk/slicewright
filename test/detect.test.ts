@@ -57,6 +57,7 @@ export function detectsPanelInsets(): void {
   // Exact matching: every column of the gradient differs from its neighbor.
   const gradient = inspectRaster(horizontalGradient(30, 10), {
     ...defaultInspectOptions,
+    mode: 'nine',
     noise: 'off',
   });
   ok(codes(gradient).includes('stretch.x.none'));

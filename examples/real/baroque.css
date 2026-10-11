@@ -1,0 +1,11 @@
+/* slicewright: baroque, nine */
+.baroque {
+  box-sizing: border-box;
+  border-style: solid;
+  border-width: 98px 97px 95px 97px;
+  border-image-source: url("baroque.png");
+  border-image-slice: 98 97 95 97 fill;
+  border-image-repeat: stretch stretch;
+  min-width: 194px;
+  min-height: 193px;
+}

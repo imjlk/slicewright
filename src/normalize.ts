@@ -14,6 +14,7 @@ import {
   type Raster,
   type Rect,
 } from './raster.js';
+import { layoutFromInsets, minimumLayoutSize } from './layout.js';
 import { renderSlices } from './render.js';
 import { resizeRaster, targetSize, type ResizeFilter } from './resize.js';
 import { insetsToScale9Borders, type SliceInsets } from './slices.js';
@@ -60,7 +61,7 @@ export const defaultNormalizeOptions: NormalizeOptions = {
  * uniform stretch span.
  *
  * @evidence docs/spec.md#normalization Orders crop, resize, inspection, and rebuild, and rebuilds only uniform axes.
- * @evidenceReview docs/spec.md#normalization #51e9586 Checked this code against the section line by line and ran normalizesGeneratedArt green with pnpm test.
+ * @evidenceReview docs/spec.md#normalization #ef22e0f Checked this code against the section line by line and ran normalizesGeneratedArt green with pnpm test.
  */
 export function normalizeRaster(
   source: Raster,
@@ -96,7 +97,9 @@ export function normalizeRaster(
   const keepAxis = (axis: 'x' | 'y'): number | undefined => {
     if (
       report.tile[axis] ||
+      report.mode === 'multi' ||
       (axis === 'y' && report.mode === 'three') ||
+      (axis === 'x' && report.mode === 'three-vertical') ||
       report.findings.some(
         (finding) =>
           finding.code === `stretch.${axis}.none` || finding.code === `stretch.${axis}.short`,
@@ -144,6 +147,16 @@ export function normalizeRaster(
       width,
       height,
       scale9Borders: insetsToScale9Borders(report.insets, width, height),
+      layout: layoutFromInsets(report.insets, width, height, {
+        shape: report.mode === 'multi' ? 'nine' : report.mode,
+        tile: report.tile,
+      }),
+      minSize: minimumLayoutSize(
+        layoutFromInsets(report.insets, width, height, {
+          shape: report.mode === 'multi' ? 'nine' : report.mode,
+          tile: report.tile,
+        }),
+      ),
       contentBounds: contentBounds(rebuilt.raster) ?? null,
       findings: [...report.findings, ...findings],
     },
@@ -155,7 +168,7 @@ export function normalizeRaster(
  * Lossless when the span is uniform: every dropped line equals a kept one.
  *
  * @evidence docs/spec.md#normalization Copies the borders and the first kept lines of each span.
- * @evidenceReview docs/spec.md#normalization #51e9586 Checked this code against the section line by line and ran normalizesGeneratedArt green with pnpm test.
+ * @evidenceReview docs/spec.md#normalization #ef22e0f Checked this code against the section line by line and ran normalizesGeneratedArt green with pnpm test.
  */
 export function rebuildSlices(
   raster: Raster,

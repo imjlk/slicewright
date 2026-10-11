@@ -40,5 +40,6 @@ jobs:
       - run: pnpm check
       - run: pnpm test
       - run: pnpm build
-      # Renders examples/real as Phaser 4 NineSlices in the runner's Chrome.
-      - run: pnpm phaser:check
+      # Renders examples/real as Phaser 4 NineSlices and CSS border-images in
+      # the runner's Chrome and compares them with slicewright's renderer.
+      - run: pnpm engine:check

@@ -85,7 +85,7 @@ export function resizesWithoutHalos(): void {
 
 /**
  * @evidence docs/spec.md#normalization Crops and resizes before inspecting, rebuilds uniform axes losslessly, and leaves a three-slice height alone.
- * @evidenceReview docs/spec.md#normalization #51e9586 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#normalization #ef22e0f Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function normalizesGeneratedArt(): void {
   const target = panel(40, 30);

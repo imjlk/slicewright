@@ -208,6 +208,41 @@ export function detectStretchSpan(
   return best;
 }
 
+/**
+ * Every run of matching lines inside `bounds` that is at least `minimum` lines
+ * long, in order.
+ *
+ * @evidence docs/spec.md#multiple-stretch-regions Collects every matching run that reaches the minimum length.
+ * @evidenceReview docs/spec.md#multiple-stretch-regions #f7d00d8 Checked this code against the section line by line and ran detectsMultipleRegions green with pnpm test.
+ */
+export function detectStretchRuns(
+  raster: Raster,
+  axis: Axis,
+  bounds: Rect,
+  options: MatchOptions,
+  minimum: number,
+): AxisSpan[] {
+  const start = axis === 'x' ? bounds.x : bounds.y;
+  const length = axis === 'x' ? bounds.width : bounds.height;
+  const runs: AxisSpan[] = [];
+  let runStart: number | undefined;
+  const close = (end: number): void => {
+    if (runStart !== undefined && end - runStart >= minimum) {
+      runs.push({ start: runStart, end });
+    }
+    runStart = undefined;
+  };
+  for (let index = start; index < start + length - 1; index += 1) {
+    if (linesMatch(raster, axis, index, index + 1, bounds, options)) {
+      runStart ??= index;
+    } else {
+      close(index + 1);
+    }
+  }
+  close(start + length);
+  return runs;
+}
+
 export interface RepeatSpan {
   readonly span: AxisSpan;
   readonly period: number;

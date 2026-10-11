@@ -38,8 +38,12 @@ enforces in `pnpm check`:
 - The CLI uses gunshi. Commands print JSON to stdout only (the gunshi header
   stays off) and keep exit codes: 0 ok, 1 error findings, 2 usage or input
   failure.
+- Detection produces an engine-neutral `SliceLayout`; renderers and targets
+  read only the layout. Engine specifics live in `src/targets/`, declared
+  through capabilities. See `docs/extending.md` before adding a layout
+  feature or a target.
 - Behavior is judged on real generated art too, not only fixtures: rerun
-  `pnpm phaser:check` and look at `preview` sheets for `examples/real` after
+  `pnpm engine:check` and look at `preview` sheets for `examples/real` after
   detection changes.
 
 ## Commands
@@ -49,4 +53,4 @@ enforces in `pnpm check`:
 - `pnpm build`
 - `pnpm fix`
 - `pnpm examples` regenerates `examples/*.png` from the test fixtures.
-- `pnpm phaser:check` renders `examples/real` in Phaser 4 through headless Chrome.
+- `pnpm engine:check` renders `examples/real` in Phaser 4 and CSS through headless Chrome.

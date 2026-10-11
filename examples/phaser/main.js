@@ -32,16 +32,20 @@ const entries = await Promise.all(
 function sizesFor(entry) {
   const { w, h } = entry.likeFrame.frame;
   const b = entry.likeFrame.scale9Borders;
+  // Phaser's three-slice keeps the height; zero side insets keep the width.
   const three = b.y === 0 && b.h === h;
+  const vertical = b.x === 0 && b.w === w;
   const sizes = [
     ['frame', w, h],
-    ['min', w - b.w, three ? h : h - b.h],
-    ['wide', Math.round(w * 2.5), h],
+    ['min', vertical ? w : w - b.w, three ? h : h - b.h],
   ];
+  if (!vertical) {
+    sizes.push(['wide', Math.round(w * 2.5), h]);
+  }
   if (!three) {
     sizes.push(['tall', w, Math.round(h * 2.5)]);
   }
-  sizes.push(['double', w * 2, three ? h : h * 2]);
+  sizes.push(['double', vertical ? w : w * 2, three ? h : h * 2]);
   return sizes;
 }
 

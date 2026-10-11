@@ -20,6 +20,18 @@ and right edges stretch vertically, and the center stretches both ways. The
 stretchable span on each axis must be at least one pixel wide, so `left + right`
 must be smaller than the width and `top + bottom` smaller than the height.
 
+## Slice layouts
+
+Every slicing scheme is one engine-neutral layout: each axis is a list of
+segments that cover it in order, and each segment is `fixed` (keeps its size),
+`stretch`, or `tile`. A nine-slice has one flexible segment per axis between
+fixed ones; a three-slice has a fully fixed vertical axis; a vertical
+three-slice has a fully fixed horizontal axis; a multi-region layout has more
+than one flexible segment on an axis; a layout with nothing flexible is
+`fixed`. Insets convert to a layout and back whenever each axis has at most one
+flexible segment, and a fixed axis converts to zero insets on both sides. The
+minimum size of a layout is the sum of its fixed segments on each axis.
+
 ## Stretch detection
 
 Insets are detected from the image when the caller gives none. Two adjacent
@@ -66,6 +78,24 @@ horizontally and its height stays fixed to the image. In automatic mode an image
 with no vertical stretch span becomes a three-slice and an informational
 `three-slice.auto` finding records the choice. Forcing three-slice mode sets
 `top` and `bottom` to zero.
+
+## Vertical three-slice
+
+A vertical three-slice keeps its width and stretches only vertically, like a
+scroll bar track. In automatic mode, when no two adjacent columns match but rows
+do, the layout becomes a vertical three-slice and a `three-slice.vertical.auto`
+finding records it. Forcing the mode sets `left` and `right` to zero and skips
+the column checks.
+
+## Multiple stretch regions
+
+Some art has fixed detail in the middle of an edge, such as a crest on a title
+plate, with stretchable lengths on both sides. With multiple regions requested,
+every uniform run on an axis that reaches 10% of the content becomes its own
+stretch segment, with fixed segments between them. An axis with only one such
+run keeps the single-region result, a tiled axis is never split, and a
+`regions.multi` finding records the counts. The reported insets are the
+outermost flexible lines.
 
 ## Stretch uniformity
 
@@ -141,8 +171,9 @@ hold it open; after resizing, rows and columns that averaged to full
 transparency are cropped as well. With a keep length, it rebuilds a smaller
 texture that keeps the fixed borders and the first `keep` lines of each stretch
 span. It rebuilds only an axis whose span was really found (not tiled, no
-`stretch.<axis>.none` or `stretch.<axis>.short` fallback), and never the
-vertical axis of a three-slice. Noise tolerance accepts spans that
+`stretch.<axis>.none` or `stretch.<axis>.short` fallback), never an axis that
+keeps its size (the height of a three-slice, the width of a vertical
+three-slice), and never a multi-region layout. Noise tolerance accepts spans that
 carry texture or shading, which stretching keeps but cutting would lose, so each
 axis is verified: rebuilt alone and rendered back at the original size, its
 99th-percentile pixel difference must stay within the exact tolerance, not the
@@ -156,11 +187,15 @@ without rebuilding.
 
 ## Preview sheet
 
-A preview sheet renders the slice layout at several sizes on one PNG over a
-checkerboard: the source with stretch spans tinted, the source size, the minimum
-size, wide, tall (skipped for a three-slice), and doubled. Rendering samples the
-nearest source pixel, keeps corners unscaled, and repeats spans in tiling mode the
-way Phaser does: a whole number of tiles, each scaled to fill the span.
+A preview sheet renders the layout at several sizes on one PNG over a
+checkerboard: the source with flexible segments tinted, the source size, the
+minimum size, wide and tall (each only when that axis can resize), and doubled
+on the axes that can resize. Rendering samples the nearest source pixel. Fixed
+segments keep their size and the flexible segments share the rest in proportion
+to their source size. A tiled segment repeats a whole number of tiles, the
+segment length divided by the source length rounded down and at least one, each
+scaled to fill the segment, as Phaser does. A size below the fixed segments is
+raised to them.
 
 ## Phaser scale9Borders
 
@@ -168,7 +203,55 @@ Phaser 4 reads a frame's `scale9Borders` as the stretchable center rectangle:
 `x = left`, `y = top`, `w = width - left - right`, `h = height - top - bottom`.
 Phaser treats a frame as a three-slice when `y` is zero and `h` equals the frame
 height. slicewright converts both ways and writes a single-frame JSON Hash atlas,
-untrimmed and unrotated, that `this.load.atlas` accepts.
+untrimmed and unrotated, that `this.load.atlas` accepts. The Phaser target adds
+the `nineslice` call, passing `tileX` and `tileY` for tiled axes, because atlas
+data cannot carry them. Phaser has no vertical three-slice, so it is emulated.
+
+## Targets
+
+A target turns a layout into an engine's files. Each target declares the shapes
+it represents natively, the shapes it can only emulate, and whether it tiles
+per axis, both axes together, or not at all. Emulation exports the fixed axis
+with zero insets, so the engine would stretch it, and a `target.emulated`
+finding tells the caller to keep that axis at its source size. A shape the
+target can neither represent nor emulate is a `target.unsupported` error and
+writes no files. Tiling the target cannot express is a `target.tile` warning,
+and a layout that never resizes is a `target.fixed` warning. Targets: `phaser`,
+`css`, `godot`, `unity`, `ninepatch`.
+
+## CSS border-image
+
+The CSS target writes a class with `border-image-slice` set to the insets plus
+`fill`, matching `border-width` in pixels, and `border-image-repeat` of
+`stretch` or, for a tiled axis, `round` (whole tiles scaled to fit). A
+three-slice fixes the height and a vertical three-slice fixes the width; any
+other layout sets the minimum width and height. CSS cannot express more than
+one region per axis.
+
+## Godot StyleBoxTexture
+
+The Godot target writes a Godot 4 `StyleBoxTexture` resource: the texture as a
+`res://` path (the image's path inside the output directory, or only its file
+name when it lies outside), `texture_margin_left`, `_top`, `_right`, and `_bottom` from the
+insets, and `axis_stretch_horizontal` and `axis_stretch_vertical` set to stretch
+(0) or, for a tiled axis, tile fit (2). Godot represents nine-slices; the
+three-slice shapes are emulated.
+
+## Unity sprite border
+
+The Unity target writes the sprite border in Unity's order: `x` left, `y`
+bottom, `z` right, `w` top, as `Sprite.border` and `TextureImporter.spriteBorder`
+use it, with Image type `Sliced`, or `Tiled` when an axis tiles. Unity tiles
+both axes together. Unity represents nine-slices; the three-slice shapes are
+emulated.
+
+## Android nine-patch
+
+The nine-patch target writes a `.9.png` that is the image inside a 1 px
+transparent frame. In the top line, opaque black marks every column of every
+flexible segment; in the left line, every row. A fixed axis is marked whole.
+Padding lines on the right and bottom are left out. Nine-patches support any
+number of regions per axis and cannot tile.
 
 ## Atlas frames
 
