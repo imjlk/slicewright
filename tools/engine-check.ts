@@ -4,6 +4,7 @@ import { dirname, extname, join, normalize, resolve, sep } from 'node:path';
 import { isDeepStrictEqual, parseArgs } from 'node:util';
 
 import { chromium, type Page } from 'playwright-core';
+import typia from 'typia';
 
 import { defaultInspectOptions, inspectRaster } from '../src/inspect.js';
 import { layoutFromInsets, type SliceLayout } from '../src/layout.js';
@@ -338,6 +339,13 @@ function detectTiles(): Map<string, TileCheck> {
   return checks;
 }
 
+/** A recorded inspection result, as `detected` prints it. */
+interface ExpectedInspection {
+  readonly regions: 'single' | 'multi';
+  readonly layout: SliceLayout;
+  readonly findings: string[];
+}
+
 interface InspectionCheck {
   readonly label: string;
   readonly regions: 'single' | 'multi';
@@ -381,19 +389,26 @@ function checkInspections(): InspectionCheck[] {
     const findings = report.findings.map((finding) => finding.code);
     const detected = { regions, layout: report.layout, findings };
     const expectedPath = join(dirname(manifestPath), entry.expected);
-    const expected = existsSync(expectedPath)
-      ? (JSON.parse(readFileSync(expectedPath, 'utf8')) as Partial<typeof detected>)
+    // The expected file must have exactly this shape: a missing field must
+    // never default to a value that happens to match.
+    const parsed = existsSync(expectedPath)
+      ? typia.validateEquals<ExpectedInspection>(JSON.parse(readFileSync(expectedPath, 'utf8')))
       : undefined;
+    const expected = parsed?.success === true ? parsed.data : undefined;
     // Compared by value: key order and finding order carry no meaning.
     const problem =
-      expected === undefined
+      parsed === undefined
         ? `${entry.expected} is missing`
+        : parsed.success === false
+          ? `${entry.expected} is malformed: ${parsed.errors.map((error) => `${error.path} expected ${error.expected}`).join('; ')}`
+        : expected === undefined
+          ? `${entry.expected} is malformed`
         : expected.regions !== regions
           ? `${entry.expected} records regions "${String(expected.regions)}" but the manifest asks for "${regions}"`
           : !isDeepStrictEqual(report.layout, expected.layout)
             ? `the detected layout differs from ${entry.expected}`
-            : !isDeepStrictEqual([...findings].sort(), [...(expected.findings ?? [])].sort())
-              ? `the findings ${findings.join(', ')} differ from ${(expected.findings ?? []).join(', ')}`
+            : !isDeepStrictEqual([...findings].sort(), [...expected.findings].sort())
+              ? `the findings ${findings.join(', ')} differ from ${expected.findings.join(', ')}`
               : undefined;
     return {
       label: entry.label,
