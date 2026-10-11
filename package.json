@@ -1,0 +1,64 @@
+{
+  "name": "slicewright",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Prompt, inspect, and preview nine-slice and three-slice UI art for game engines.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/imjlk/slicewright.git"
+  },
+  "bugs": {
+    "url": "https://github.com/imjlk/slicewright/issues"
+  },
+  "homepage": "https://github.com/imjlk/slicewright#readme",
+  "keywords": [
+    "nine-slice",
+    "9-slice",
+    "nine-patch",
+    "scale9",
+    "phaser",
+    "game-ui",
+    "sprite"
+  ],
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "packageManager": "pnpm@11.7.0",
+  "bin": {
+    "slicewright": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "skills"
+  ],
+  "scripts": {
+    "slicewright": "ttsx src/cli.ts",
+    "check": "ttsc --noEmit",
+    "lint": "ttsc --noEmit",
+    "format": "ttsc format",
+    "fix": "ttsc fix",
+    "test": "ttsx test/index.ts",
+    "build": "ttsc -p tsconfig.build.json",
+    "examples": "ttsx tools/make-examples.ts"
+  },
+  "dependencies": {
+    "fast-png": "8.0.0",
+    "typia": "13.0.2"
+  },
+  "devDependencies": {
+    "@ttsc/evidence": "0.30.4",
+    "@ttsc/graph": "0.30.4",
+    "@ttsc/lint": "0.30.4",
+    "@types/node": "^24.0.0",
+    "ttsc": "0.30.4",
+    "typescript": "7.0.2"
+  }
+}
