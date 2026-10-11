@@ -46,9 +46,9 @@ error, and every command exits 2 on bad input. `--help` works on each command.
    `--insets l,r,t,b` to `inspect` to check insets chosen by hand, `--mode
    three` for horizontal-only art, `--tile x` when an edge should repeat.
 6. **Look at the preview.** `slicewright preview ui/panel.png --out
-   sheet.png`, then open `sheet.png`. Cells, left to right: stretch spans
-   tinted magenta, source, minimum size, wide, tall (nine-slice only),
-   doubled. Corners must look identical in every cell and edges must not
+   sheet.png`, then open `sheet.png`. Cells, left to right: flexible segments
+   tinted magenta, source, minimum size, wide (when the width resizes), tall
+   (when the height resizes), doubled. Corners must look identical in every cell and edges must not
    smear.
 7. **Hand it to the engine.** `slicewright export ui/panel.png --target
    phaser,css --out-dir ui` writes each engine's files

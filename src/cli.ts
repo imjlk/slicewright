@@ -303,6 +303,8 @@ const normalize = define({
   },
   run: (ctx) => {
     const { input, out } = ctx.values;
+    // Validate every option before any file is written.
+    const targetIds = targetList(ctx.values.target);
     const source = readPng(input);
     const result = normalizeRaster(source, {
       inspect: inspectOptions(ctx.values, undefined),
@@ -328,7 +330,7 @@ const normalize = define({
       atlasOut = phaser.ok ? ctx.values.atlas : undefined;
       atlasFindings = phaser.findings;
     }
-    const exports = targetList(ctx.values.target).map((id) =>
+    const exports = targetIds.map((id) =>
       writeExport(id, {
         name: ctx.values.name ?? basename(out).replace(/\.png$/i, ''),
         outDir: dirname(out),

@@ -95,3 +95,18 @@ export function fixedAxisNote(layout: SliceLayout): string {
   }
   return '';
 }
+
+/**
+ * A relative file path as a URL: each path component percent-encoded so
+ * characters such as # and ? stay part of the name. A value that already has
+ * a URL scheme is returned unchanged.
+ */
+export function urlFromPath(path: string): string {
+  if (/^[A-Za-z][A-Za-z0-9+.-]*:/.test(path)) {
+    return path;
+  }
+  return path
+    .split('/')
+    .map((component) => encodeURIComponent(component))
+    .join('/');
+}

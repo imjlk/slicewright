@@ -12,6 +12,7 @@ import {
 import { pixelOffset } from '../src/raster.js';
 import { inspectAtlas } from '../src/phaser.js';
 import { renderLayout, renderPreviewSheet } from '../src/render.js';
+import { urlFromPath } from '../src/targets/common.js';
 import { cssString } from '../src/targets/css.js';
 import { capabilityFindings, exportForTarget, sliceTargets } from '../src/targets/index.js';
 import { crestPanel, fillRect, panel, sameRaster, shadedBar, transpose } from './fixtures.js';
@@ -268,7 +269,7 @@ export function checksTargetCapabilities(): void {
 
 /**
  * @evidence docs/spec.md#css-border-image Checks the slice with fill, border widths, round for tiled axes, and the fixed height of a three-slice.
- * @evidenceReview docs/spec.md#css-border-image #61fe631 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#css-border-image #9ee8b1e Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function exportsCssBorderImage(): void {
   const raster = panel(40, 30);
@@ -284,6 +285,14 @@ export function exportsCssBorderImage(): void {
   ok(css.includes('border-image-repeat: round stretch;'));
   ok(css.includes('border-image-source: url("ui/panel.png");'));
   strictEqual(cssString('a"b\\c.png'), '"a\\"b\\\\c.png"');
+  const hostile = text(
+    exportForTarget('css', { name: 'x*/ body{}', imageRef: 'ui/button#blue.png', raster, layout }).files[0]
+      ?.contents,
+  );
+  ok(hostile.startsWith('/* slicewright: x* / body{}, nine */'));
+  ok(hostile.includes('url("ui/button%23blue.png")'));
+  strictEqual(urlFromPath('a b/c?d.png'), 'a%20b/c%3Fd.png');
+  strictEqual(urlFromPath('https://cdn.example/x.png'), 'https://cdn.example/x.png');
   ok(css.includes('min-width: 14px;'));
   const linked = exportForTarget('css', {
     name: 'panel',

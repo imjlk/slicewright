@@ -1,5 +1,5 @@
 import { axisTiles, layoutShape, type AxisLayout } from '../layout.js';
-import { exportInsets } from './common.js';
+import { exportInsets, urlFromPath } from './common.js';
 import type { ExportInput, ExportResult, SliceTarget } from './types.js';
 
 export const cssTarget: SliceTarget = {
@@ -20,7 +20,7 @@ export const cssTarget: SliceTarget = {
  * border widths, `round` for tiled axes, and the minimum or fixed size.
  *
  * @evidence docs/spec.md#css-border-image Writes the slice, width, repeat, and size declarations for the CSS target.
- * @evidenceReview docs/spec.md#css-border-image #61fe631 Checked this code against the section line by line and ran exportsCssBorderImage green with pnpm test.
+ * @evidenceReview docs/spec.md#css-border-image #9ee8b1e Checked this code against the section line by line and ran exportsCssBorderImage green with pnpm test.
  */
 export function exportCss({ name, imageRef, layout, loaderPaths }: ExportInput): Omit<ExportResult, 'target' | 'findings'> {
   const insets = exportInsets(layout);
@@ -40,12 +40,13 @@ export function exportCss({ name, imageRef, layout, loaderPaths }: ExportInput):
       ? `${name}.css`
       : `${directory.replace(/\/+$/, '')}/${name}.css`;
   const css = [
-    `/* slicewright: ${name}, ${shape} */`,
+    // The name is caller data; a */ inside it would end the comment early.
+    `/* slicewright: ${name.replaceAll('*/', '* /')}, ${shape} */`,
     `.${className} {`,
     '  box-sizing: border-box;',
     '  border-style: solid;',
     `  border-width: ${top}px ${right}px ${bottom}px ${left}px;`,
-    `  border-image-source: url(${cssString(imageRef)});`,
+    `  border-image-source: url(${cssString(urlFromPath(imageRef))});`,
     `  border-image-slice: ${top} ${right} ${bottom} ${left} fill;`,
     `  border-image-repeat: ${repeat(layout.x)} ${repeat(layout.y)};`,
     ...size,

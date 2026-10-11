@@ -6,7 +6,7 @@ import { parseArgs } from 'node:util';
 import { chromium, type Page } from 'playwright-core';
 
 import { inspectRaster } from '../src/inspect.js';
-import { layoutFromInsets } from '../src/layout.js';
+import { layoutFromInsets, type SliceLayout } from '../src/layout.js';
 import { decodePng } from '../src/png.js';
 import { createRaster, pixelOffset, rasterDifference, type Raster } from '../src/raster.js';
 import { renderLayout } from '../src/render.js';
@@ -227,9 +227,14 @@ function compareCells(
         : cell.shape === 'three-vertical'
           ? 'three-vertical'
           : 'nine';
-    const detected = detectedTile.get(cell.entry)?.tile ?? '';
+    const detection = detectedTile.get(cell.entry);
+    const detected = detection?.tile ?? '';
     const tile = { x: detected.includes('x'), y: detected.includes('y') };
-    const layout = layoutFromInsets(scale9BordersToInsets(cell.borders, w, h), w, h, { shape, tile });
+    // Current detection is the truth; only a rebuilt sample falls back to its atlas.
+    const layout =
+      detection !== undefined && !detection.rebuilt
+        ? detection.layout
+        : layoutFromInsets(scale9BordersToInsets(cell.borders, w, h), w, h, { shape, tile });
     const expected = flatten(
       renderLayout(source, layout, cell.rendered[0], cell.rendered[1], tileCount),
       background,
@@ -278,13 +283,17 @@ interface TileCheck {
   readonly usage: string;
   readonly manifest: string;
   readonly problem?: string;
+  /** The layout detection finds now; the truth renders and exports are checked against. */
+  readonly layout: SliceLayout;
+  /** A rebuilt (`like`) sample, whose layout only its atlas records. */
+  readonly rebuilt: boolean;
 }
 
 /** Detects each manifest image's tiling and checks the manifest and Phaser usage against it. */
 function detectTiles(): Map<string, TileCheck> {
   const manifestPath = join(root, values.manifest);
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
-    entries: Array<{ label: string; atlas: string; tile?: string }>;
+    entries: Array<{ label: string; atlas: string; tile?: string; like?: string }>;
   };
   const checks = new Map<string, TileCheck>();
   for (const entry of manifest.entries) {
@@ -316,6 +325,8 @@ function detectTiles(): Map<string, TileCheck> {
       usage: usageTile,
       manifest: manifestTile,
       ...(problem === undefined ? {} : { problem }),
+      layout: report.layout,
+      rebuilt: entry.like !== undefined,
     });
   }
   return checks;
@@ -357,11 +368,17 @@ function findStaleExports(tiles: ReadonlyMap<string, TileCheck>): string[] {
         : frame.slicewright?.shape === 'three-vertical'
           ? 'three-vertical'
           : 'nine';
-    const tile = tiles.get(entry.label)?.tile ?? '';
-    const layout = layoutFromInsets(scale9BordersToInsets(frame.scale9Borders, w, h), w, h, {
-      shape,
-      tile: { x: tile.includes('x'), y: tile.includes('y') },
-    });
+    const detection = tiles.get(entry.label);
+    const tile = detection?.tile ?? '';
+    // A committed export must match what the current detection and targets write;
+    // a rebuilt sample can only be regenerated from its own atlas.
+    const layout =
+      detection !== undefined && !detection.rebuilt
+        ? detection.layout
+        : layoutFromInsets(scale9BordersToInsets(frame.scale9Borders, w, h), w, h, {
+            shape,
+            tile: { x: tile.includes('x'), y: tile.includes('y') },
+          });
     const raster = decodePng(readFileSync(join(dirname(atlasPath), atlas.meta.image)));
     const input = { name, imageRef: atlas.meta.image, raster, layout };
     const committed: Array<[string, string, string]> = [['phaser', atlasPath, atlasText]];

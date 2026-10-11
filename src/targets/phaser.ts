@@ -1,7 +1,7 @@
 import type { Finding } from '../inspect.js';
 import { axisTiles, flexibleSegments, layoutShape, type SliceLayout } from '../layout.js';
 import { createSingleFrameAtlas } from '../phaser.js';
-import { exportInsets, fixedAxisNote } from './common.js';
+import { exportInsets, fixedAxisNote, urlFromPath } from './common.js';
 import type { ExportInput, ExportResult, SliceTarget } from './types.js';
 
 export const phaserTarget: SliceTarget = {
@@ -73,7 +73,7 @@ export function exportPhaser({
     usage:
       // Phaser resolves both URLs against its loader path, not the atlas file.
       // Values are serialized as string literals so quotes in names stay valid code.
-      `this.load.atlas(${js(name)}, ${js(loaderPaths?.image ?? imageRef)}, ${js(joinUrl(loaderPaths?.directory ?? '', `${name}.json`))});\n` +
+      `this.load.atlas(${js(name)}, ${js(urlFromPath(loaderPaths?.image ?? imageRef))}, ${js(urlFromPath(joinUrl(loaderPaths?.directory ?? '', `${name}.json`)))});\n` +
       `this.add.nineslice(x, y, ${js(name)}, ${js(name)}, width, height${tileArgs});` +
       // Prose goes in a comment so the snippet stays valid JavaScript.
       (fixedAxisNote(layout) === '' ? '' : `\n//${fixedAxisNote(layout)}`),

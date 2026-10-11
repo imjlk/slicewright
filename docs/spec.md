@@ -255,7 +255,9 @@ are `phaser` and `css`, both verified; other engines are not supported.
 The CSS target writes a class with `border-image-slice` set to the insets plus
 `fill`, matching `border-width` in pixels, and `border-image-repeat` of
 `stretch` or, for a tiled axis, `round` (whole tiles scaled to fit). The usage
-links the stylesheet from the same served path the Phaser usage loads from. `round`
+links the stylesheet from the same served path the Phaser usage loads from.
+URLs the targets emit percent-encode each path component, so a name such as
+`button#blue.png` stays one file; the atlas keeps the plain file path. `round`
 takes the nearest whole number of tiles rather than rounding down, so a tiled
 CSS export carries a `target.tile` warning. A
 three-slice fixes the height and a vertical three-slice fixes the width; any
