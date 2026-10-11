@@ -20,7 +20,9 @@ image was generated with the GPT `image_gen` route of
 hand: `slicewright prompt` keeps decoration in the corners. No target exports a
 multi-region layout yet, so it has no atlas or CSS. The manifest's
 `inspections` list makes the engine check detect it with `--regions multi`
-and compare the layout and finding codes with `crest.layout.json`. Single-region
+and compare the layout and finding codes with `crest.layout.json`. When a
+detection change is intended, a failing check prints the new result as
+`detected`; save that object as `crest.layout.json`. Single-region
 detection on the same image stretches only the span right of the crest and
 warns `insets.large`.
 
@@ -36,5 +38,5 @@ with the current prompt.
 `../tiled/rope.png` is a synthetic panel whose rope edge repeats exactly every
 6 px, so the check also covers a tiled export (`tile.x.auto`).
 
-Render them with `pnpm engine:check`, or serve the repository and open
+Render the exported samples with `pnpm engine:check`, or serve the repository and open
 `examples/phaser/index.html` or `examples/css/index.html`.
