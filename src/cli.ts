@@ -305,6 +305,10 @@ const normalize = define({
     const { input, out } = ctx.values;
     // Validate every option before any file is written.
     const targetIds = targetList(ctx.values.target);
+    const assetName = ctx.values.name ?? basename(out).replace(/\.png$/i, '');
+    if (targetIds.length > 0) {
+      insideDirectory(dirname(out), assetName);
+    }
     const source = readPng(input);
     const result = normalizeRaster(source, {
       inspect: inspectOptions(ctx.values, undefined),
@@ -332,7 +336,7 @@ const normalize = define({
     }
     const exports = targetIds.map((id) =>
       writeExport(id, {
-        name: ctx.values.name ?? basename(out).replace(/\.png$/i, ''),
+        name: assetName,
         outDir: dirname(out),
         imagePath: out,
         imageRef: ctx.values['image-ref'],
@@ -449,6 +453,17 @@ function urlPath(path: string): string {
   return path.split(sep).join('/').replace(/\\/g, '/');
 }
 
+/** `file` joined to `directory`, refusing any path that would leave it. */
+function insideDirectory(directory: string, file: string): string {
+  const path = join(directory, file);
+  const inside = relative(resolve(directory), resolve(path));
+  // A leading ".." component escapes; a name such as "..panel" does not.
+  if (inside === '' || inside === '..' || inside.startsWith(`..${sep}`) || isAbsolute(inside)) {
+    throw new UsageError(`"${file}" would be written outside ${directory}; pick a plain --name.`);
+  }
+  return path;
+}
+
 function targetList(value: string | undefined): string[] {
   if (value === undefined) {
     return [];
@@ -499,15 +514,8 @@ function writeExport(
       directory: urlPath(relative(process.cwd(), resolve(options.outDir))),
     },
   });
-  const outDir = resolve(options.outDir);
   const files = result.files.map((file) => {
-    const path = join(options.outDir, file.path);
-    // A name such as ../config must not write outside the output directory.
-    const inside = relative(outDir, resolve(path));
-    // A leading ".." component escapes; a name such as "..panel" does not.
-    if (inside === '' || inside === '..' || inside.startsWith(`..${sep}`) || isAbsolute(inside)) {
-      throw new UsageError(`"${file.path}" would be written outside ${options.outDir}; pick a plain --name.`);
-    }
+    const path = insideDirectory(options.outDir, file.path);
     writeFileSync(path, file.contents);
     return path;
   });

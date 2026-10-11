@@ -35,10 +35,11 @@ export function exportCss({ name, imageRef, layout, loaderPaths }: ExportInput):
         : [`  min-width: ${left + right}px;`, `  min-height: ${top + bottom}px;`];
   const className = cssIdentifier(name);
   const directory = loaderPaths?.directory ?? '';
-  const stylesheetUrl =
+  const stylesheetUrl = urlFromPath(
     directory === '' || directory === '.'
       ? `${name}.css`
-      : `${directory.replace(/\/+$/, '')}/${name}.css`;
+      : `${directory.replace(/\/+$/, '')}/${name}.css`,
+  );
   const css = [
     // The name is caller data; a */ inside it would end the comment early.
     `/* slicewright: ${name.replaceAll('*/', '* /')}, ${shape} */`,

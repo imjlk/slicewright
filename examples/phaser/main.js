@@ -38,7 +38,8 @@ function sizesFor(entry) {
   const vertical = entry.likeFrame.slicewright?.shape === 'three-vertical';
   const sizes = [
     ['frame', w, h],
-    ['min', vertical ? w : w - b.w, three ? h : h - b.h],
+    // A resizable axis renders at least 1 px, as renderLayout does.
+    ['min', vertical ? w : Math.max(1, w - b.w), three ? h : Math.max(1, h - b.h)],
   ];
   if (!vertical) {
     sizes.push(['wide', Math.round(w * 2.5), h]);

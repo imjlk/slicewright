@@ -84,6 +84,8 @@ export function describesSliceLayouts(): void {
     Array.from(source.data.subarray(pixelOffset(source, 19, 15), pixelOffset(source, 19, 15) + 4)),
   );
   ok(sameRaster(renderLayout(source, three, 20, 90), renderLayout(source, three, 20, 30)));
+  throws(() => renderLayout(source, nine, Number.POSITIVE_INFINITY, 30), RangeError);
+  throws(() => renderLayout(source, nine, 40, 2.5), RangeError);
 }
 
 /**
@@ -302,6 +304,14 @@ export function exportsCssBorderImage(): void {
     loaderPaths: { image: 'ui/panel.png', directory: 'ui' },
   });
   ok(linked.usage.includes('<link rel="stylesheet" href="ui/panel.css">'));
+  const hashed = exportForTarget('css', {
+    name: 'button#blue',
+    imageRef: 'button#blue.png',
+    raster,
+    layout,
+    loaderPaths: { image: 'ui/button#blue.png', directory: 'ui' },
+  });
+  ok(hashed.usage.includes('href="ui/button%23blue.css"'));
 
   const three = layoutFromInsets({ left: 6, right: 6, top: 0, bottom: 0 }, 40, 30, {
     shape: 'three',

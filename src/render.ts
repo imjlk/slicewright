@@ -58,7 +58,7 @@ export function renderSlices(
  * flexible keeps its source length.
  *
  * @evidence docs/spec.md#preview-sheet Keeps fixed segments unscaled, shares the rest among flexible segments, and tiles whole tiles with nearest sampling.
- * @evidenceReview docs/spec.md#preview-sheet #ec2d281 Checked this code against the section line by line and ran rendersSlicesAndPreviewSheets green with pnpm test.
+ * @evidenceReview docs/spec.md#preview-sheet #49443a9 Checked this code against the section line by line and ran rendersSlicesAndPreviewSheets green with pnpm test.
  * @evidence docs/spec.md#slice-layouts Renders any number of fixed, stretched, and tiled segments per axis.
  * @evidenceReview docs/spec.md#slice-layouts #fc52f65 Checked this code against the section line by line and ran describesSliceLayouts green with pnpm test.
  */
@@ -69,6 +69,14 @@ export function renderLayout(
   height: number,
   tileCount: 'floor' | 'round' = 'floor',
 ): Raster {
+  for (const [name, value] of [
+    ['width', width],
+    ['height', height],
+  ] as const) {
+    if (!Number.isInteger(value) || value < 0) {
+      throw new RangeError(`The ${name} to render must be a whole number of pixels, got ${value}.`);
+    }
+  }
   const columns = axisMap(layout.x, width, tileCount);
   const rows = axisMap(layout.y, height, tileCount);
   const out = createRaster(columns.length, rows.length);
@@ -86,7 +94,7 @@ export function renderLayout(
  * side by side over a checkerboard. Axes that cannot resize are not resized.
  *
  * @evidence docs/spec.md#preview-sheet Builds the guides, source, minimum, wide, tall, and doubled cells.
- * @evidenceReview docs/spec.md#preview-sheet #ec2d281 Checked this code against the section line by line and ran rendersSlicesAndPreviewSheets green with pnpm test.
+ * @evidenceReview docs/spec.md#preview-sheet #49443a9 Checked this code against the section line by line and ran rendersSlicesAndPreviewSheets green with pnpm test.
  */
 export function renderPreviewSheet(source: Raster, layout: SliceLayout): PreviewSheet {
   const cap = (value: number): number => Math.min(Math.round(value), maximumCellSize);

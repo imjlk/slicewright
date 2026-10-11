@@ -207,7 +207,7 @@ to their source size. A tiled segment repeats a whole number of tiles, the
 segment length divided by the source length rounded down and at least one, each
 scaled to fill the segment, as Phaser does; the renderer can round to the
 nearest count instead, to compare with CSS `round`. A size below the fixed segments is
-raised to them.
+raised to them; a requested size must be a whole, non-negative number of pixels.
 
 ## Phaser scale9Borders
 
