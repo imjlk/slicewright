@@ -145,12 +145,12 @@ async function checkPhaser(page: Page): Promise<{
     result.report as unknown as RenderedCell[],
     'floor',
   );
+  // --max-mean governs every Phaser comparison; --css-max-mean only the CSS ones.
   const maxMean = Number(values['max-mean']);
-  const cssMaxMean = Number(values['css-max-mean']);
   return {
     ...result,
     rendererComparisons,
-    rendererFailing: rendererComparisons.filter((item) => item.mean > cssMaxMean),
+    rendererFailing: rendererComparisons.filter((item) => item.mean > maxMean),
     sizeMismatches: result.report.filter((item) => item.requested.join() !== item.rendered.join()),
     // A skipped comparison means the manifest no longer pairs what it claims to.
     failing: result.comparisons.filter(
