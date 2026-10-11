@@ -147,6 +147,11 @@ export function rendersSlicesAndPreviewSheets(): void {
     /preview sheet would be/,
   );
   throws(() => renderPreviewSheet(bar, barReport.layout, { maxWidth: 0 }), RangeError);
+  // A layout for another image is refused even when no cell would render it.
+  throws(
+    () => renderPreviewSheet(source, barReport.layout, { cells: ['guides'] }),
+    /layout is 48x12/,
+  );
 }
 
 /**

@@ -130,6 +130,12 @@ export function renderPreviewSheet(
   layout: SliceLayout,
   options: PreviewOptions = {},
 ): PreviewSheet {
+  // Checked here too: a guides-only sheet never reaches renderLayout's check.
+  if (layout.x.length !== source.width || layout.y.length !== source.height) {
+    throw new RangeError(
+      `The layout is ${layout.x.length}x${layout.y.length} but the image is ${source.width}x${source.height}.`,
+    );
+  }
   const zoom = options.zoom ?? 1;
   const maxWidth = options.maxWidth ?? defaultPreviewMaxWidth;
   if (!Number.isInteger(zoom) || zoom < 1 || zoom > maximumZoom) {
