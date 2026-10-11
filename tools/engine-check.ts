@@ -355,7 +355,7 @@ function checkInspections(): InspectionCheck[] {
   };
   // A renamed or misspelled key would otherwise compare nothing and pass.
   const unknownKeys = Object.keys(manifest).filter(
-    (key) => !['entries', 'packs', 'inspections'].includes(key),
+    (key) => !['entries', 'inspections'].includes(key),
   );
   if (unknownKeys.length > 0) {
     usage(`${values.manifest} has unknown keys: ${unknownKeys.join(', ')}.`);
