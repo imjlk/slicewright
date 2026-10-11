@@ -69,24 +69,39 @@ class Check extends Phaser.Scene {
   }
 
   create() {
-    const checker = this.add.graphics();
-    for (let y = 0; y < height; y += 12) {
-      for (let x = 0; x < width; x += 12) {
-        checker.fillStyle((x / 12 + y / 12) % 2 === 0 ? 0x34343e : 0x2a2a32);
-        checker.fillRect(x, y, 12, 12);
-      }
-    }
+    // A solid background, so scripts can composite the expected render over it.
     let y = gap;
     const report = [];
     for (const row of rows) {
       this.add.text(gap, y, row.entry.label, { fontSize: '13px', color: '#e8e8e8' });
       let x = labelWidth;
       for (const [label, w, h] of row.sizes) {
-        const slice = this.add.nineslice(x, y, row.entry.key, row.entry.frameName, w, h).setOrigin(0);
+        // Tile flags are constructor arguments; atlas data cannot carry them.
+        const tile = row.entry.tile ?? '';
+        const slice = this.add
+          .nineslice(
+            x,
+            y,
+            row.entry.key,
+            row.entry.frameName,
+            w,
+            h,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            tile.includes('x'),
+            tile.includes('y'),
+          )
+          .setOrigin(0);
         report.push({
           entry: row.entry.label,
           label,
           at: [x, y],
+          image: new URL(row.entry.imageUrl).pathname,
+          frame: row.entry.frame.frame,
+          borders: row.entry.frame.scale9Borders,
+          tile,
           requested: [w, h],
           rendered: [slice.width, slice.height],
           insets: [slice.leftWidth, slice.rightWidth, slice.topHeight, slice.bottomHeight],

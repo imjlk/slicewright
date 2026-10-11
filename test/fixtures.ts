@@ -112,3 +112,14 @@ export function crestPanel(width: number, height: number): Raster {
   }
   return raster;
 }
+
+/** A panel whose top and bottom borders carry a rope pattern repeating every 6 px. */
+export function ropePanel(width: number, height: number): Raster {
+  const raster = panel(width, height);
+  for (let x = 6; x < width - 6; x += 1) {
+    const color: Color = x % 6 < 3 ? [230, 190, 60, 255] : [120, 80, 20, 255];
+    fillRect(raster, x, 2, 1, 3, color);
+    fillRect(raster, x, height - 5, 1, 3, color);
+  }
+  return raster;
+}

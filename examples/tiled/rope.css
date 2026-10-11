@@ -1,0 +1,11 @@
+/* slicewright: rope, nine */
+.rope {
+  box-sizing: border-box;
+  border-style: solid;
+  border-width: 6px 6px 6px 6px;
+  border-image-source: url("rope.png");
+  border-image-slice: 6 6 6 6 fill;
+  border-image-repeat: round stretch;
+  min-width: 12px;
+  min-height: 12px;
+}

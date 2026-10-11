@@ -21,9 +21,15 @@ export const phaserTarget: SliceTarget = {
  * NineSlice reads, plus the `tileX` / `tileY` constructor flags for tiled axes.
  *
  * @evidence docs/spec.md#phaser-scale9borders Exports the atlas frame and the nineslice call with tiling flags for the Phaser target.
- * @evidenceReview docs/spec.md#phaser-scale9borders #bb888dc Checked this code against the section line by line and ran convertsToPhaserBorders green with pnpm test.
+ * @evidenceReview docs/spec.md#phaser-scale9borders #ae82d95 Checked this code against the section line by line and ran convertsToPhaserBorders green with pnpm test.
  */
-export function exportPhaser({ name, imageRef, raster, layout }: ExportInput): Omit<ExportResult, 'target' | 'findings'> {
+export function exportPhaser({
+  name,
+  imageRef,
+  raster,
+  layout,
+  loaderPaths,
+}: ExportInput): Omit<ExportResult, 'target' | 'findings'> {
   const atlas = createSingleFrameAtlas(
     name,
     imageRef,
@@ -38,8 +44,13 @@ export function exportPhaser({ name, imageRef, raster, layout }: ExportInput): O
   return {
     files: [{ path: `${name}.json`, contents: `${JSON.stringify(atlas, null, 2)}\n` }],
     usage:
-      `this.load.atlas('${name}', '${imageRef}', '${name}.json');\n` +
+      // Phaser resolves both URLs against its loader path, not the atlas file.
+      `this.load.atlas('${name}', '${loaderPaths?.image ?? imageRef}', '${joinUrl(loaderPaths?.directory ?? '', `${name}.json`)}');\n` +
       `this.add.nineslice(x, y, '${name}', '${name}', width, height${tileArgs});` +
       fixedAxisNote(layout),
   };
+}
+
+function joinUrl(directory: string, file: string): string {
+  return directory === '' || directory === '.' ? file : `${directory.replace(/\/+$/, '')}/${file}`;
 }

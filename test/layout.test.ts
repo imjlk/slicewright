@@ -103,6 +103,16 @@ export function detectsVerticalThreeSlices(): void {
   deepStrictEqual(forced.insets, { left: 0, right: 0, top: 6, bottom: 6 });
   strictEqual(forced.ok, true);
 
+  // Loader URLs resolve from the loader base, not from the atlas file.
+  const loaded = exportForTarget('phaser', {
+    name: 'track',
+    imageRef: 'track.png',
+    raster: bar,
+    layout: report.layout,
+    loaderPaths: { image: 'ui/track.png', directory: 'ui' },
+  });
+  ok(loaded.usage.includes("this.load.atlas('track', 'ui/track.png', 'ui/track.json');"));
+
   // The Phaser target's own vertical export passes the atlas check.
   const exported = exportForTarget('phaser', {
     name: 'track',
@@ -153,6 +163,10 @@ export function detectsMultipleRegions(): void {
   strictEqual(bar.mode, 'multi');
   strictEqual(bar.layout.x.segments.filter((segment) => segment.kind === 'stretch').length, 2);
   deepStrictEqual(bar.layout.y.segments, [{ start: 0, end: 12, kind: 'fixed' }]);
+  deepStrictEqual(bar.findings.find((finding) => finding.code === 'regions.multi')?.details, {
+    x: 2,
+    y: 0,
+  });
 
   const plain = inspectRaster(panel(96, 40), { ...defaultInspectOptions, regions: 'multi' });
   strictEqual(plain.mode, 'nine');

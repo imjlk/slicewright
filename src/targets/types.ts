@@ -29,6 +29,12 @@ export interface ExportInput {
   readonly imageRef: string;
   readonly raster: Raster;
   readonly layout: SliceLayout;
+  /**
+   * URLs for loader calls in usage text, relative to the engine's loader base
+   * (for example the page root): the image, and the directory the exported
+   * files are written to. Defaults to `imageRef` and the bare file names.
+   */
+  readonly loaderPaths?: { readonly image: string; readonly directory: string };
 }
 
 export interface ExportFile {

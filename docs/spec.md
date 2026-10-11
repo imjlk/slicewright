@@ -203,7 +203,8 @@ on the axes that can resize. Rendering samples the nearest source pixel. Fixed
 segments keep their size and the flexible segments share the rest in proportion
 to their source size. A tiled segment repeats a whole number of tiles, the
 segment length divided by the source length rounded down and at least one, each
-scaled to fill the segment, as Phaser does. A size below the fixed segments is
+scaled to fill the segment, as Phaser does; the renderer can round to the
+nearest count instead, to compare with CSS `round`. A size below the fixed segments is
 raised to them.
 
 ## Phaser scale9Borders
@@ -213,8 +214,12 @@ Phaser 4 reads a frame's `scale9Borders` as the stretchable center rectangle:
 Phaser treats a frame as a three-slice when `y` is zero and `h` equals the frame
 height. slicewright converts both ways and writes a single-frame JSON Hash atlas,
 untrimmed and unrotated, that `this.load.atlas` accepts. The Phaser target adds
-the `nineslice` call, passing `tileX` and `tileY` for tiled axes, because atlas
-data cannot carry them. Phaser has no vertical three-slice, so it is emulated.
+the `this.load.atlas` and `nineslice` calls, passing `tileX` and `tileY` for
+tiled axes, because atlas data cannot carry them. Phaser resolves the image and
+atlas URLs in `this.load.atlas` against its loader path rather than the atlas
+file, so the call uses paths from where the game is served (the working
+directory, from the CLI) while the atlas keeps the image path relative to
+itself. Phaser has no vertical three-slice, so it is emulated.
 
 ## Targets
 

@@ -52,12 +52,13 @@ export function renderSlices(
  * Renders a layout at a new size, sampling the nearest source pixel. Fixed
  * segments keep their size; flexible segments share the remaining length in
  * proportion to their source size. Tiled segments repeat a whole number of
- * tiles, at least one, each scaled to fill the segment, as Phaser does. A size
+ * tiles, at least one, each scaled to fill the segment: the count rounds down
+ * as Phaser does, or to the nearest whole number to match CSS `round`. A size
  * below the fixed segments is raised to them, and an axis with nothing
  * flexible keeps its source length.
  *
  * @evidence docs/spec.md#preview-sheet Keeps fixed segments unscaled, shares the rest among flexible segments, and tiles whole tiles with nearest sampling.
- * @evidenceReview docs/spec.md#preview-sheet #b10124e Checked this code against the section line by line and ran rendersSlicesAndPreviewSheets green with pnpm test.
+ * @evidenceReview docs/spec.md#preview-sheet #ec2d281 Checked this code against the section line by line and ran rendersSlicesAndPreviewSheets green with pnpm test.
  * @evidence docs/spec.md#slice-layouts Renders any number of fixed, stretched, and tiled segments per axis.
  * @evidenceReview docs/spec.md#slice-layouts #b1ab6bb Checked this code against the section line by line and ran describesSliceLayouts green with pnpm test.
  */
@@ -66,9 +67,10 @@ export function renderLayout(
   layout: SliceLayout,
   width: number,
   height: number,
+  tileCount: 'floor' | 'round' = 'floor',
 ): Raster {
-  const columns = axisMap(layout.x, width);
-  const rows = axisMap(layout.y, height);
+  const columns = axisMap(layout.x, width, tileCount);
+  const rows = axisMap(layout.y, height, tileCount);
   const out = createRaster(columns.length, rows.length);
   rows.forEach((sourceY, y) => {
     columns.forEach((sourceX, x) => {
@@ -84,7 +86,7 @@ export function renderLayout(
  * side by side over a checkerboard. Axes that cannot resize are not resized.
  *
  * @evidence docs/spec.md#preview-sheet Builds the guides, source, minimum, wide, tall, and doubled cells.
- * @evidenceReview docs/spec.md#preview-sheet #b10124e Checked this code against the section line by line and ran rendersSlicesAndPreviewSheets green with pnpm test.
+ * @evidenceReview docs/spec.md#preview-sheet #ec2d281 Checked this code against the section line by line and ran rendersSlicesAndPreviewSheets green with pnpm test.
  */
 export function renderPreviewSheet(source: Raster, layout: SliceLayout): PreviewSheet {
   const cap = (value: number): number => Math.min(Math.round(value), maximumCellSize);
@@ -135,7 +137,7 @@ export function renderPreviewSheet(source: Raster, layout: SliceLayout): Preview
 }
 
 /** For each output line of one axis, the source line it samples. */
-function axisMap(axis: AxisLayout, requested: number): number[] {
+function axisMap(axis: AxisLayout, requested: number, tileCount: 'floor' | 'round'): number[] {
   const flexible = flexibleSegments(axis);
   const fixedLength = axis.segments
     .filter((segment) => segment.kind === 'fixed')
@@ -161,7 +163,10 @@ function axisMap(axis: AxisLayout, requested: number): number[] {
     const boundary = Math.round((extra * shared) / flexibleSource);
     const length = boundary - given;
     given = boundary;
-    const tiles = segment.kind === 'tile' ? Math.max(1, Math.floor(length / sourceLength)) : 1;
+    const count = tileCount === 'round'
+      ? Math.round(length / sourceLength)
+      : Math.floor(length / sourceLength);
+    const tiles = segment.kind === 'tile' ? Math.max(1, count) : 1;
     const tileLength = length / tiles;
     for (let index = 0; index < length; index += 1) {
       const local = (index + 0.5) % tileLength;

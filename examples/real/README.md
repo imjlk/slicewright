@@ -24,5 +24,8 @@ carry no pattern along them. A first baroque frame drawn with that older prompt
 got a rope edge that could neither stretch nor tile; `baroque` is the redraw
 with the current prompt.
 
+`../tiled/rope.png` is a synthetic panel whose rope edge repeats exactly every
+6 px, so the check also covers a tiled export (`tile.x.auto`).
+
 Render them with `pnpm engine:check`, or serve the repository and open
 `examples/phaser/index.html` or `examples/css/index.html`.

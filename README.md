@@ -113,8 +113,9 @@ pnpm engine:check
 
 renders every sample as a Phaser 4 NineSlice and as its exported CSS
 `border-image` in headless Chrome. It checks the sizes and insets Phaser read,
-compares rebuilt textures with their sources, and compares the browser's
-border-image pixels with slicewright's own renderer.
+compares every Phaser and CSS render with slicewright's own renderer, compares
+rebuilt textures with their sources, and checks that the tiling the Phaser
+usage passes matches what detection finds (a tiled rope sample covers it).
 
 ## Development
 

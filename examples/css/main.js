@@ -41,7 +41,7 @@ for (const entry of manifest.entries.filter((item) => item.css !== undefined)) {
     cell.style.width = `${w}px`;
     cell.style.height = `${h}px`;
     document.body.append(cell);
-    report.push({ entry: entry.label, image: new URL(atlas.meta.image, atlasUrl).pathname, size, at: [x, y], rendered: [w, h], borders: frame.scale9Borders, frame: frame.frame });
+    report.push({ entry: entry.label, image: new URL(atlas.meta.image, atlasUrl).pathname, size, at: [x, y], rendered: [w, h], borders: frame.scale9Borders, frame: frame.frame, tile: entry.tile ?? '' });
     x += w + gap;
     rowHeight = Math.max(rowHeight, h);
   }

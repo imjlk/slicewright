@@ -455,6 +455,11 @@ function targetList(value: string | undefined): string[] {
     .split(',')
     .map((id) => id.trim())
     .filter((id) => id.length > 0);
+  if (ids.length === 0) {
+    throw new UsageError(
+      `--target names no target. Known targets: ${Object.keys(sliceTargets).join(', ')}.`,
+    );
+  }
   for (const id of ids) {
     if (findTarget(id) === undefined) {
       throw new UsageError(
@@ -486,9 +491,19 @@ function writeExport(
     imageRef,
     raster: options.raster,
     layout: options.layout,
+    // Loader calls resolve from where the game is served; assume the working directory.
+    loaderPaths: {
+      image: urlPath(relative(process.cwd(), resolve(options.imagePath))),
+      directory: urlPath(relative(process.cwd(), resolve(options.outDir))),
+    },
   });
+  const outDir = resolve(options.outDir);
   const files = result.files.map((file) => {
     const path = join(options.outDir, file.path);
+    // A name such as ../config must not write outside the output directory.
+    if (!resolve(path).startsWith(outDir + sep)) {
+      throw new UsageError(`"${file.path}" would be written outside ${options.outDir}; pick a plain --name.`);
+    }
     writeFileSync(path, file.contents);
     return path;
   });

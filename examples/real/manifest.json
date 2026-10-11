@@ -58,6 +58,12 @@
       "label": "scifi",
       "atlas": "scifi.json",
       "css": "scifi.css"
+    },
+    {
+      "label": "rope (tiled x)",
+      "atlas": "../tiled/rope.json",
+      "css": "../tiled/rope.css",
+      "tile": "x"
     }
   ]
 }

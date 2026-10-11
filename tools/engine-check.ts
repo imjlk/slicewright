@@ -1,15 +1,17 @@
 import { createReadStream, existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { extname, join, normalize, resolve, sep } from 'node:path';
+import { dirname, extname, join, normalize, resolve, sep } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { chromium, type Page } from 'playwright-core';
 
+import { inspectRaster } from '../src/inspect.js';
 import { layoutFromInsets } from '../src/layout.js';
 import { decodePng } from '../src/png.js';
 import { createRaster, pixelOffset, rasterDifference, type Raster } from '../src/raster.js';
 import { renderLayout } from '../src/render.js';
 import { scale9BordersToInsets, type Scale9Borders } from '../src/slices.js';
+import { exportForTarget } from '../src/targets/index.js';
 
 // Renders a manifest in real engines through headless Chrome and prints what
 // they built. Phaser: sizes, the insets NineSlice read, and rebuilt textures
@@ -72,11 +74,20 @@ const browser = await chromium.launch({
 });
 const output: Record<string, unknown> = {};
 let failed = false;
+// The tiling a sample needs comes from slicewright's own detection, never from
+// the manifest, so a wrong flag in the manifest or the printed usage is caught.
+const detectedTile = detectTiles();
+const tileMismatches = [...detectedTile.values()].filter((item) => item.problem !== undefined);
+output['tile'] = { detected: [...detectedTile.values()], mismatches: tileMismatches };
+failed ||= tileMismatches.length > 0;
 try {
   if (engines.includes('phaser')) {
     const result = await checkPhaser(await openPage('phaser'));
     output['phaser'] = result;
-    failed ||= result.sizeMismatches.length > 0 || result.failing.length > 0;
+    failed ||=
+      result.sizeMismatches.length > 0 ||
+      result.failing.length > 0 ||
+      result.rendererFailing.length > 0;
   }
   if (engines.includes('css')) {
     const result = await checkCss(await openPage('css'));
@@ -109,6 +120,8 @@ async function openPage(engine: 'phaser' | 'css'): Promise<Page> {
 async function checkPhaser(page: Page): Promise<{
   report: Array<{ requested: number[]; rendered: number[] }>;
   comparisons: Array<{ mean: number }>;
+  rendererComparisons: CellComparison[];
+  rendererFailing: unknown[];
   sizeMismatches: unknown[];
   failing: unknown[];
 }> {
@@ -122,12 +135,22 @@ async function checkPhaser(page: Page): Promise<{
     };
     return { report: scope.slicewrightReport, comparisons: scope.slicewrightCompare() };
   });
+  const canvas = await page.locator('canvas').screenshot();
   if (values.screenshot !== undefined) {
-    writeFileSync(values.screenshot, await page.locator('canvas').screenshot());
+    writeFileSync(values.screenshot, canvas);
   }
+  // Every NineSlice, tiled ones included, against slicewright's renderer.
+  const rendererComparisons = compareCells(
+    decodePng(canvas),
+    result.report as unknown as RenderedCell[],
+    'floor',
+  );
   const maxMean = Number(values['max-mean']);
+  const cssMaxMean = Number(values['css-max-mean']);
   return {
     ...result,
+    rendererComparisons,
+    rendererFailing: rendererComparisons.filter((item) => item.mean > cssMaxMean),
     sizeMismatches: result.report.filter((item) => item.requested.join() !== item.rendered.join()),
     // A skipped comparison means the manifest no longer pairs what it claims to.
     failing: result.comparisons.filter(
@@ -136,30 +159,57 @@ async function checkPhaser(page: Page): Promise<{
   };
 }
 
-interface CssCell {
+interface RenderedCell {
   readonly entry: string;
   readonly image: string;
-  readonly size: string;
+  readonly label?: string;
+  readonly size?: string;
   readonly at: [number, number];
   readonly rendered: [number, number];
   readonly borders: Scale9Borders;
   readonly frame: { readonly w: number; readonly h: number };
+  /** Tiled axes: '', 'x', 'y', or 'xy'. */
+  readonly tile?: string;
+}
+
+interface CellComparison {
+  readonly entry: string;
+  readonly size: string;
+  readonly rendered: [number, number];
+  readonly mean: number;
+  readonly p99: number;
+  readonly max: number;
 }
 
 async function checkCss(page: Page): Promise<{
-  comparisons: Array<{ entry: string; size: string; mean: number; p99: number; max: number }>;
+  comparisons: CellComparison[];
   failing: unknown[];
 }> {
   await page.waitForFunction(() => 'slicewrightCssReport' in globalThis, undefined, {
     timeout: 30_000,
   });
   const cells = await page.evaluate(
-    () => (globalThis as unknown as { slicewrightCssReport: CssCell[] }).slicewrightCssReport,
+    () => (globalThis as unknown as { slicewrightCssReport: RenderedCell[] }).slicewrightCssReport,
   );
-  const screenshot = decodePng(await page.screenshot({ fullPage: true }));
+  // CSS `round` takes the nearest tile count, so compare with that rule.
+  const comparisons = compareCells(
+    decodePng(await page.screenshot({ fullPage: true })),
+    cells,
+    'round',
+  );
+  const maxMean = Number(values['css-max-mean']);
+  return { comparisons, failing: comparisons.filter((item) => item.mean > maxMean) };
+}
+
+/** Compares each rendered cell in `screenshot` with slicewright's own render of it. */
+function compareCells(
+  screenshot: Raster,
+  cells: readonly RenderedCell[],
+  tileCount: 'floor' | 'round',
+): CellComparison[] {
   const background = [0x1d, 0x1d, 0x24] as const;
   const sources = new Map<string, Raster>();
-  const comparisons = cells.map((cell) => {
+  return cells.map((cell) => {
     const source =
       sources.get(cell.image) ?? decodePng(readFileSync(join(root, cell.image.replace(/^\//, ''))));
     sources.set(cell.image, source);
@@ -170,21 +220,24 @@ async function checkCss(page: Page): Promise<{
         : cell.borders.x === 0 && cell.borders.w === w
           ? 'three-vertical'
           : 'nine';
-    const layout = layoutFromInsets(scale9BordersToInsets(cell.borders, w, h), w, h, { shape });
-    const expected = flatten(renderLayout(source, layout, cell.rendered[0], cell.rendered[1]), background);
+    const detected = detectedTile.get(cell.entry)?.tile ?? '';
+    const tile = { x: detected.includes('x'), y: detected.includes('y') };
+    const layout = layoutFromInsets(scale9BordersToInsets(cell.borders, w, h), w, h, { shape, tile });
+    const expected = flatten(
+      renderLayout(source, layout, cell.rendered[0], cell.rendered[1], tileCount),
+      background,
+    );
     const actual = crop(screenshot, cell.at[0], cell.at[1], cell.rendered[0], cell.rendered[1]);
     const difference = rasterDifference(expected, actual);
     return {
       entry: cell.entry,
-      size: cell.size,
+      size: cell.size ?? cell.label ?? '',
       rendered: cell.rendered,
       mean: Number(difference.mean.toFixed(2)),
       p99: Math.round(difference.p99),
       max: Math.round(difference.max),
     };
   });
-  const maxMean = Number(values['css-max-mean']);
-  return { comparisons, failing: comparisons.filter((item) => item.mean > maxMean) };
 }
 
 function flatten(raster: Raster, color: readonly [number, number, number]): Raster {
@@ -208,4 +261,55 @@ function crop(raster: Raster, x: number, y: number, width: number, height: numbe
     out.data.set(raster.data.subarray(from, from + width * 4), row * width * 4);
   }
   return out;
+}
+
+interface TileCheck {
+  readonly entry: string;
+  /** Tiled axes slicewright detects in the image: '', 'x', 'y', or 'xy'. */
+  readonly tile: string;
+  /** Tiled axes the Phaser target's printed nineslice call passes. */
+  readonly usage: string;
+  readonly manifest: string;
+  readonly problem?: string;
+}
+
+/** Detects each manifest image's tiling and checks the manifest and Phaser usage against it. */
+function detectTiles(): Map<string, TileCheck> {
+  const manifestPath = join(root, values.manifest);
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
+    entries: Array<{ label: string; atlas: string; tile?: string }>;
+  };
+  const checks = new Map<string, TileCheck>();
+  for (const entry of manifest.entries) {
+    const atlasPath = join(dirname(manifestPath), entry.atlas);
+    const atlas = JSON.parse(readFileSync(atlasPath, 'utf8')) as { meta: { image: string } };
+    const raster = decodePng(readFileSync(join(dirname(atlasPath), atlas.meta.image)));
+    const report = inspectRaster(raster);
+    const axes = (flags: { x: boolean; y: boolean }): string =>
+      `${flags.x ? 'x' : ''}${flags.y ? 'y' : ''}`;
+    const tile = axes(report.tile);
+    const usage = exportForTarget('phaser', {
+      name: entry.label,
+      imageRef: atlas.meta.image,
+      raster,
+      layout: report.layout,
+    }).usage;
+    const flags = /, (true|false), (true|false)\);/.exec(usage);
+    const usageTile = axes({ x: flags?.[1] === 'true', y: flags?.[2] === 'true' });
+    const manifestTile = entry.tile ?? '';
+    const problem =
+      usageTile !== tile
+        ? `the Phaser usage tiles "${usageTile}" but the image needs "${tile}"`
+        : manifestTile !== tile
+          ? `the manifest tiles "${manifestTile}" but the image needs "${tile}"`
+          : undefined;
+    checks.set(entry.label, {
+      entry: entry.label,
+      tile,
+      usage: usageTile,
+      manifest: manifestTile,
+      ...(problem === undefined ? {} : { problem }),
+    });
+  }
+  return checks;
 }

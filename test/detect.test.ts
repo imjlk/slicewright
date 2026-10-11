@@ -16,6 +16,7 @@ import {
   fillRect,
   horizontalGradient,
   panel,
+  ropePanel,
   setPixel,
   shadedBar,
   type Color,
@@ -255,14 +256,7 @@ export function toleratesGeneratedNoise(): void {
  * @evidenceReview docs/spec.md#repeating-edges #795d113 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function tilesRepeatingEdges(): void {
-  // A panel whose top and bottom borders carry a 6 px rope pattern.
-  const rope = panel(96, 40);
-  for (let x = 6; x < 90; x += 1) {
-    const color: Color = x % 6 < 3 ? [230, 190, 60, 255] : [120, 80, 20, 255];
-    fillRect(rope, x, 2, 1, 3, color);
-    fillRect(rope, x, 35, 1, 3, color);
-  }
-  const report = inspectRaster(rope);
+  const report = inspectRaster(ropePanel(96, 40));
   const finding = report.findings.find((item) => item.code === 'tile.x.auto');
   strictEqual(finding?.details?.['period'], 6);
   strictEqual(report.tile.x, true);

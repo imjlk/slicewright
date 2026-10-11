@@ -393,11 +393,15 @@ export function multiRegionLayout(
   };
   const [left, right] = envelope(layout.x);
   const [top, bottom] = envelope(layout.y);
+  const regions = {
+    x: flexibleSegments(layout.x).length,
+    y: flexibleSegments(layout.y).length,
+  };
   findings.push({
     code: 'regions.multi',
     severity: 'info',
-    message: `The layout keeps ${Math.max(runsX.length, 1)} horizontal and ${Math.max(runsY.length, 1)} vertical stretch regions; no current target can export more than one region per axis.`,
-    details: { x: runsX.length, y: runsY.length },
+    message: `The layout keeps ${regions.x} horizontal and ${regions.y} vertical stretch regions; no current target can export more than one region per axis.`,
+    details: regions,
   });
   return { insets: { left, right, top, bottom }, mode: 'multi', tile: base.tile, layout };
 }
