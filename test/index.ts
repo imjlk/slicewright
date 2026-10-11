@@ -4,3 +4,4 @@ import './prepare.test.js';
 import './layout.test.js';
 import './padding.test.js';
 import './pack.test.js';
+import './argv.test.js';

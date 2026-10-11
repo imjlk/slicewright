@@ -352,6 +352,15 @@ class at all, no stylesheet is written. Packing refuses to write over an input
 atlas, its image, or the stylesheet beside it, comparing existing files by their
 real path, and refuses an image path that is also its own atlas or stylesheet.
 
+## Command-line arguments
+
+A number option takes a negative value written either as `--tolerance=-1` or
+as `--tolerance -1`. The argument parser would read a separate `-1` as a short
+option and leave the flag without a value, so a negative number that follows
+a flag taking a number is joined to that flag first; the command then
+validates the value like any other. Other flags and everything after `--` are
+passed through unchanged.
+
 ## Generation prompts
 
 A prompt plan turns a UI kind (button, panel, dialog, bar, bar fill, tooltip,
