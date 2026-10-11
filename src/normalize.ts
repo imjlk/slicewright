@@ -150,6 +150,7 @@ export function normalizeRaster(
       layout: layoutFromInsets(report.insets, width, height, {
         shape: report.mode === 'multi' ? 'nine' : report.mode,
         tile: report.tile,
+        ...(report.layout.content === undefined ? {} : { content: report.layout.content }),
       }),
       minSize: minimumLayoutSize(
         layoutFromInsets(report.insets, width, height, {

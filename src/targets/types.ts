@@ -1,7 +1,6 @@
 import type { Finding } from '../inspect.js';
 import type { LayoutShape, SliceLayout } from '../layout.js';
 import type { Raster } from '../raster.js';
-import type { SliceInsets } from '../slices.js';
 
 /** What a target can represent, declared once so every gap is reported the same way. */
 export interface TargetCapabilities {
@@ -36,8 +35,6 @@ export interface ExportInput {
    * files are written to. Defaults to `imageRef` and the bare file names.
    */
   readonly loaderPaths?: { readonly image: string; readonly directory: string };
-  /** Where content sits inside the frame, measured from each edge in source pixels. */
-  readonly contentPadding?: SliceInsets;
 }
 
 export interface ExportFile {

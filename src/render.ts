@@ -103,11 +103,7 @@ export function renderLayout(
  * @evidence docs/spec.md#preview-sheet Builds the guides, source, minimum, wide, tall, and doubled cells.
  * @evidenceReview docs/spec.md#preview-sheet #49443a9 Checked this code against the section line by line and ran rendersSlicesAndPreviewSheets green with pnpm test.
  */
-export function renderPreviewSheet(
-  source: Raster,
-  layout: SliceLayout,
-  contentPadding?: SliceInsets | null,
-): PreviewSheet {
+export function renderPreviewSheet(source: Raster, layout: SliceLayout): PreviewSheet {
   const cap = (value: number): number => Math.min(Math.round(value), maximumCellSize);
   const minimum = minimumLayoutSize(layout);
   const resizesX = flexibleSegments(layout.x).length > 0;
@@ -133,7 +129,7 @@ export function renderPreviewSheet(
     label,
     raster:
       label === 'guides'
-        ? outlineContent(tintSegments(source, layout), contentPadding)
+        ? outlineContent(tintSegments(source, layout), layout.content)
         : renderLayout(source, layout, width, height),
   }));
 

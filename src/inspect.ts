@@ -14,6 +14,7 @@ import {
 } from './detect.js';
 import {
   axisFromSpans,
+  contentLimits,
   flexibleSegments,
   layoutFromInsets,
   minimumLayoutSize,
@@ -150,7 +151,9 @@ export function inspectRaster(
     }
   }
 
-  const contentPadding = resolveContentPadding(raster, bounds, options, matching, findings);
+  const contentPadding = resolveContentPadding(raster, bounds, options, matching, layout, findings);
+  const finalLayout: SliceLayout =
+    contentPadding === null ? layout : { ...layout, content: contentPadding };
 
   return {
     ok: !findings.some((finding) => finding.severity === 'error'),
@@ -160,7 +163,7 @@ export function inspectRaster(
     insetsSource: options.insets === undefined ? 'detected' : 'given',
     insets,
     scale9Borders: insetsToScale9Borders(insets, raster.width, raster.height),
-    layout,
+    layout: finalLayout,
     contentPadding,
     contentPaddingSource: options.contentPadding === undefined ? 'detected' : 'given',
     minSize: minimumLayoutSize(layout),
@@ -222,32 +225,60 @@ export function noiseAdjusted(
 
 /**
  * Given content padding is validated; otherwise it is detected from the
- * content, using each axis's matching tolerance.
+ * content and clamped to the fixed segments at each edge of a resizable axis,
+ * so it never changes when the art resizes.
  *
- * @evidence docs/spec.md#content-padding Validates given padding as an error finding and detects it otherwise.
- * @evidenceReview docs/spec.md#content-padding #80d013d Checked this code against the section line by line and ran detectsContentPadding green with pnpm test.
+ * @evidence docs/spec.md#content-padding Validates given padding, detects it otherwise, and keeps it within the fixed segments at each edge.
+ * @evidenceReview docs/spec.md#content-padding #d8f1459 Checked this code against the section line by line and ran detectsContentPadding green with pnpm test.
  */
 export function resolveContentPadding(
   raster: Raster,
   bounds: Rect | undefined,
   options: InspectOptions,
   matching: AxisMatching,
+  layout: SliceLayout,
   findings: Finding[],
 ): SliceInsets | null {
+  const limits = contentLimits(layout);
+  const sides = ['left', 'right', 'top', 'bottom'] as const;
   if (options.contentPadding !== undefined) {
-    const problem = paddingProblem(options.contentPadding, raster.width, raster.height);
+    const given = options.contentPadding;
+    const problem =
+      paddingProblem(given, raster.width, raster.height) ??
+      sides
+        .filter((side) => given[side] > limits[side])
+        .map(
+          (side) =>
+            `${side} padding ${given[side]} reaches past the fixed ${limits[side]} px at that edge, where it would scale with the art.`,
+        )[0];
     if (problem !== undefined) {
       findings.push({ code: 'padding.invalid', severity: 'error', message: problem });
     }
-    return options.contentPadding;
+    return given;
   }
   if (bounds === undefined) {
     return null;
   }
-  return detectContentPadding(raster, bounds, {
+  const detected = detectContentPadding(raster, bounds, {
     x: matching.x.tolerance,
     y: matching.y.tolerance,
   });
+  const clamped = {
+    left: Math.min(detected.left, limits.left),
+    right: Math.min(detected.right, limits.right),
+    top: Math.min(detected.top, limits.top),
+    bottom: Math.min(detected.bottom, limits.bottom),
+  };
+  if (sides.some((side) => clamped[side] !== detected[side])) {
+    findings.push({
+      code: 'padding.clamped',
+      severity: 'info',
+      message:
+        "The frame's inner edge lies inside a stretch span on some side, so the content padding stops at the fixed edge there; content may overlap that part of the frame.",
+      details: { detected, clamped },
+    });
+  }
+  return clamped;
 }
 
 export interface Layout {

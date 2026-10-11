@@ -211,16 +211,21 @@ five sample lines at 40% to 60% of the content walk outward from its center,
 each stopping at the first step between neighboring pixels larger than 16 or
 twice the axis's matching tolerance, and each side takes the median stop. A
 smooth fill or gradient never stops a walk; the frame's inner edge does. A walk
-that reaches the image edge gives zero padding on that side. Given padding must
-be whole, non-negative, and leave a content area at least one pixel wide, or it
-is a `padding.invalid` error. Padding up to the inset on a side stays fixed when
-the art resizes; beyond it, it reaches into a stretch span and scales with it.
+that reaches the image edge gives zero padding on that side.
+
+Padding is part of the layout, so it travels with it through every transform
+and target. On an axis that resizes it stays within the fixed segments at each
+edge, so it never changes with size: detected padding that would reach into a
+stretch span is clamped to the fixed edge with a `padding.clamped` note, and
+given padding past the fixed edge is a `padding.invalid` error, as is padding
+that is not whole and non-negative or leaves no content area at least one pixel
+wide. A target refuses a layout whose padding does not fit the image.
 
 The Phaser target records it in the frame as `"slicewright": { "contentPadding":
 … }`, which Phaser keeps in `frame.customData`, and its usage names that path.
 The CSS target sets `border-width` to the padding, which sizes the content box,
 and `border-image-width` to the insets, so the art still draws at its slices;
-the minimum size holds both. The atlas check refuses padding that does not fit
+the minimum size on every resizable axis holds both. The atlas check refuses padding that does not fit
 the frame (`atlas.padding-invalid`). The preview outlines the content box on the
 guides cell.
 

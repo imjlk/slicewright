@@ -27,18 +27,23 @@ export function exportCss({
   imageRef,
   layout,
   loaderPaths,
-  contentPadding,
 }: ExportInput): Omit<ExportResult, 'target' | 'findings'> {
   const insets = exportInsets(layout);
   const { top, right, bottom, left } = insets;
-  const padding = contentPadding ?? insets;
+  const padding = layout.content ?? insets;
   const shape = layoutShape(layout);
   const repeat = (axis: AxisLayout): string => (axisTiles(axis) ? 'round' : 'stretch');
   const size =
     shape === 'three'
-      ? [`  height: ${layout.y.length}px;`, `  min-width: ${left + right}px;`]
+      ? [
+          `  height: ${layout.y.length}px;`,
+          `  min-width: ${Math.max(left + right, padding.left + padding.right)}px;`,
+        ]
       : shape === 'three-vertical'
-        ? [`  width: ${layout.x.length}px;`, `  min-height: ${top + bottom}px;`]
+        ? [
+            `  width: ${layout.x.length}px;`,
+            `  min-height: ${Math.max(top + bottom, padding.top + padding.bottom)}px;`,
+          ]
         : [
             `  min-width: ${Math.max(left + right, padding.left + padding.right)}px;`,
             `  min-height: ${Math.max(top + bottom, padding.top + padding.bottom)}px;`,

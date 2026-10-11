@@ -1,4 +1,4 @@
-import { deepStrictEqual, ok, strictEqual } from 'node:assert/strict';
+import { deepStrictEqual, ok, strictEqual, throws } from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { defaultInspectOptions, inspectRaster } from '../src/inspect.js';
@@ -14,7 +14,7 @@ function text(contents: string | Uint8Array | undefined): string {
 
 /**
  * @evidence docs/spec.md#content-padding Detects padding on flat, shaded, empty-centered, and borderless art, validates given padding, exports it to Phaser and CSS, checks it in atlases, and outlines it in the preview.
- * @evidenceReview docs/spec.md#content-padding #80d013d Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#content-padding #d8f1459 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function detectsContentPadding(): void {
   const flat = inspectRaster(panel(40, 30));
@@ -44,6 +44,35 @@ export function detectsContentPadding(): void {
   });
   strictEqual(given.contentPaddingSource, 'given');
   deepStrictEqual(given.contentPadding, { left: 3, right: 3, top: 4, bottom: 4 });
+  // Given padding past the fixed edge would scale with the art, so it is refused.
+  const pastInset = inspectRaster(panel(40, 30), {
+    ...defaultInspectOptions,
+    contentPadding: { left: 9, right: 3, top: 4, bottom: 4 },
+  });
+  ok(pastInset.findings.some((finding) => finding.code === 'padding.invalid'));
+
+  // A detected inner edge inside a stretch span is clamped to the fixed edge.
+  const deep = panel(40, 30);
+  fillRect(deep, 6, 6, 4, 18, [200, 160, 90, 255]);
+  const clamped = inspectRaster(deep, {
+    ...defaultInspectOptions,
+    insets: { left: 6, right: 6, top: 6, bottom: 6 },
+  });
+  strictEqual(clamped.contentPadding?.left, 6);
+  ok(clamped.findings.some((finding) => finding.code === 'padding.clamped'));
+
+  // A target refuses padding that does not fit the image, like a layout of another size.
+  throws(
+    () =>
+      exportForTarget('css', {
+        name: 'panel',
+        imageRef: 'panel.png',
+        raster: panel(40, 30),
+        layout: { ...flat.layout, content: { left: 30, right: 30, top: 4, bottom: 4 } },
+      }),
+    RangeError,
+  );
+
   const invalid = inspectRaster(panel(40, 30), {
     ...defaultInspectOptions,
     contentPadding: { left: 20, right: 20, top: 4, bottom: 4 },
@@ -54,12 +83,14 @@ export function detectsContentPadding(): void {
   // Phaser keeps the padding in the frame and the usage names where to read it.
   const raster = panel(40, 30);
   const padding = { left: 3, right: 3, top: 4, bottom: 4 };
+  // Padding travels in the layout, so every target and transform sees the same value.
+  const layout = given.layout;
+  deepStrictEqual(layout.content, padding);
   const phaser = exportForTarget('phaser', {
     name: 'panel',
     imageRef: 'panel.png',
     raster,
-    layout: flat.layout,
-    contentPadding: padding,
+    layout,
   });
   const atlas = JSON.parse(text(phaser.files[0]?.contents)) as {
     frames: Record<string, { slicewright?: { contentPadding?: unknown } }>;
@@ -74,8 +105,7 @@ export function detectsContentPadding(): void {
       name: 'panel',
       imageRef: 'panel.png',
       raster,
-      layout: flat.layout,
-      contentPadding: padding,
+      layout,
     }).files[0]?.contents,
   );
   ok(css.includes('border-width: 4px 3px 4px 3px;'));
@@ -93,7 +123,7 @@ export function detectsContentPadding(): void {
   ok(brokenReport.frames[0]?.findings.some((finding) => finding.code === 'atlas.padding-invalid'));
 
   // The guides cell outlines the content box.
-  const sheet = renderPreviewSheet(raster, flat.layout, padding);
+  const sheet = renderPreviewSheet(raster, layout);
   const guides = sheet.cells[0];
   const at = pixelOffset(sheet.raster, (guides?.x ?? 0) + 3, (guides?.y ?? 0) + 4);
   deepStrictEqual(Array.from(sheet.raster.data.subarray(at, at + 4)), [0, 220, 255, 255]);

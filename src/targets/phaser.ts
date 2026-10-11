@@ -55,7 +55,6 @@ export function exportPhaser({
   raster,
   layout,
   loaderPaths,
-  contentPadding,
 }: ExportInput): Omit<ExportResult, 'target' | 'findings'> {
   const atlas = createSingleFrameAtlas(
     name,
@@ -65,7 +64,7 @@ export function exportPhaser({
     exportInsets(layout),
     {
       ...(layoutShape(layout) === 'three-vertical' ? { shape: 'three-vertical' as const } : {}),
-      ...(contentPadding === undefined ? {} : { contentPadding }),
+      ...(layout.content === undefined ? {} : { contentPadding: layout.content }),
     },
   );
   const tileX = axisTiles(layout.x);
@@ -81,7 +80,7 @@ export function exportPhaser({
       `this.add.nineslice(x, y, ${js(name)}, ${js(name)}, width, height${tileArgs});` +
       // Prose goes in a comment so the snippet stays valid JavaScript.
       (fixedAxisNote(layout) === '' ? '' : `\n//${fixedAxisNote(layout)}`) +
-      (contentPadding === undefined
+      (layout.content === undefined
         ? ''
         : `\n// Content padding (left, right, top, bottom): this.textures.getFrame(${js(name)}, ${js(name)}).customData.slicewright.contentPadding`),
   };

@@ -287,7 +287,6 @@ interface TileCheck {
   readonly layout: SliceLayout;
   /** A rebuilt (`like`) sample, whose layout only its atlas records. */
   readonly rebuilt: boolean;
-  readonly contentPadding: SliceInsets | null;
 }
 
 /** Detects each manifest image's tiling and checks the manifest and Phaser usage against it. */
@@ -328,7 +327,6 @@ function detectTiles(): Map<string, TileCheck> {
       ...(problem === undefined ? {} : { problem }),
       layout: report.layout,
       rebuilt: entry.like !== undefined,
-      contentPadding: report.contentPadding,
     });
   }
   return checks;
@@ -382,17 +380,13 @@ function findStaleExports(tiles: ReadonlyMap<string, TileCheck>): string[] {
             tile: { x: tile.includes('x'), y: tile.includes('y') },
           });
     const raster = decodePng(readFileSync(join(dirname(atlasPath), atlas.meta.image)));
-    const contentPadding =
+    // A rebuilt sample's padding, like its layout, is only recorded in its atlas.
+    const padding = frame.slicewright?.contentPadding;
+    const exportLayout =
       detection !== undefined && !detection.rebuilt
-        ? detection.contentPadding
-        : (frame.slicewright?.contentPadding ?? null);
-    const input = {
-      name,
-      imageRef: atlas.meta.image,
-      raster,
-      layout,
-      ...(contentPadding === null ? {} : { contentPadding }),
-    };
+        ? layout
+        : { ...layout, ...(padding === undefined ? {} : { content: padding }) };
+    const input = { name, imageRef: atlas.meta.image, raster, layout: exportLayout };
     const committed: Array<[string, string, string]> = [['phaser', atlasPath, atlasText]];
     if (entry.css !== undefined) {
       const cssPath = join(dirname(manifestPath), entry.css);

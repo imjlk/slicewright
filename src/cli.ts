@@ -151,7 +151,7 @@ const preview = define({
     const raster = readPng(ctx.values.input);
     const settings = inspectOptions(ctx.values, raster);
     const report = inspectRaster(raster, settings);
-    const sheet = renderPreviewSheet(raster, report.layout, report.contentPadding);
+    const sheet = renderPreviewSheet(raster, report.layout);
     writeFileSync(ctx.values.out, encodePng(sheet.raster));
     print({
       image: ctx.values.input,
@@ -186,7 +186,6 @@ const frame = define({
       atlasPath: out,
       raster,
       layout: report.layout,
-      contentPadding: report.contentPadding,
     });
     print({
       image: input,
@@ -335,7 +334,6 @@ const normalize = define({
         atlasPath: ctx.values.atlas,
         raster: result.raster,
         layout: result.report.layout,
-        contentPadding: result.report.contentPadding,
       });
       atlasOk = phaser.ok;
       atlasOut = phaser.ok ? ctx.values.atlas : undefined;
@@ -349,7 +347,6 @@ const normalize = define({
         imageRef: ctx.values['image-ref'],
         raster: result.raster,
         layout: result.report.layout,
-        contentPadding: result.report.contentPadding,
       }),
     );
     print({
@@ -410,7 +407,6 @@ const exportCommand = define({
         imageRef: ctx.values['image-ref'],
         raster,
         layout: report.layout,
-        contentPadding: report.contentPadding,
       }),
     );
     print({ image: input, ...summary(report), exports });
@@ -430,7 +426,6 @@ function phaserAtlas(options: {
   readonly atlasPath: string | undefined;
   readonly raster: Raster;
   readonly layout: SliceLayout;
-  readonly contentPadding: SliceInsets | null;
 }): { ok: boolean; atlas: unknown; findings: readonly Finding[] } {
   const imageRef =
     options.imageRef ??
@@ -442,7 +437,6 @@ function phaserAtlas(options: {
     imageRef,
     raster: options.raster,
     layout: options.layout,
-    ...(options.contentPadding === null ? {} : { contentPadding: options.contentPadding }),
   });
   const ok = !result.findings.some((finding) => finding.severity === 'error');
   const contents = result.files[0]?.contents;
@@ -515,7 +509,6 @@ function writeExport(
     readonly imageRef?: string | undefined;
     readonly raster: Raster;
     readonly layout: SliceLayout;
-    readonly contentPadding: SliceInsets | null;
   },
 ): { target: string; ok: boolean; files: string[]; usage: string; findings: readonly Finding[] } {
   mkdirSync(options.outDir, { recursive: true });
@@ -528,7 +521,6 @@ function writeExport(
     imageRef,
     raster: options.raster,
     layout: options.layout,
-    ...(options.contentPadding === null ? {} : { contentPadding: options.contentPadding }),
     // Loader calls resolve from where the game is served; assume the working directory.
     loaderPaths: {
       image: urlPath(relative(process.cwd(), resolve(options.imagePath))),

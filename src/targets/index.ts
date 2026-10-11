@@ -1,4 +1,5 @@
 import type { Finding } from '../inspect.js';
+import { paddingProblem } from '../padding.js';
 import { capabilityFindings } from './common.js';
 import { cssTarget } from './css.js';
 import { phaserTarget } from './phaser.js';
@@ -41,6 +42,13 @@ export function exportForTarget(id: string, input: ExportInput): ExportResult {
     throw new RangeError(
       `The layout is ${input.layout.x.length}x${input.layout.y.length} but the image is ${input.raster.width}x${input.raster.height}.`,
     );
+  }
+  const contentProblem =
+    input.layout.content === undefined
+      ? undefined
+      : paddingProblem(input.layout.content, input.raster.width, input.raster.height);
+  if (contentProblem !== undefined) {
+    throw new RangeError(contentProblem);
   }
   const findings: Finding[] = capabilityFindings(target, input.layout);
   if (findings.some((finding) => finding.severity === 'error')) {

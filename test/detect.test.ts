@@ -184,7 +184,11 @@ export function checksTilingSeams(): void {
     insets: { left: 4, right: 4, top: 0, bottom: 0 },
   });
   strictEqual(seamless.ok, true);
-  deepStrictEqual(codes(seamless), []);
+  // Stripes have no frame, so only content-padding notes may appear.
+  deepStrictEqual(
+    codes(seamless).filter((code) => !code.startsWith('padding.')),
+    [],
+  );
 
   const seam = inspectRaster(striped, {
     ...tiled,
