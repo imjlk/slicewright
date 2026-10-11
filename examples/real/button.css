@@ -2,9 +2,10 @@
 .button {
   box-sizing: border-box;
   border-style: solid;
-  border-width: 20px 25px 20px 25px;
+  border-width: 8px 4px 9px 4px;
   border-image-source: url("button.png");
   border-image-slice: 20 25 20 25 fill;
+  border-image-width: 20px 25px 20px 25px;
   border-image-repeat: stretch stretch;
   min-width: 50px;
   min-height: 40px;

@@ -10,7 +10,7 @@ import { layoutFromInsets, type SliceLayout } from '../src/layout.js';
 import { decodePng } from '../src/png.js';
 import { createRaster, pixelOffset, rasterDifference, type Raster } from '../src/raster.js';
 import { renderLayout } from '../src/render.js';
-import { scale9BordersToInsets, type Scale9Borders } from '../src/slices.js';
+import { scale9BordersToInsets, type Scale9Borders, type SliceInsets } from '../src/slices.js';
 import { exportForTarget } from '../src/targets/index.js';
 
 // Renders a manifest in real engines through headless Chrome and prints what
@@ -351,7 +351,7 @@ function findStaleExports(tiles: ReadonlyMap<string, TileCheck>): string[] {
         {
           frame: { w: number; h: number };
           scale9Borders: Scale9Borders;
-          slicewright?: { shape?: string };
+          slicewright?: { shape?: string; contentPadding?: SliceInsets };
         }
       >;
       meta: { image: string };
@@ -380,7 +380,13 @@ function findStaleExports(tiles: ReadonlyMap<string, TileCheck>): string[] {
             tile: { x: tile.includes('x'), y: tile.includes('y') },
           });
     const raster = decodePng(readFileSync(join(dirname(atlasPath), atlas.meta.image)));
-    const input = { name, imageRef: atlas.meta.image, raster, layout };
+    // A rebuilt sample's padding, like its layout, is only recorded in its atlas.
+    const padding = frame.slicewright?.contentPadding;
+    const exportLayout =
+      detection !== undefined && !detection.rebuilt
+        ? layout
+        : { ...layout, ...(padding === undefined ? {} : { content: padding }) };
+    const input = { name, imageRef: atlas.meta.image, raster, layout: exportLayout };
     const committed: Array<[string, string, string]> = [['phaser', atlasPath, atlasText]];
     if (entry.css !== undefined) {
       const cssPath = join(dirname(manifestPath), entry.css);

@@ -21,7 +21,9 @@ store one. Corners keep their size, the top and bottom edges stretch
 horizontally, the left and right edges stretch vertically, and the center
 stretches both ways. The stretchable span on each axis must be at least one
 pixel wide, so `left + right` must be smaller than the width and `top + bottom`
-smaller than the height.
+smaller than the height. When the fixed segments take more than half of an
+axis that resizes, an `insets.large` warning says how little stretches and how
+far the art can shrink.
 
 ## Slice layouts
 
@@ -201,6 +203,36 @@ lines into their neighbors over about the stretched span divided by twice the
 keep length. When inspection reports an error, it returns the resized image
 without rebuilding.
 
+## Content padding
+
+Content padding is where content such as text sits inside the frame: four sizes
+in pixels measured from each edge, separate from the slice insets. An ornate
+frame's corners can reach far past its border, so the insets can be much larger
+than the room content needs. Unless the caller gives it, padding is detected:
+five sample lines at 40% to 60% of the content walk outward from its center,
+each stopping at the first step between neighboring pixels larger than 16 or
+twice the axis's matching tolerance, and each side takes the median stop. A
+smooth fill or gradient never stops a walk; the frame's inner edge does. A walk
+that reaches the image edge gives zero padding on that side.
+
+Padding is part of the layout, so it travels with it through every transform
+and target. On an axis that resizes it stays within the fixed segments at each
+edge, so it never changes with size: detected padding that would reach into a
+stretch span is clamped to the fixed edge with a `padding.clamped` note, and
+given padding past the fixed edge is a `padding.invalid` error, as is padding
+that is not whole and non-negative or leaves no content area at least one pixel
+wide. Rejected padding is reported but kept out of the layout. A target refuses a layout whose padding does not fit the image or reaches
+past the fixed segments at an edge.
+
+The Phaser target records it in the frame as `"slicewright": { "contentPadding":
+… }`, which Phaser keeps in `frame.customData`, and its usage names that path.
+The CSS target sets `border-width` to the padding, which sizes the content box,
+and `border-image-width` to the insets, so the art still draws at its slices;
+the minimum size on every resizable axis holds both. The atlas check refuses padding that does not fit
+the frame or reaches past the fixed segments its `scale9Borders` leave
+(`atlas.padding-invalid`). The preview outlines the content box on the
+guides cell.
+
 ## Preview sheet
 
 A preview sheet renders the layout at several sizes on one PNG over a
@@ -291,8 +323,8 @@ still render it as a nine-slice.
 A prompt plan turns a UI kind (button, panel, dialog, bar, tooltip, frame), a
 style, and a background choice into a generation prompt. The prompt asks for a
 flat, front-facing element that fills the canvas, decoration only in the
-corners (the end caps for a bar), edges that are plain bands with no pattern
-running along them (a rope or vine edge can neither stretch nor tile cleanly
+corners (the end caps for a bar), edges that are plain bands with no pattern,
+grain, or texture running along them (a rope or vine edge can neither stretch nor tile cleanly
 when a model draws it), a plain center, no text or icons, and the requested
 background. Bars are planned as three-slices. The plan lists what to avoid and
 the follow-up steps: remove the background, inspect, and preview.

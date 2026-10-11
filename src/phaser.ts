@@ -1,6 +1,8 @@
 import typia from 'typia';
 
 import { inspectRaster, type Finding, type InspectOptions, type InspectReport } from './inspect.js';
+import { contentLimits, layoutFromInsets } from './layout.js';
+import { paddingProblem } from './padding.js';
 import { cropRaster, type Raster } from './raster.js';
 import {
   insetsToScale9Borders,
@@ -28,7 +30,11 @@ export interface PhaserAtlasFrame {
    * `shape: 'three-vertical'` marks zero side insets as a fixed width rather
    * than a full-width stretch span, which `scale9Borders` alone cannot say.
    */
-  readonly slicewright?: { readonly shape?: 'three-vertical' };
+  readonly slicewright?: {
+    readonly shape?: 'three-vertical';
+    /** Where content sits inside the frame, in frame pixels from each edge. */
+    readonly contentPadding?: SliceInsets;
+  };
 }
 
 export interface PhaserAtlasMeta {
@@ -78,9 +84,13 @@ export function createSingleFrameAtlas(
   width: number,
   height: number,
   insets: SliceInsets,
-  shape?: 'three-vertical',
+  extra: { readonly shape?: 'three-vertical'; readonly contentPadding?: SliceInsets } = {},
 ): PhaserJsonHashAtlas {
   const rect = { x: 0, y: 0, w: width, h: height };
+  const data = {
+    ...(extra.shape === undefined ? {} : { shape: extra.shape }),
+    ...(extra.contentPadding === undefined ? {} : { contentPadding: extra.contentPadding }),
+  };
   return {
     frames: {
       [name]: {
@@ -90,7 +100,7 @@ export function createSingleFrameAtlas(
         spriteSourceSize: rect,
         sourceSize: { w: width, h: height },
         scale9Borders: insetsToScale9Borders(insets, width, height),
-        ...(shape === undefined ? {} : { slicewright: { shape } }),
+        ...(Object.keys(data).length === 0 ? {} : { slicewright: data }),
       },
     },
     meta: { image, size: { w: width, h: height }, scale: '1' },
@@ -205,6 +215,32 @@ function inspectFrame(
     return { name, ok: false, findings };
   }
 
+  const padding = frame.slicewright?.contentPadding;
+  // Padding must also stay within the fixed segments that scale9Borders leaves.
+  const fixedEdges = contentLimits(
+    layoutFromInsets(scale9BordersToInsets(borders, w, h), w, h, {
+      shape:
+        borders.y === 0 && borders.h === h
+          ? 'three'
+          : frame.slicewright?.shape === 'three-vertical'
+            ? 'three-vertical'
+            : 'nine',
+    }),
+  );
+  const paddingIssue =
+    padding === undefined
+      ? undefined
+      : (paddingProblem(padding, w, h) ??
+        (['left', 'right', 'top', 'bottom'] as const)
+          .filter((side) => padding[side] > fixedEdges[side])
+          .map(
+            (side) =>
+              `${side} content padding ${padding[side]} reaches past the fixed ${fixedEdges[side]} px that scale9Borders leaves at that edge.`,
+          )[0]);
+  if (paddingIssue !== undefined) {
+    findings.push({ code: 'atlas.padding-invalid', severity: 'error', message: paddingIssue });
+    return { name, ok: false, findings };
+  }
   if (frame.slicewright?.shape === 'three-vertical' && !(borders.x === 0 && borders.w === w)) {
     findings.push({
       code: 'atlas.marker-mismatch',

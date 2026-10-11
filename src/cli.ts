@@ -20,7 +20,7 @@ import type { SliceLayout } from './layout.js';
 import type { Raster } from './raster.js';
 import { renderPreviewSheet } from './render.js';
 import { resizeRaster, targetSize } from './resize.js';
-import { parseBorders, parseInsets, scale9BordersToInsets } from './slices.js';
+import { parseBorders, parseInsets, scale9BordersToInsets, type SliceInsets } from './slices.js';
 import { exportForTarget, findTarget, sliceTargets } from './targets/index.js';
 
 /** Exit codes: 0 ok, 1 error findings, 2 usage or input failure. */
@@ -61,6 +61,10 @@ const sliceArgs = {
     default: 'auto',
     description: 'Slice mode: three keeps the height, three-vertical keeps the width',
   },
+  padding: {
+    type: 'string',
+    description: 'Give content padding instead of detecting it: l,r,t,b or h,v or n',
+  },
   regions: {
     type: 'enum',
     choices: ['single', 'multi'],
@@ -93,6 +97,7 @@ const image = { type: 'positional', description: 'PNG image' } as const;
 
 interface SliceValues {
   readonly regions: string;
+  readonly padding?: string | undefined;
   readonly insets?: string | undefined;
   readonly borders?: string | undefined;
   readonly mode: string;
@@ -560,6 +565,7 @@ function inspectOptions(values: SliceValues, raster: Raster | undefined): Inspec
     regions: values.regions === 'multi' ? 'multi' : 'single',
     tile: { x: tile.includes('x'), y: tile.includes('y') },
     ...(insets === undefined ? {} : { insets }),
+    ...(values.padding === undefined ? {} : { contentPadding: parseInsets(values.padding) }),
   };
 }
 
@@ -612,10 +618,10 @@ function atlasImage(json: unknown, path: string): string {
 
 function summary(report: InspectReport): Pick<
   InspectReport,
-  'ok' | 'mode' | 'insets' | 'scale9Borders' | 'minSize' | 'tile' | 'findings'
+  'ok' | 'mode' | 'insets' | 'scale9Borders' | 'minSize' | 'tile' | 'contentPadding' | 'findings'
 > {
-  const { ok, mode, insets, scale9Borders, minSize, tile, findings } = report;
-  return { ok, mode, insets, scale9Borders, minSize, tile, findings };
+  const { ok, mode, insets, scale9Borders, minSize, tile, contentPadding, findings } = report;
+  return { ok, mode, insets, scale9Borders, minSize, tile, contentPadding, findings };
 }
 
 function readPng(path: string | undefined): Raster {

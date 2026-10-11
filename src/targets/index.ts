@@ -1,4 +1,6 @@
 import type { Finding } from '../inspect.js';
+import { contentLimits } from '../layout.js';
+import { paddingProblem } from '../padding.js';
 import { capabilityFindings } from './common.js';
 import { cssTarget } from './css.js';
 import { phaserTarget } from './phaser.js';
@@ -41,6 +43,21 @@ export function exportForTarget(id: string, input: ExportInput): ExportResult {
     throw new RangeError(
       `The layout is ${input.layout.x.length}x${input.layout.y.length} but the image is ${input.raster.width}x${input.raster.height}.`,
     );
+  }
+  const content = input.layout.content;
+  const limits = contentLimits(input.layout);
+  const contentProblem =
+    content === undefined
+      ? undefined
+      : (paddingProblem(content, input.raster.width, input.raster.height) ??
+        (['left', 'right', 'top', 'bottom'] as const)
+          .filter((side) => content[side] > limits[side])
+          .map(
+            (side) =>
+              `${side} content padding ${content[side]} reaches past the fixed ${limits[side]} px at that edge, where it would scale with the art.`,
+          )[0]);
+  if (contentProblem !== undefined) {
+    throw new RangeError(contentProblem);
   }
   const findings: Finding[] = capabilityFindings(target, input.layout);
   if (findings.some((finding) => finding.severity === 'error')) {

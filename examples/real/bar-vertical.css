@@ -2,9 +2,10 @@
 .bar-vertical {
   box-sizing: border-box;
   border-style: solid;
-  border-width: 39px 0px 39px 0px;
+  border-width: 38px 3px 38px 2px;
   border-image-source: url("bar-vertical.png");
   border-image-slice: 39 0 39 0 fill;
+  border-image-width: 39px 0px 39px 0px;
   border-image-repeat: stretch stretch;
   width: 33px;
   min-height: 78px;

@@ -29,42 +29,71 @@ command exits 2 on bad input. `--help` works on each command.
    generator can produce (`transparent`, `chroma-green`, `chroma-magenta`).
 2. **Plan the prompt.**
    `slicewright prompt --kind panel --style "<style>" --background transparent`
-   Send `prompt` to the image generator as written and pass the `avoid` list
-   as a negative prompt where the generator takes one. Generate one element
-   per image. Ornament belongs in the corners; keep the edges between them
-   plain, because a model-drawn rope, chain, or vine edge neither stretches
-   nor tiles cleanly.
+   Send `prompt` to the image generator as written. Pass the `avoid` list as a
+   negative prompt where the generator takes one; otherwise append it to the
+   prompt as an `Avoid: …` line. Use the plan's `aspect` as the generator's
+   aspect ratio, or say it in the prompt when the generator has no such
+   option. Generate one element per image. Ornament belongs in the corners;
+   keep the edges between them plain, because a model-drawn rope, chain, vine,
+   or wood grain along an edge neither stretches nor tiles cleanly. If the
+   user's style invites texture (hand-painted wood, stone), keep the texture
+   in the corners and fill, and ask for smooth edges.
 3. **Key a chroma background** when the generator could not return alpha:
    `slicewright key art.png --out keyed.png` (the key is read from the border).
 4. **Normalize.** `slicewright normalize art.png --width 480 --out ui/panel.png
-   --atlas ui/panel.json --name panel` crops margins, resizes to the in-game
+   --name ui-panel --target phaser,css` crops margins, resizes to the in-game
    size with area averaging (`--filter nearest` for pixel art), picks insets
-   at that size, and writes a one-frame atlas. Add `--target` to write engine
-   files at the same time (see step 7). Add `--keep 8` to shrink the
-   texture when the art is flat; it refuses axes where that would lose
-   texture or shading.
-5. **Read the findings** with the table below. Fix every `error`. Pass
+   and content padding at that size, and writes the engine files next to the
+   PNG. This is the usual way to finish generated art; `export` (step 7) is
+   for a finished PNG. The width you pick sets the scale of the corners and
+   borders; the height follows the generated aspect, which only matters for
+   how thick the top and bottom read, because the art stretches anyway. Give
+   `--height` instead when the height is what must match. Add `--keep 8` to
+   shrink the texture when the art is flat; it refuses axes where that would
+   lose texture or shading, which is most painted art.
+5. **Read the findings** with the table below. Fix every `error`, and compare
+   `minSize` with the smallest size the game uses (`insets.large` warns when
+   the fixed parts take most of an axis). Pass
    `--insets l,r,t,b` to `inspect` to check insets chosen by hand, `--mode
-   three` for horizontal-only art, `--tile x` when an edge should repeat.
+   three` for horizontal-only art, `--mode three-vertical` for vertical-only
+   art (scroll bar tracks), `--tile x` when an edge should repeat, and
+   `--regions multi` when fixed detail sits in the middle of an edge (a crest
+   on a title plate). Pass `--padding l,r,t,b` when the detected content
+   padding (where text fits inside the frame) is wrong.
 6. **Look at the preview.** `slicewright preview ui/panel.png --out
    sheet.png`, then open `sheet.png`. Cells, left to right: flexible segments
-   tinted magenta, source, minimum size, wide (when the width resizes), tall
-   (when the height resizes), doubled. Corners must look identical in every cell and edges must not
-   smear.
+   tinted magenta with the content box outlined in cyan, source, minimum size,
+   wide (when the width resizes), tall (when the height resizes), doubled.
+   Corners must look identical in every cell and edges must not smear.
 7. **Hand it to the engine.** `slicewright export ui/panel.png --target
-   phaser,css --out-dir ui` writes each engine's files
-   and prints how to use them; `slicewright targets` lists what each target
+   phaser,css --out-dir ui` writes each engine's files for a PNG that is
+   already final. It detects insets and padding again, so repeat any
+   `--insets`, `--padding`, or `--tolerance` you used before. Printed URLs are
+   relative to the directory you run from, as if the game were served from
+   there; run it from the game's served root or pass `--image-ref`. Prefix
+   `--name` (`ui-button`) so CSS class names do not collide in a page. It
+   prints how to use them; `slicewright targets` lists what each target
    can represent. Only Phaser and CSS are supported; both are verified in the
    real engine. For a packed atlas, disable trimming (and rotation) for
    nine-slice sprites, add `scale9Borders` per frame (TexturePacker 7.1+ can
    export them), then run `slicewright atlas ui.json` to check every frame
    against the pixels.
 
+## Making a matching set
+
+Several pieces that belong together (a dialog, a button, and a bar) need one
+style description used word for word in every `prompt` call, generated in one
+session. When the generator accepts reference images, generate the main piece
+first and pass it as a reference for the others. Normalize each piece to its
+own in-game width, then put the preview sheets side by side and regenerate a
+piece that drifts in color or wood tone before slicing further.
+
 ## Findings
 
 | Code | Meaning | Fix |
 | --- | --- | --- |
-| `stretch.x.nonuniform`, `stretch.y.nonuniform` | Given insets cut into detail, so stretching changes the art. | Widen the insets past the named pair, or let detection pick them. |
+| `stretch.x.nonuniform`, `stretch.y.nonuniform` | Given insets cut into detail, so stretching changes the art. | Widen the insets past the named pair, or let detection pick them. For textured art whose edges vary slightly, `--tolerance` (default 4, try 6 to 12) or `--outlier-ratio 0.02` accepts that texture; regenerating with smoother edges is better. |
+| `insets.large` | The fixed parts take most of an axis, so little stretches and the art cannot shrink much. | Usually edge texture or detail: regenerate with plainer edges, or raise `--tolerance` slightly. |
 | `stretch.x.none`, `stretch.y.none` | No two adjacent lines match; any stretch smears. | Regenerate with plain edges and center, or use `--mode three` for a vertical gradient. |
 | `stretch.x.short`, `stretch.y.short` | Only a tiny run matches and nothing repeats: the edges carry non-repeating detail (vines, drawn rope). | Regenerate with plain edges between the corners; or choose insets by hand after the preview. |
 | `tile.x.auto`, `tile.y.auto` | The edges repeat with the named period, so that axis tiles. | Create the NineSlice with `tileX` / `tileY`; atlas data cannot carry it. |
@@ -84,6 +113,8 @@ command exits 2 on bad input. `--help` works on each command.
 | `margin.transparent` | Transparent border pixels become part of the corners. | `normalize` crops them; otherwise crop unless the spacing is intended. |
 | `rebuild.x.lossy`, `rebuild.y.lossy` | `--keep` would flatten texture or shading on that axis. | Informational: that axis kept its full span. |
 | `rebuild.filtering` | A small `--keep` fades under linear texture filtering. | Use `--keep 8` or more, or nearest filtering (Phaser `pixelArt`). |
+| `padding.invalid` | Given content padding leaves no content area. | Shrink `--padding`. |
+| `atlas.padding-invalid` | An atlas frame's content padding does not fit the frame. | Re-export the frame. |
 | `insets.asymmetric` | Opposite insets differ by more than 2 px. | Usually generator drift; check the preview. |
 | `insets.invalid` | Insets leave no stretch pixel. | Shrink the insets. |
 | `image.empty` | Every pixel is transparent. | The background removal took everything; redo it. |
@@ -98,6 +129,18 @@ this.load.atlas('ui', 'ui/panel.png', 'ui/panel.json');
 // Insets come from the frame's scale9Borders; width and height default to the frame.
 const panel = this.add.nineslice(400, 300, 'ui', 'panel', 320, 200);
 panel.setSize(360, 220); // never below left+right by top+bottom; scale instead.
+```
+
+Place text inside the content padding, not the slice insets. The padding ends
+exactly where the frame does, so keep a margin of about 8 px for text, and
+more where corner ornaments reach inward:
+
+```ts
+const padding = this.textures.getFrame('ui', 'panel').customData.slicewright.contentPadding;
+const margin = 8; // breathing room between text and the frame
+const corner = panel.getTopLeft(); // works for any origin
+this.add.text(corner.x + padding.left + margin, corner.y + padding.top + margin, 'Hello', style)
+  .setWordWrapWidth(panel.width - padding.left - padding.right - margin * 2);
 ```
 
 `scale9Borders` is the stretchable center rectangle `{ x, y, w, h }`. A frame

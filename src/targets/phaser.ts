@@ -62,7 +62,10 @@ export function exportPhaser({
     raster.width,
     raster.height,
     exportInsets(layout),
-    layoutShape(layout) === 'three-vertical' ? 'three-vertical' : undefined,
+    {
+      ...(layoutShape(layout) === 'three-vertical' ? { shape: 'three-vertical' as const } : {}),
+      ...(layout.content === undefined ? {} : { contentPadding: layout.content }),
+    },
   );
   const tileX = axisTiles(layout.x);
   const tileY = axisTiles(layout.y);
@@ -76,7 +79,10 @@ export function exportPhaser({
       `this.load.atlas(${js(name)}, ${js(urlFromPath(loaderPaths?.image ?? imageRef))}, ${js(urlFromPath(joinUrl(loaderPaths?.directory ?? '', `${name}.json`)))});\n` +
       `this.add.nineslice(x, y, ${js(name)}, ${js(name)}, width, height${tileArgs});` +
       // Prose goes in a comment so the snippet stays valid JavaScript.
-      (fixedAxisNote(layout) === '' ? '' : `\n//${fixedAxisNote(layout)}`),
+      (fixedAxisNote(layout) === '' ? '' : `\n//${fixedAxisNote(layout)}`) +
+      (layout.content === undefined
+        ? ''
+        : `\n// Content padding (left, right, top, bottom): this.textures.getFrame(${js(name)}, ${js(name)}).customData.slicewright.contentPadding`),
   };
 }
 

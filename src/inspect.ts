@@ -14,12 +14,14 @@ import {
 } from './detect.js';
 import {
   axisFromSpans,
+  contentLimits,
   flexibleSegments,
   layoutFromInsets,
   minimumLayoutSize,
   type AxisLayout,
   type SliceLayout,
 } from './layout.js';
+import { detectContentPadding, paddingProblem } from './padding.js';
 import { alphaAt, pixelOffset, type Raster, type Rect } from './raster.js';
 import {
   insetsProblem,
@@ -53,6 +55,8 @@ export interface InspectOptions extends MatchOptions {
   readonly regions?: 'single' | 'multi';
   /** `auto` raises the tolerance to the measured noise floor of generated art. */
   readonly noise: 'auto' | 'off';
+  /** Caller-supplied content padding; omitted means detect it. */
+  readonly contentPadding?: SliceInsets;
 }
 
 /** Matching settings per axis; noise is measured separately along each. */
@@ -72,6 +76,9 @@ export interface InspectReport {
   readonly scale9Borders: Scale9Borders;
   /** The engine-neutral layout every renderer and target consumes. */
   readonly layout: SliceLayout;
+  /** Where content such as text sits inside the frame; null for an empty image. */
+  readonly contentPadding: SliceInsets | null;
+  readonly contentPaddingSource: 'detected' | 'given';
   readonly minSize: { readonly width: number; readonly height: number };
   readonly contentBounds: Rect | null;
   /** Axes that tile, as given or detected from repeating edges. */
@@ -137,12 +144,20 @@ export function inspectRaster(
 
   const { insets, mode, tile, layout } = resolved;
   findings.push(...symmetryFindings(insets));
+  findings.push(...largeInsetFindings(layout));
   for (const axis of ['x', 'y'] as const) {
     // Only an axis with exactly one tiled span has a seam to check.
     if (tile[axis] && flexibleSegments(layout[axis]).length === 1) {
       findings.push(...seamFindings(raster, axis, spanOf(raster, insets, axis), matching[axis]));
     }
   }
+
+  const contentPadding = resolveContentPadding(raster, bounds, options, matching, layout, findings);
+  // Padding that failed validation is reported but never enters the layout, so
+  // exports carry no padding rather than one that would scale with the art.
+  const paddingRejected = findings.some((finding) => finding.code === 'padding.invalid');
+  const finalLayout: SliceLayout =
+    contentPadding === null || paddingRejected ? layout : { ...layout, content: contentPadding };
 
   return {
     ok: !findings.some((finding) => finding.severity === 'error'),
@@ -152,7 +167,9 @@ export function inspectRaster(
     insetsSource: options.insets === undefined ? 'detected' : 'given',
     insets,
     scale9Borders: insetsToScale9Borders(insets, raster.width, raster.height),
-    layout,
+    layout: finalLayout,
+    contentPadding,
+    contentPaddingSource: options.contentPadding === undefined ? 'detected' : 'given',
     minSize: minimumLayoutSize(layout),
     contentBounds: bounds ?? null,
     tile,
@@ -208,6 +225,64 @@ export function noiseAdjusted(
     details: { noise, x: matching.x, y: matching.y },
   });
   return matching;
+}
+
+/**
+ * Given content padding is validated; otherwise it is detected from the
+ * content and clamped to the fixed segments at each edge of a resizable axis,
+ * so it never changes when the art resizes.
+ *
+ * @evidence docs/spec.md#content-padding Validates given padding, detects it otherwise, and keeps it within the fixed segments at each edge.
+ * @evidenceReview docs/spec.md#content-padding #3fc5743 Checked this code against the section line by line and ran detectsContentPadding green with pnpm test.
+ */
+export function resolveContentPadding(
+  raster: Raster,
+  bounds: Rect | undefined,
+  options: InspectOptions,
+  matching: AxisMatching,
+  layout: SliceLayout,
+  findings: Finding[],
+): SliceInsets | null {
+  const limits = contentLimits(layout);
+  const sides = ['left', 'right', 'top', 'bottom'] as const;
+  if (options.contentPadding !== undefined) {
+    const given = options.contentPadding;
+    const problem =
+      paddingProblem(given, raster.width, raster.height) ??
+      sides
+        .filter((side) => given[side] > limits[side])
+        .map(
+          (side) =>
+            `${side} padding ${given[side]} reaches past the fixed ${limits[side]} px at that edge, where it would scale with the art.`,
+        )[0];
+    if (problem !== undefined) {
+      findings.push({ code: 'padding.invalid', severity: 'error', message: problem });
+    }
+    return given;
+  }
+  if (bounds === undefined) {
+    return null;
+  }
+  const detected = detectContentPadding(raster, bounds, {
+    x: matching.x.tolerance,
+    y: matching.y.tolerance,
+  });
+  const clamped = {
+    left: Math.min(detected.left, limits.left),
+    right: Math.min(detected.right, limits.right),
+    top: Math.min(detected.top, limits.top),
+    bottom: Math.min(detected.bottom, limits.bottom),
+  };
+  if (sides.some((side) => clamped[side] !== detected[side])) {
+    findings.push({
+      code: 'padding.clamped',
+      severity: 'info',
+      message:
+        "The frame's inner edge lies inside a stretch span on some side, so the content padding stops at the fixed edge there; content may overlap that part of the frame.",
+      details: { detected, clamped },
+    });
+  }
+  return clamped;
 }
 
 export interface Layout {
@@ -413,7 +488,7 @@ export function multiRegionLayout(
 
 /**
  * @evidence docs/spec.md#slice-insets Rejects caller insets that leave no stretch span.
- * @evidenceReview docs/spec.md#slice-insets #705f0b4 Checked this code against the section line by line and ran rejectsInsetsWithoutAStretchSpan green with pnpm test.
+ * @evidenceReview docs/spec.md#slice-insets #5f061b0 Checked this code against the section line by line and ran rejectsInsetsWithoutAStretchSpan green with pnpm test.
  * @evidence docs/spec.md#stretch-uniformity Reports the first mismatching pair in each caller-given stretch span unless the axis tiles.
  * @evidenceReview docs/spec.md#stretch-uniformity #695468c Checked this code against the section line by line and ran rejectsGivenInsetsThatStretchDetail green with pnpm test.
  * @evidence docs/spec.md#three-slice Forces zero top and bottom insets in three-slice mode.
@@ -674,6 +749,36 @@ function touchesTransparency(raster: Raster, x: number, y: number): boolean {
     }
   }
   return false;
+}
+
+/** Fixed segments above this share of a resizable axis leave little room to resize. */
+const largeInsetRatio = 0.5;
+
+/**
+ * Warns when the fixed segments take most of an axis that resizes, so the art
+ * cannot shrink much below its source size and only a short span stretches.
+ *
+ * @evidence docs/spec.md#slice-insets Warns when fixed segments take more than half of a resizable axis.
+ * @evidenceReview docs/spec.md#slice-insets #5f061b0 Checked this code against the section line by line and ran rejectsInsetsWithoutAStretchSpan green with pnpm test.
+ */
+export function largeInsetFindings(layout: SliceLayout): Finding[] {
+  const minimum = minimumLayoutSize(layout);
+  return (['x', 'y'] as const).flatMap((axis) => {
+    const length = layout[axis].length;
+    const fixed = axis === 'x' ? minimum.width : minimum.height;
+    if (flexibleSegments(layout[axis]).length === 0 || fixed <= length * largeInsetRatio) {
+      return [];
+    }
+    const dimension = axis === 'x' ? 'width' : 'height';
+    return [
+      {
+        code: `insets.large`,
+        severity: 'warning' as const,
+        message: `The fixed parts take ${fixed} of ${length} px of the ${dimension}, so it cannot go below ${fixed} px and only ${length - fixed} px stretches. Detail along the edge often causes this; regenerate with plainer edges or check the tolerance.`,
+        details: { axis, fixed, length },
+      },
+    ];
+  });
 }
 
 function symmetryFindings(insets: SliceInsets): Finding[] {

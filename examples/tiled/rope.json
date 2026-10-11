@@ -24,6 +24,14 @@
         "y": 6,
         "w": 108,
         "h": 36
+      },
+      "slicewright": {
+        "contentPadding": {
+          "left": 6,
+          "right": 6,
+          "top": 6,
+          "bottom": 6
+        }
       }
     }
   },

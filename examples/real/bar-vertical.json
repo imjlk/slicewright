@@ -26,7 +26,13 @@
         "h": 242
       },
       "slicewright": {
-        "shape": "three-vertical"
+        "shape": "three-vertical",
+        "contentPadding": {
+          "left": 2,
+          "right": 3,
+          "top": 38,
+          "bottom": 38
+        }
       }
     }
   },

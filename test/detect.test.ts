@@ -28,7 +28,7 @@ function codes(report: InspectReport): string[] {
 
 /**
  * @evidence docs/spec.md#slice-insets Checks negative, fractional, and span-consuming insets.
- * @evidenceReview docs/spec.md#slice-insets #705f0b4 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#slice-insets #5f061b0 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function rejectsInsetsWithoutAStretchSpan(): void {
   strictEqual(insetsProblem({ left: 4, right: 4, top: 4, bottom: 4 }, 9, 9), undefined);
@@ -36,6 +36,15 @@ export function rejectsInsetsWithoutAStretchSpan(): void {
   ok(insetsProblem({ left: 0, right: 0, top: 5, bottom: 4 }, 9, 9)?.includes('top + bottom'));
   ok(insetsProblem({ left: -1, right: 0, top: 0, bottom: 0 }, 9, 9)?.includes('non-negative'));
   ok(insetsProblem({ left: 1.5, right: 0, top: 0, bottom: 0 }, 9, 9)?.includes('integer'));
+
+  // Fixed parts taking most of a resizable axis are worth a warning.
+  const crowded = inspectRaster(panel(40, 30), {
+    ...defaultInspectOptions,
+    insets: { left: 12, right: 12, top: 6, bottom: 6 },
+  });
+  const large = crowded.findings.find((finding) => finding.code === 'insets.large');
+  deepStrictEqual(large?.details, { axis: 'x', fixed: 24, length: 40 });
+  strictEqual(codes(inspectRaster(panel(40, 30))).includes('insets.large'), false);
 }
 
 /**
@@ -184,7 +193,11 @@ export function checksTilingSeams(): void {
     insets: { left: 4, right: 4, top: 0, bottom: 0 },
   });
   strictEqual(seamless.ok, true);
-  deepStrictEqual(codes(seamless), []);
+  // Stripes have no frame, so only content-padding notes may appear.
+  deepStrictEqual(
+    codes(seamless).filter((code) => !code.startsWith('padding.')),
+    [],
+  );
 
   const seam = inspectRaster(striped, {
     ...tiled,

@@ -13,7 +13,8 @@ inspection finds or checks the exact slice insets afterwards.
 - `normalize` crops, resizes to the in-game size, picks insets there, can
   rebuild a smaller texture, and writes a one-frame atlas.
 - `inspect` detects the stretch spans, or checks insets you give, and reports
-  smearing, repeating edges, seams, noise, alpha holes, margins, and spill.
+  smearing, repeating edges, seams, noise, alpha holes, margins, and spill. It
+  also finds the content padding: where text fits inside the frame.
 - `preview` renders the art at several stretched sizes on one PNG.
 - `export` writes engine files for Phaser and CSS `border-image`; `targets`
   lists what each can represent.
@@ -80,6 +81,13 @@ stretched, and tiled segments.
 | `css` | ✓ | ✓ | ✓ | ✗ | per axis, nearest tile count |
 
 Emulated means zero insets on the fixed axis; keep that axis at its size.
+
+**Content padding** is separate from the insets: an ornate frame's corners can
+reach far past its border, so text may start much closer to the edge than the
+stretch spans do. It is detected from the frame's inner edge (or given with
+`--padding l,r,t,b`), stored in the Phaser frame as
+`customData.slicewright.contentPadding`, and written to CSS as `border-width`
+while `border-image-width` keeps the art at its slices.
 Anything a target cannot represent is reported instead of exported.
 
 ### Engine support
@@ -143,7 +151,6 @@ The core is pure TypeScript over RGBA buffers. PNG input and output use
 ## Roadmap
 
 - Approximate-period tiling for hand-drawn patterned edges.
-- Content padding: where text sits inside an ornate frame (Phaser frame `customData`, CSS `border-width` separate from `border-image-width`).
 - A first npm release once the detection settles.
 
 ## License

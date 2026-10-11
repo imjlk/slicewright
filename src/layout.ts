@@ -21,6 +21,12 @@ export interface AxisLayout {
 export interface SliceLayout {
   readonly x: AxisLayout;
   readonly y: AxisLayout;
+  /**
+   * Where content such as text sits, measured from each edge. On an axis that
+   * resizes it stays within the fixed segments at that edge, so it never
+   * changes with size.
+   */
+  readonly content?: SliceInsets;
 }
 
 /**
@@ -79,7 +85,11 @@ export function layoutFromInsets(
   insets: SliceInsets,
   width: number,
   height: number,
-  options: { readonly shape?: 'nine' | 'three' | 'three-vertical'; readonly tile?: TileAxes } = {},
+  options: {
+    readonly shape?: 'nine' | 'three' | 'three-vertical';
+    readonly tile?: TileAxes;
+    readonly content?: SliceInsets;
+  } = {},
 ): SliceLayout {
   const shape = options.shape ?? 'nine';
   const kind = (axis: 'x' | 'y'): 'stretch' | 'tile' => (options.tile?.[axis] === true
@@ -93,7 +103,7 @@ export function layoutFromInsets(
     shape === 'three'
       ? axisFromSpans(height, [])
       : axisFromSpans(height, [{ start: insets.top, end: height - insets.bottom, kind: kind('y') }]);
-  return { x, y };
+  return { x, y, ...(options.content === undefined ? {} : { content: options.content }) };
 }
 
 export function flexibleSegments(axis: AxisLayout): Segment[] {
@@ -159,4 +169,25 @@ export function minimumLayoutSize(layout: SliceLayout): { width: number; height:
 /** True when `axis` tiles anywhere. */
 export function axisTiles(axis: AxisLayout): boolean {
   return axis.segments.some((segment) => segment.kind === 'tile');
+}
+
+/**
+ * The most content padding each edge can hold without reaching a flexible
+ * segment: the fixed run at that edge, or the whole axis when it never resizes.
+ *
+ * @evidence docs/spec.md#content-padding Bounds each side's padding by the fixed segments at that edge.
+ * @evidenceReview docs/spec.md#content-padding #3fc5743 Checked this code against the section line by line and ran detectsContentPadding green with pnpm test.
+ */
+export function contentLimits(layout: SliceLayout): SliceInsets {
+  const ends = (axis: AxisLayout): [number, number] => {
+    const flexible = flexibleSegments(axis);
+    const first = flexible[0];
+    const last = flexible.at(-1);
+    return first === undefined || last === undefined
+      ? [axis.length, axis.length]
+      : [first.start, axis.length - last.end];
+  };
+  const [left, right] = ends(layout.x);
+  const [top, bottom] = ends(layout.y);
+  return { left, right, top, bottom };
 }
