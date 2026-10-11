@@ -1,5 +1,5 @@
 import { deepStrictEqual, ok, strictEqual, throws } from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -38,7 +38,7 @@ function pixel(raster: Raster, x: number, y: number): number[] {
 
 /**
  * @evidence docs/spec.md#atlas-packing Packs a panel, a bar, and a tiled rope panel: exact pixels, extrusion, spacing, kept borders and slicewright data, a passing atlas check, one usage, and refused inputs.
- * @evidenceReview docs/spec.md#atlas-packing #13ea142 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#atlas-packing #cd28666 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function packsAtlases(): void {
   const pieces = [
@@ -112,7 +112,9 @@ export function packsAtlases(): void {
       contentPadding: false,
     },
     { name: 'rope', tile: { x: true, y: false }, note: '', contentPadding: false },
+    { name: 'icon', plain: true, tile: { x: false, y: false }, note: '', contentPadding: false },
   ]);
+  ok(usage.endsWith('\nthis.add.image(x, y, "ui", "icon");'));
   strictEqual(usage.match(/this\.load\.atlas/g)?.length, 1);
   ok(
     usage.includes(
@@ -142,7 +144,7 @@ export function packsAtlases(): void {
 
 /**
  * @evidence docs/spec.md#atlas-packing Packs committed atlases from files: one load call, tiling flags, a stylesheet whose classes point at each frame's own image, no classes for frames that are part of an image, and refused trimmed frames.
- * @evidenceReview docs/spec.md#atlas-packing #13ea142 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#atlas-packing #cd28666 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function packsAtlasFiles(): void {
   const dir = mkdtempSync(join(tmpdir(), 'slicewright-pack-'));
@@ -265,6 +267,45 @@ export function packsAtlasFiles(): void {
     firstFrame.frame.x = 10_000;
     writeFileSync(join(dir, 'outside.json'), JSON.stringify(changed));
     throws(() => packOne('outside.json'), /outside its/);
+    firstFrame.frame.x = 0.25;
+    writeFileSync(join(dir, 'fractional.json'), JSON.stringify(changed));
+    throws(() => packOne('fractional.json'), /fractional/);
+
+    // The image cannot share a path with its own atlas.
+    throws(
+      () =>
+        buildPack({
+          ...options,
+          inputs: [join(dir, 'ui.json')],
+          out: join(dir, 'x.json'),
+          name: 'x',
+        }),
+      /give the image a \.png name/,
+    );
+    // A link to an input image, or another letter case of it, is the same file.
+    symlinkSync(join(dir, 'ui.png'), join(dir, 'link.png'));
+    throws(
+      () =>
+        buildPack({
+          ...options,
+          inputs: [join(dir, 'ui.json')],
+          out: join(dir, 'link.png'),
+          name: 'packed',
+        }),
+      /would overwrite/,
+    );
+    if (existsSync(join(dir, 'UI.PNG'))) {
+      throws(
+        () =>
+          buildPack({
+            ...options,
+            inputs: [join(dir, 'ui.json')],
+            out: join(dir, 'UI.PNG'),
+            name: 'packed',
+          }),
+        /would overwrite/,
+      );
+    }
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

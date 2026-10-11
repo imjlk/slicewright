@@ -242,11 +242,12 @@ function inspectFrame(
       message: 'Rotated atlas frames are not a tested NineSlice input; disable rotation for this sprite.',
     });
   }
-  if (x < 0 || y < 0 || x + w > image.width || y + h > image.height) {
+  // A fractional rectangle would crop at shifted byte offsets.
+  if (![x, y, w, h].every(Number.isInteger) || x < 0 || y < 0 || x + w > image.width || y + h > image.height) {
     findings.push({
       code: 'atlas.frame-outside-image',
       severity: 'error',
-      message: `Frame ${w}x${h}+${x}+${y} lies outside the ${image.width}x${image.height} image.`,
+      message: `Frame ${w}x${h}+${x}+${y} is not a whole-pixel rectangle inside the ${image.width}x${image.height} image.`,
     });
     return { name, ok: false, findings };
   }

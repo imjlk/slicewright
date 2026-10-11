@@ -327,20 +327,23 @@ Packing combines frames from several atlases, usually the one-frame atlases
 that `normalize` and `export` write, into one image and one JSON Hash atlas so
 a game loads a matching set with a single `this.load.atlas` call. Every frame
 keeps its pixels exactly, untrimmed and unrotated, with its `scale9Borders` and
-slicewright data; frames without borders pack as plain sprites. Frames go on
+slicewright data; frames without borders pack as plain sprites, which the
+usage adds with `this.add.image`. Frames go on
 shelves, tallest first, in a sheet about as wide as it is tall. Each frame is
 surrounded by its own outermost pixels repeated outward (`extrude`, 1 px by
 default), so linear filtering at the frame edge never samples a neighbor, and
 then by transparent spacing (2 px by default); both are whole numbers from 0 to
-64. Frame names must be unique across the inputs, and a trimmed or rotated
-input frame is refused, because its pixels cannot be copied as they render.
+64. Frame names must be unique across the inputs, and a trimmed, rotated, or
+fractional input frame is refused, because its pixels cannot be copied as they
+render.
 The packed atlas gets the same check as any other atlas, and an error in it
 fails the command. Its usage loads the atlas once and creates each frame's NineSlice with its tiling
 flags. Because CSS `border-image` cannot address part of an image, the packed
 CSS is one stylesheet with a class per frame that still points at each frame's
 own image, and a frame that is only part of its image has no CSS class; with no
 class at all, no stylesheet is written. Packing refuses to write over an input
-atlas, its image, or the stylesheet beside it.
+atlas, its image, or the stylesheet beside it, comparing existing files by their
+real path, and refuses an image path that is also its own atlas or stylesheet.
 
 ## Generation prompts
 

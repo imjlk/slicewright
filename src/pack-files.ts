@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 
 import type { Finding, InspectOptions } from './inspect.js';
@@ -61,7 +61,7 @@ interface AtlasSource {
  * stylesheet sit next to the PNG.
  *
  * @evidence docs/spec.md#atlas-packing Refuses trimmed, rotated, and out-of-image input frames, checks the packed atlas, writes one load call with a NineSlice per frame, and gives CSS classes only to frames that are a whole image.
- * @evidenceReview docs/spec.md#atlas-packing #13ea142 Checked this code against the section line by line and ran packsAtlasFiles green with pnpm test.
+ * @evidenceReview docs/spec.md#atlas-packing #cd28666 Checked this code against the section line by line and ran packsAtlasFiles green with pnpm test.
  */
 export function buildPack(options: PackFilesOptions): PackFilesResult {
   const outDir = dirname(options.out);
@@ -69,10 +69,17 @@ export function buildPack(options: PackFilesOptions): PackFilesResult {
   const cssPath = join(outDir, `${options.name}.css`);
   const sources = options.inputs.flatMap((path) => atlasSources(path));
   // Packing next to its inputs must never overwrite them or their stylesheets.
-  const outputs = [options.out, atlasPath, cssPath].map((path) => resolve(path));
+  // Existing files compare by their real path, so a symlink or another letter
+  // case on a case-insensitive disk still names the same file.
+  const outputs = [options.out, atlasPath, cssPath].map((path) => filePath(path));
+  if (new Set(outputs).size !== outputs.length) {
+    throw new PackInputError(
+      `--out ${options.out} is also the atlas or stylesheet path for --name ${options.name}; give the image a .png name.`,
+    );
+  }
   for (const input of options.inputs) {
     const stem = resolve(input).replace(/\.json$/i, '');
-    const taken = [resolve(input), `${stem}.css`, `${stem}.png`];
+    const taken = [input, `${stem}.css`, `${stem}.png`].map((path) => filePath(path));
     const clash = outputs.find((path) => taken.includes(path));
     if (clash !== undefined) {
       throw new PackInputError(
@@ -81,7 +88,7 @@ export function buildPack(options: PackFilesOptions): PackFilesResult {
     }
   }
   for (const source of sources) {
-    const clash = outputs.find((path) => path === source.image);
+    const clash = outputs.find((path) => path === filePath(source.image));
     if (clash !== undefined) {
       throw new PackInputError(
         `Packing would overwrite the input image ${clash}; pick another --out.`,
@@ -101,7 +108,15 @@ export function buildPack(options: PackFilesOptions): PackFilesResult {
     served(atlasPath),
     sources.flatMap(({ piece, layout }) =>
       layout === undefined
-        ? []
+        ? [
+            {
+              name: piece.name,
+              plain: true,
+              tile: { x: false, y: false },
+              note: '',
+              contentPadding: false,
+            },
+          ]
         : [
             {
               name: piece.name,
@@ -144,6 +159,9 @@ function atlasSources(path: string): AtlasSource[] {
       throw new PackInputError(
         `Frame "${name}" in ${path} is ${frame.trimmed === true ? 'trimmed' : 'rotated'}; repack it untrimmed and unrotated first.`,
       );
+    }
+    if (![x, y, w, h].every(Number.isInteger)) {
+      throw new PackInputError(`Frame "${name}" in ${path} has a fractional rectangle ${JSON.stringify(frame.frame)}.`);
     }
     if (x < 0 || y < 0 || w <= 0 || h <= 0 || x + w > raster.width || y + h > raster.height) {
       throw new PackInputError(
@@ -234,6 +252,11 @@ function packedCss(
     ].join('\n'),
     findings,
   };
+}
+
+/** The real path of an existing file, so links and letter case resolve; otherwise the absolute path. */
+function filePath(path: string): string {
+  return existsSync(path) ? realpathSync.native(path) : resolve(path);
 }
 
 /** A path as a URL-style reference: forward slashes on every platform. */

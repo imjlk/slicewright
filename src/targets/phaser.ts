@@ -90,6 +90,8 @@ export function exportPhaser({
 
 export interface PhaserUsageFrame {
   readonly name: string;
+  /** A frame without borders, drawn as a plain image. */
+  readonly plain?: boolean;
   readonly tile: { readonly x: boolean; readonly y: boolean };
   /** A note such as keeping a fixed axis at its size, or an empty string. */
   readonly note: string;
@@ -113,6 +115,10 @@ export function phaserUsage(
     `this.load.atlas(${js(key)}, ${js(urlFromPath(imagePath))}, ${js(urlFromPath(atlasPath))});`,
   ];
   for (const frame of frames) {
+    if (frame.plain === true) {
+      lines.push(`this.add.image(x, y, ${js(key)}, ${js(frame.name)});`);
+      continue;
+    }
     const tileArgs =
       frame.tile.x || frame.tile.y
         ? `, undefined, undefined, undefined, undefined, ${frame.tile.x}, ${frame.tile.y}`
