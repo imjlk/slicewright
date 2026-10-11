@@ -14,7 +14,7 @@ const minimumEdgeStep = 16;
  * edge does. A walk that reaches the image edge gives zero padding.
  *
  * @evidence docs/spec.md#content-padding Walks five sample lines outward from the center to the first strong neighbor step and takes the median per side.
- * @evidenceReview docs/spec.md#content-padding #51d3985 Checked this code against the section line by line and ran detectsContentPadding green with pnpm test.
+ * @evidenceReview docs/spec.md#content-padding #3fc5743 Checked this code against the section line by line and ran detectsContentPadding green with pnpm test.
  */
 export function detectContentPadding(
   raster: Raster,
@@ -75,7 +75,7 @@ export function detectContentPadding(
  * Returns why content padding cannot fit an image of this size, or undefined.
  *
  * @evidence docs/spec.md#content-padding Requires non-negative whole padding that leaves a content area at least one pixel wide.
- * @evidenceReview docs/spec.md#content-padding #51d3985 Checked this code against the section line by line and ran detectsContentPadding green with pnpm test.
+ * @evidenceReview docs/spec.md#content-padding #3fc5743 Checked this code against the section line by line and ran detectsContentPadding green with pnpm test.
  */
 export function paddingProblem(
   padding: SliceInsets,

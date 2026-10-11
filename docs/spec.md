@@ -221,7 +221,7 @@ edge, so it never changes with size: detected padding that would reach into a
 stretch span is clamped to the fixed edge with a `padding.clamped` note, and
 given padding past the fixed edge is a `padding.invalid` error, as is padding
 that is not whole and non-negative or leaves no content area at least one pixel
-wide. A target refuses a layout whose padding does not fit the image or reaches
+wide. Rejected padding is reported but kept out of the layout. A target refuses a layout whose padding does not fit the image or reaches
 past the fixed segments at an edge.
 
 The Phaser target records it in the frame as `"slicewright": { "contentPadding":
@@ -229,7 +229,8 @@ The Phaser target records it in the frame as `"slicewright": { "contentPadding":
 The CSS target sets `border-width` to the padding, which sizes the content box,
 and `border-image-width` to the insets, so the art still draws at its slices;
 the minimum size on every resizable axis holds both. The atlas check refuses padding that does not fit
-the frame (`atlas.padding-invalid`). The preview outlines the content box on the
+the frame or reaches past the fixed segments its `scale9Borders` leave
+(`atlas.padding-invalid`). The preview outlines the content box on the
 guides cell.
 
 ## Preview sheet

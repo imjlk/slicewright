@@ -14,7 +14,7 @@ function text(contents: string | Uint8Array | undefined): string {
 
 /**
  * @evidence docs/spec.md#content-padding Detects padding on flat, shaded, empty-centered, and borderless art, validates given padding, exports it to Phaser and CSS, checks it in atlases, and outlines it in the preview.
- * @evidenceReview docs/spec.md#content-padding #51d3985 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#content-padding #3fc5743 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function detectsContentPadding(): void {
   const flat = inspectRaster(panel(40, 30));
@@ -50,6 +50,13 @@ export function detectsContentPadding(): void {
     contentPadding: { left: 9, right: 3, top: 4, bottom: 4 },
   });
   ok(pastInset.findings.some((finding) => finding.code === 'padding.invalid'));
+  // Rejected padding stays out of the layout, so exports still succeed without it.
+  strictEqual(pastInset.layout.content, undefined);
+  strictEqual(
+    exportForTarget('css', { name: 'p', imageRef: 'p.png', raster: panel(40, 30), layout: pastInset.layout })
+      .files.length,
+    1,
+  );
 
   // A detected inner edge inside a stretch span is clamped to the fixed edge.
   const deep = panel(40, 30);
@@ -133,6 +140,20 @@ export function detectsContentPadding(): void {
   }
   const brokenReport = inspectAtlas(broken, raster, defaultInspectOptions);
   ok(brokenReport.frames[0]?.findings.some((finding) => finding.code === 'atlas.padding-invalid'));
+
+  // Padding inside the frame but past the fixed edge is refused too.
+  const deepPadding = JSON.parse(text(phaser.files[0]?.contents)) as {
+    frames: Record<string, { slicewright: { contentPadding: { left: number } } }>;
+  };
+  for (const entry of Object.values(deepPadding.frames)) {
+    entry.slicewright.contentPadding.left = 9;
+  }
+  const deepReport = inspectAtlas(deepPadding, raster, defaultInspectOptions);
+  ok(
+    deepReport.frames[0]?.findings.some((finding) =>
+      finding.message.includes('reaches past the fixed'),
+    ),
+  );
 
   // The guides cell outlines the content box.
   const sheet = renderPreviewSheet(raster, layout);

@@ -153,8 +153,11 @@ export function inspectRaster(
   }
 
   const contentPadding = resolveContentPadding(raster, bounds, options, matching, layout, findings);
+  // Padding that failed validation is reported but never enters the layout, so
+  // exports carry no padding rather than one that would scale with the art.
+  const paddingRejected = findings.some((finding) => finding.code === 'padding.invalid');
   const finalLayout: SliceLayout =
-    contentPadding === null ? layout : { ...layout, content: contentPadding };
+    contentPadding === null || paddingRejected ? layout : { ...layout, content: contentPadding };
 
   return {
     ok: !findings.some((finding) => finding.severity === 'error'),
@@ -230,7 +233,7 @@ export function noiseAdjusted(
  * so it never changes when the art resizes.
  *
  * @evidence docs/spec.md#content-padding Validates given padding, detects it otherwise, and keeps it within the fixed segments at each edge.
- * @evidenceReview docs/spec.md#content-padding #51d3985 Checked this code against the section line by line and ran detectsContentPadding green with pnpm test.
+ * @evidenceReview docs/spec.md#content-padding #3fc5743 Checked this code against the section line by line and ran detectsContentPadding green with pnpm test.
  */
 export function resolveContentPadding(
   raster: Raster,

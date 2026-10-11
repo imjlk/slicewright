@@ -1,6 +1,7 @@
 import typia from 'typia';
 
 import { inspectRaster, type Finding, type InspectOptions, type InspectReport } from './inspect.js';
+import { contentLimits, layoutFromInsets } from './layout.js';
 import { paddingProblem } from './padding.js';
 import { cropRaster, type Raster } from './raster.js';
 import {
@@ -215,7 +216,27 @@ function inspectFrame(
   }
 
   const padding = frame.slicewright?.contentPadding;
-  const paddingIssue = padding === undefined ? undefined : paddingProblem(padding, w, h);
+  // Padding must also stay within the fixed segments that scale9Borders leaves.
+  const fixedEdges = contentLimits(
+    layoutFromInsets(scale9BordersToInsets(borders, w, h), w, h, {
+      shape:
+        borders.y === 0 && borders.h === h
+          ? 'three'
+          : frame.slicewright?.shape === 'three-vertical'
+            ? 'three-vertical'
+            : 'nine',
+    }),
+  );
+  const paddingIssue =
+    padding === undefined
+      ? undefined
+      : (paddingProblem(padding, w, h) ??
+        (['left', 'right', 'top', 'bottom'] as const)
+          .filter((side) => padding[side] > fixedEdges[side])
+          .map(
+            (side) =>
+              `${side} content padding ${padding[side]} reaches past the fixed ${fixedEdges[side]} px that scale9Borders leaves at that edge.`,
+          )[0]);
   if (paddingIssue !== undefined) {
     findings.push({ code: 'atlas.padding-invalid', severity: 'error', message: paddingIssue });
     return { name, ok: false, findings };
