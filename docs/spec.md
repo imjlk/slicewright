@@ -219,8 +219,11 @@ with zero insets, so the engine would stretch it, and a `target.emulated`
 finding tells the caller to keep that axis at its source size. A shape the
 target can neither represent nor emulate is a `target.unsupported` error and
 writes no files. Tiling the target cannot express is a `target.tile` warning,
-and a layout that never resizes is a `target.fixed` warning. Targets: `phaser`,
-`css`, `godot`, `unity`, `ninepatch`.
+and a layout that never resizes is a `target.fixed` warning. Each target also
+has a status: `verified` targets (`phaser`, `css`) are rendered in the real
+engine by the engine check, and `experimental` targets (`godot`, `unity`,
+`ninepatch`) follow the documented format without being run, which a
+`target.experimental` finding states on every export.
 
 ## CSS border-image
 

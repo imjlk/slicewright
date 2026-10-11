@@ -136,7 +136,7 @@ export function detectsMultipleRegions(): void {
 
 /**
  * @evidence docs/spec.md#targets Rejects unsupported shapes without files, notes emulation, warns about tiling gaps and fixed layouts, and lists every target.
- * @evidenceReview docs/spec.md#targets #a3f3c6c Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#targets #47e058c Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function checksTargetCapabilities(): void {
   deepStrictEqual(Object.keys(sliceTargets).sort(), [
@@ -171,6 +171,19 @@ export function checksTargetCapabilities(): void {
 
   const still = { x: axisFromSpans(40, []), y: axisFromSpans(30, []) };
   ok(codes(capabilityFindings(sliceTargets['css']!, still)).includes('target.fixed'));
+
+  const nine = layoutFromInsets({ left: 6, right: 6, top: 6, bottom: 6 }, 40, 30);
+  for (const target of Object.values(sliceTargets)) {
+    const experimental = codes(capabilityFindings(target, nine)).includes('target.experimental');
+    strictEqual(experimental, target.status === 'experimental', target.id);
+  }
+  deepStrictEqual(
+    Object.values(sliceTargets)
+      .filter((target) => target.status === 'verified')
+      .map((target) => target.id)
+      .sort(),
+    ['css', 'phaser'],
+  );
 }
 
 /**

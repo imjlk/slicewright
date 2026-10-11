@@ -29,7 +29,7 @@ export const sliceTargets: Readonly<Record<string, SliceTarget>> = Object.fromEn
  * produces its findings and no files.
  *
  * @evidence docs/spec.md#targets Looks the target up, checks capabilities, and writes files only when no error remains.
- * @evidenceReview docs/spec.md#targets #a3f3c6c Checked this code against the section line by line and ran checksTargetCapabilities green with pnpm test.
+ * @evidenceReview docs/spec.md#targets #47e058c Checked this code against the section line by line and ran checksTargetCapabilities green with pnpm test.
  */
 export function exportForTarget(id: string, input: ExportInput): ExportResult {
   const target = sliceTargets[id];

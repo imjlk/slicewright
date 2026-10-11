@@ -5,6 +5,7 @@ import type { ExportInput, ExportResult, SliceTarget } from './types.js';
 export const cssTarget: SliceTarget = {
   id: 'css',
   label: 'CSS border-image',
+  status: 'verified',
   capabilities: { shapes: ['nine', 'three', 'three-vertical'], emulated: [], tile: 'per-axis' },
   exportLayout: exportCss,
 };

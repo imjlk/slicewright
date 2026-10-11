@@ -53,7 +53,9 @@ error, and every command exits 2 on bad input. `--help` works on each command.
 7. **Hand it to the engine.** `slicewright export ui/panel.png --target
    phaser,css,godot,unity,ninepatch --out-dir ui` writes each engine's files
    and prints how to use them; `slicewright targets` lists what each target
-   can represent. For a packed atlas, disable trimming (and rotation) for
+   can represent. Phaser and CSS are verified in the real engine; Godot,
+   Unity, and nine-patch are experimental, and other engines are not
+   supported. For a packed atlas, disable trimming (and rotation) for
    nine-slice sprites, add `scale9Borders` per frame (TexturePacker 7.1+ can
    export them), then run `slicewright atlas ui.json` to check every frame
    against the pixels.
@@ -72,6 +74,7 @@ error, and every command exits 2 on bad input. `--help` works on each command.
 | `regions.multi` | The layout has several stretch regions per axis. | Export to `ninepatch`; other targets report `target.unsupported`. |
 | `target.unsupported` | The target cannot represent this layout; no files were written. | Pick a target that can, or re-slice as a nine-slice. |
 | `target.emulated` | The target has no native form of this layout; the fixed axis has zero insets. | Keep that axis at its source size in the engine. |
+| `target.experimental` | Godot, Unity, and nine-patch output is not run in those engines. | Check it in the engine before shipping. |
 | `target.tile` | The target cannot tile as asked (Unity tiles both axes; nine-patch never). | Accept stretching, or pick a target that tiles per axis. |
 | `noise.tolerance` | Generated art is noisy, so matching tolerance was raised per axis. | Informational. `--noise off` restores exact matching. |
 | `noise.high` | The interior is busy along both axes. | Stretching smears it; use a flatter fill or tile it. |

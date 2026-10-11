@@ -42,6 +42,11 @@ export interface ExportResult {
 export interface SliceTarget {
   readonly id: string;
   readonly label: string;
+  /**
+   * `verified` targets are rendered in the real engine by `pnpm engine:check`;
+   * `experimental` ones follow the engine's documented format but are not run.
+   */
+  readonly status: 'verified' | 'experimental';
   readonly capabilities: TargetCapabilities;
   /** Writes the target's files; only called for layouts the capabilities accept. */
   readonly exportLayout: (input: ExportInput) => Omit<ExportResult, 'target' | 'findings'>;

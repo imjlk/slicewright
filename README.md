@@ -75,17 +75,30 @@ stretched, and tiled segments.
 | Tiled axis | A span repeats instead of stretching | `--tile x/y/xy`, or edges that repeat a pattern |
 | Multiple regions | Several stretch spans per axis around fixed detail | `--regions multi` |
 
-| Target | Nine | Three | Vertical three | Multi | Tiling |
-| --- | --- | --- | --- | --- | --- |
-| `phaser` | ✓ | ✓ | emulated | ✗ | per axis |
-| `css` | ✓ | ✓ | ✓ | ✗ | per axis |
-| `godot` | ✓ | emulated | emulated | ✗ | per axis |
-| `unity` | ✓ | emulated | emulated | ✗ | both axes |
-| `ninepatch` | ✓ | emulated | emulated | ✓ | ✗ |
+| Target | Status | Nine | Three | Vertical three | Multi | Tiling |
+| --- | --- | --- | --- | --- | --- | --- |
+| `phaser` | verified | ✓ | ✓ | emulated | ✗ | per axis |
+| `css` | verified | ✓ | ✓ | ✓ | ✗ | per axis |
+| `godot` | experimental | ✓ | emulated | emulated | ✗ | per axis |
+| `unity` | experimental | ✓ | emulated | emulated | ✗ | both axes |
+| `ninepatch` | experimental | ✓ | emulated | emulated | ✓ | ✗ |
 
 Emulated means zero insets on the fixed axis; keep that axis at its size.
-Anything a target cannot represent is reported instead of exported. Adding a
-layout or a target is described in [`docs/extending.md`](docs/extending.md).
+Anything a target cannot represent is reported instead of exported.
+
+### Engine support
+
+slicewright is developed against **Phaser 4**, and CSS `border-image` is
+checked alongside it; both are rendered in the real engine by
+`pnpm engine:check`. The `godot`, `unity`, and `ninepatch` targets are
+**experimental**: they follow each engine's documented format but are not run
+in that engine, and every export says so with a `target.experimental` finding.
+Other engines (Defold, GameMaker, Cocos, Pixi.js, Bevy, and so on) are **not
+supported**, and nothing beyond Phaser is planned for now.
+
+**Pull requests are welcome**: verification for an experimental target, or a
+new target. [`docs/extending.md`](docs/extending.md) explains how to add a
+target or a layout feature.
 
 ## How it decides
 
@@ -137,7 +150,6 @@ The core is pure TypeScript over RGBA buffers. PNG input and output use
 
 - Approximate-period tiling for hand-drawn patterned edges.
 - Content padding (nine-patch padding lines, Godot content margins).
-- Engine runs for the Godot, Unity, and Android targets.
 - A first npm release once the detection settles.
 
 ## License

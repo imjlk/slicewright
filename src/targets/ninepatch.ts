@@ -8,6 +8,7 @@ const guide = [0, 0, 0, 255] as const;
 export const ninePatchTarget: SliceTarget = {
   id: 'ninepatch',
   label: 'Android nine-patch',
+  status: 'experimental',
   capabilities: {
     shapes: ['nine', 'multi'],
     emulated: ['three', 'three-vertical'],

@@ -5,6 +5,7 @@ import type { ExportInput, ExportResult, SliceTarget } from './types.js';
 export const unityTarget: SliceTarget = {
   id: 'unity',
   label: 'Unity',
+  status: 'experimental',
   capabilities: { shapes: ['nine'], emulated: ['three', 'three-vertical'], tile: 'both' },
   exportLayout: exportUnity,
 };

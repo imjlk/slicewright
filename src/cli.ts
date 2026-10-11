@@ -343,9 +343,10 @@ const targets = define({
   description: 'List export targets and what each can represent',
   run: () => {
     print(
-      Object.values(sliceTargets).map(({ id, label, capabilities }) => ({
+      Object.values(sliceTargets).map(({ id, label, status, capabilities }) => ({
         id,
         label,
+        status,
         capabilities,
       })),
     );

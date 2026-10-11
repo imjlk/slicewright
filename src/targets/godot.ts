@@ -5,6 +5,7 @@ import type { ExportInput, ExportResult, SliceTarget } from './types.js';
 export const godotTarget: SliceTarget = {
   id: 'godot',
   label: 'Godot 4',
+  status: 'experimental',
   capabilities: { shapes: ['nine'], emulated: ['three', 'three-vertical'], tile: 'per-axis' },
   exportLayout: exportGodot,
 };

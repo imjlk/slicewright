@@ -5,16 +5,23 @@ import type { SliceTarget } from './types.js';
 
 /**
  * Compares a layout with a target's capabilities: an unsupported shape is an
- * error, an emulated shape and a fully fixed layout are noted, and tiling the
- * target cannot express is a warning.
+ * error, an emulated shape and a fully fixed layout are noted, tiling the
+ * target cannot express is a warning, and an experimental target says so.
  *
  * @evidence docs/spec.md#targets Reports unsupported shapes as errors, emulation as info, and tiling gaps as warnings, from the declared capabilities.
- * @evidenceReview docs/spec.md#targets #a3f3c6c Checked this code against the section line by line and ran checksTargetCapabilities green with pnpm test.
+ * @evidenceReview docs/spec.md#targets #47e058c Checked this code against the section line by line and ran checksTargetCapabilities green with pnpm test.
  */
 export function capabilityFindings(target: SliceTarget, layout: SliceLayout): Finding[] {
   const findings: Finding[] = [];
   const shape = layoutShape(layout);
   const { capabilities } = target;
+  if (target.status === 'experimental') {
+    findings.push({
+      code: 'target.experimental',
+      severity: 'info',
+      message: `${target.label} output follows the engine's documented format but has not been run in ${target.label}. Reports and pull requests are welcome.`,
+    });
+  }
   if (shape === 'fixed') {
     findings.push({
       code: 'target.fixed',
