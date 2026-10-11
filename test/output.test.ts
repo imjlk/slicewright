@@ -233,6 +233,10 @@ export function plansGenerationPrompts(): void {
   ok(fill.prompt.includes('Keep both ends short and simple'));
   ok(fill.prompt.includes('stretched horizontally only'));
   ok(fill.afterGeneration.some((step) => step.includes("track's content height")));
+  ok(fill.afterGeneration.some((step) => step.includes('--mode three')));
+  // The fill replaces the track's end-cap rule rather than adding to it.
+  strictEqual(fill.prompt.includes('two end caps'), false);
+  ok(bar.afterGeneration.some((step) => step.startsWith('Downscale to the target UI size')));
 }
 
 void test('PNG input', convertsPngLayoutsToRgba);

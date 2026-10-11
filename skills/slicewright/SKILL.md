@@ -68,7 +68,7 @@ command exits 2 on bad input. `--help` works on each command.
 7. **Hand it to the engine.** `slicewright export ui/panel.png --target
    phaser,css --out-dir ui` writes each engine's files for a PNG that is
    already final. It detects insets and padding again, so repeat any
-   `--insets`, `--padding`, or `--tolerance` you used before. Printed URLs are
+   `--insets`, `--padding`, `--mode`, or `--tolerance` you used before. Printed URLs are
    relative to the directory you run from, as if the game were served from
    there; run it from the game's served root or pass `--image-ref`. Prefix
    `--name` (`ui-button`) so CSS class names do not collide in a page. It
@@ -101,26 +101,32 @@ words and, when the generator takes references, the track as a reference.
    otherwise pass as a vertical stretch span.
 3. Draw progress by resizing the fill. Phaser's NineSlice never gets narrower
    than its two end caps, so below that width keep the caps' width and scale
-   the fill down horizontally:
+   the fill down horizontally. The fill follows the track's top-left corner and
+   scale, whatever the track's origin; call it again after moving, resizing, or
+   scaling the track, or keep both in one Container:
 
 ```ts
 function setProgress(track, fill, padding, value) {
+  const progress = Number.isFinite(value) ? Phaser.Math.Clamp(value, 0, 1) : 0;
   const inner = track.width - padding.left - padding.right;
-  const width = Math.round(inner * Phaser.Math.Clamp(value, 0, 1));
+  const width = Math.round(inner * progress);
   const caps = fill.leftWidth + fill.rightWidth;
-  fill.setPosition(track.x + padding.left, track.y + padding.top); // both with origin 0
+  const corner = track.getTopLeft(); // unrotated tracks
+  fill.setOrigin(0);
+  fill.setPosition(corner.x + padding.left * track.scaleX, corner.y + padding.top * track.scaleY);
   fill.setVisible(width > 0);
   fill.setSize(Math.max(width, caps), fill.height);
-  fill.setScale(width >= caps ? 1 : width / caps, 1);
+  fill.setScale((width >= caps ? 1 : width / caps) * track.scaleX, track.scaleY);
 }
 const padding = this.textures.getFrame('ui', 'bar').customData.slicewright.contentPadding;
-const track = this.add.nineslice(x, y, 'ui', 'bar', 320, 33).setOrigin(0);
-const fill = this.add.nineslice(0, 0, 'ui', 'bar-fill', 100, 28).setOrigin(0);
+const track = this.add.nineslice(x, y, 'ui', 'bar', 320); // a three-slice keeps its height
+const fill = this.add.nineslice(0, 0, 'ui', 'bar-fill');
 setProgress(track, fill, padding, 0.4);
 ```
 
 This keeps the fill exactly inside the track's content box at every width,
-checked in Phaser 4.2 at 0 to 100% on two track widths. A fill whose look
+checked in Phaser 4.2 at 0 to 100% on two track widths, a centered track, and
+a track scaled twice as wide. A fill whose look
 changes along its length (a left-to-right gradient, segments) cannot be
 resized this way, because resizing stretches it: draw it at full width and
 reveal part of it instead, for example with a Phaser mask filter. slicewright
