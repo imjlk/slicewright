@@ -227,6 +227,12 @@ The emulated vertical three-slice records its shape in the frame as
 `"slicewright": { "shape": "three-vertical" }`, which Phaser keeps in
 `frame.customData`.
 
+Because Phaser reads borders spanning the full height as its own three-slice, a
+layout whose height stretches as one full-height span (zero top and bottom
+insets on a resizable axis) cannot be encoded and is a `target.unsupported`
+error for the Phaser target. The usage keeps guidance such as a fixed size in a
+JavaScript comment.
+
 ## Targets
 
 A target turns a layout into an engine's files. Each target declares the shapes

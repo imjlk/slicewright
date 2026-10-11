@@ -80,6 +80,11 @@ const detectedTile = detectTiles();
 const tileMismatches = [...detectedTile.values()].filter((item) => item.problem !== undefined);
 output['tile'] = { detected: [...detectedTile.values()], mismatches: tileMismatches };
 failed ||= tileMismatches.length > 0;
+// The browsers render the committed files; they must be what the current
+// exporters write, or a target regression could stay green.
+const staleExports = findStaleExports(detectedTile);
+output['staleExports'] = staleExports;
+failed ||= staleExports.length > 0;
 try {
   if (engines.includes('phaser')) {
     const result = await checkPhaser(await openPage('phaser'));
@@ -314,4 +319,62 @@ function detectTiles(): Map<string, TileCheck> {
     });
   }
   return checks;
+}
+
+/**
+ * Regenerates each sample's Phaser atlas and CSS with the current targets, from
+ * the committed atlas and the detected tiling, and lists the files that differ.
+ */
+function findStaleExports(tiles: ReadonlyMap<string, TileCheck>): string[] {
+  const manifestPath = join(root, values.manifest);
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
+    entries: Array<{ label: string; atlas: string; css?: string }>;
+  };
+  const stale: string[] = [];
+  for (const entry of manifest.entries) {
+    const atlasPath = join(dirname(manifestPath), entry.atlas);
+    const atlasText = readFileSync(atlasPath, 'utf8');
+    const atlas = JSON.parse(atlasText) as {
+      frames: Record<
+        string,
+        {
+          frame: { w: number; h: number };
+          scale9Borders: Scale9Borders;
+          slicewright?: { shape?: string };
+        }
+      >;
+      meta: { image: string };
+    };
+    const [name, frame] = Object.entries(atlas.frames)[0] ?? [];
+    if (name === undefined || frame === undefined) {
+      stale.push(`${entry.atlas}: no frame`);
+      continue;
+    }
+    const { w, h } = frame.frame;
+    const shape =
+      frame.scale9Borders.y === 0 && frame.scale9Borders.h === h
+        ? 'three'
+        : frame.slicewright?.shape === 'three-vertical'
+          ? 'three-vertical'
+          : 'nine';
+    const tile = tiles.get(entry.label)?.tile ?? '';
+    const layout = layoutFromInsets(scale9BordersToInsets(frame.scale9Borders, w, h), w, h, {
+      shape,
+      tile: { x: tile.includes('x'), y: tile.includes('y') },
+    });
+    const raster = decodePng(readFileSync(join(dirname(atlasPath), atlas.meta.image)));
+    const input = { name, imageRef: atlas.meta.image, raster, layout };
+    const committed: Array<[string, string, string]> = [['phaser', atlasPath, atlasText]];
+    if (entry.css !== undefined) {
+      const cssPath = join(dirname(manifestPath), entry.css);
+      committed.push(['css', cssPath, readFileSync(cssPath, 'utf8')]);
+    }
+    for (const [target, path, text] of committed) {
+      const generated = exportForTarget(target, input).files[0]?.contents;
+      if (generated !== text) {
+        stale.push(`${path.slice(root.length + 1)} differs from the current ${target} export`);
+      }
+    }
+  }
+  return stale;
 }

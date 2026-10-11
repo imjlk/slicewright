@@ -60,6 +60,8 @@ export interface SliceTarget {
    */
   readonly status: 'verified' | 'experimental';
   readonly capabilities: TargetCapabilities;
+  /** Target-specific limits the shared capabilities cannot express. */
+  readonly check?: (layout: SliceLayout) => Finding[];
   /** Writes the target's files; only called for layouts the capabilities accept. */
   readonly exportLayout: (input: ExportInput) => Omit<ExportResult, 'target' | 'findings'>;
 }

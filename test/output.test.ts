@@ -99,7 +99,7 @@ export function rendersSlicesAndPreviewSheets(): void {
 
 /**
  * @evidence docs/spec.md#phaser-scale9borders Converts both ways, applies Phaser's three-slice rule, and writes a loadable one-frame atlas.
- * @evidenceReview docs/spec.md#phaser-scale9borders #d192956 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#phaser-scale9borders #4c250ad Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function convertsToPhaserBorders(): void {
   const insets = { left: 6, right: 8, top: 5, bottom: 7 };

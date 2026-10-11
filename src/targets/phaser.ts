@@ -1,4 +1,5 @@
-import { axisTiles, layoutShape } from '../layout.js';
+import type { Finding } from '../inspect.js';
+import { axisTiles, flexibleSegments, layoutShape, type SliceLayout } from '../layout.js';
 import { createSingleFrameAtlas } from '../phaser.js';
 import { exportInsets, fixedAxisNote } from './common.js';
 import type { ExportInput, ExportResult, SliceTarget } from './types.js';
@@ -13,15 +14,40 @@ export const phaserTarget: SliceTarget = {
     tile: 'per-axis',
     tileCount: 'floor',
   },
+  check: checkPhaserLayout,
   exportLayout: exportPhaser,
 };
+
+/**
+ * Phaser reads borders that span the full frame height as its horizontal
+ * three-slice and keeps the height, so a layout whose height stretches as one
+ * full-height span has no Phaser encoding.
+ *
+ * @evidence docs/spec.md#phaser-scale9borders Rejects a full-height vertical stretch span, which Phaser would read as its three-slice.
+ * @evidenceReview docs/spec.md#phaser-scale9borders #4c250ad Checked this code against the section line by line and ran convertsToPhaserBorders green with pnpm test.
+ */
+export function checkPhaserLayout(layout: SliceLayout): Finding[] {
+  const vertical = flexibleSegments(layout.y);
+  const fullHeight =
+    vertical.length === 1 && vertical[0]?.start === 0 && vertical[0].end === layout.y.length;
+  return fullHeight
+    ? [
+        {
+          code: 'target.unsupported',
+          severity: 'error',
+          message:
+            'Phaser reads borders spanning the full height as its horizontal three-slice and keeps the height, so a full-height vertical stretch cannot be exported. Give the art top and bottom insets, or use CSS.',
+        },
+      ]
+    : [];
+}
 
 /**
  * Phaser 4 NineSlice: a one-frame JSON Hash atlas whose `scale9Borders`
  * NineSlice reads, plus the `tileX` / `tileY` constructor flags for tiled axes.
  *
  * @evidence docs/spec.md#phaser-scale9borders Exports the atlas frame and the nineslice call with tiling flags for the Phaser target.
- * @evidenceReview docs/spec.md#phaser-scale9borders #d192956 Checked this code against the section line by line and ran convertsToPhaserBorders green with pnpm test.
+ * @evidenceReview docs/spec.md#phaser-scale9borders #4c250ad Checked this code against the section line by line and ran convertsToPhaserBorders green with pnpm test.
  */
 export function exportPhaser({
   name,
@@ -49,7 +75,8 @@ export function exportPhaser({
       // Values are serialized as string literals so quotes in names stay valid code.
       `this.load.atlas(${js(name)}, ${js(loaderPaths?.image ?? imageRef)}, ${js(joinUrl(loaderPaths?.directory ?? '', `${name}.json`))});\n` +
       `this.add.nineslice(x, y, ${js(name)}, ${js(name)}, width, height${tileArgs});` +
-      fixedAxisNote(layout),
+      // Prose goes in a comment so the snippet stays valid JavaScript.
+      (fixedAxisNote(layout) === '' ? '' : `\n//${fixedAxisNote(layout)}`),
   };
 }
 

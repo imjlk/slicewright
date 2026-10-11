@@ -16,6 +16,7 @@ export function capabilityFindings(target: SliceTarget, layout: SliceLayout): Fi
   const findings: Finding[] = [];
   const shape = layoutShape(layout);
   const { capabilities } = target;
+  findings.push(...(target.check?.(layout) ?? []));
   if (target.status === 'experimental') {
     findings.push({
       code: 'target.experimental',

@@ -123,6 +123,24 @@ export function detectsVerticalThreeSlices(): void {
     layout: report.layout,
   });
   ok(quoted.usage.includes(`this.load.atlas("king's", "king's.png", "king's.json");`));
+  // The fixed-width note is a comment, so the snippet stays valid JavaScript.
+  ok(loaded.usage.endsWith('\n// Keep the width at 12 px.'));
+  // A full-height vertical span collides with Phaser's own three-slice encoding.
+  const fullHeight = layoutFromInsets({ left: 0, right: 0, top: 0, bottom: 0 }, 12, 48, {
+    shape: 'three-vertical',
+  });
+  const refused = exportForTarget('phaser', {
+    name: 'track',
+    imageRef: 'track.png',
+    raster: bar,
+    layout: fullHeight,
+  });
+  ok(codes(refused.findings).includes('target.unsupported'));
+  strictEqual(refused.files.length, 0);
+  strictEqual(
+    exportForTarget('css', { name: 'track', imageRef: 'track.png', raster: bar, layout: fullHeight }).files.length,
+    1,
+  );
 
   // The Phaser target's own vertical export passes the atlas check.
   const exported = exportForTarget('phaser', {

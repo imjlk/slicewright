@@ -502,7 +502,8 @@ function writeExport(
     const path = join(options.outDir, file.path);
     // A name such as ../config must not write outside the output directory.
     const inside = relative(outDir, resolve(path));
-    if (inside === '' || inside.startsWith('..') || isAbsolute(inside)) {
+    // A leading ".." component escapes; a name such as "..panel" does not.
+    if (inside === '' || inside === '..' || inside.startsWith(`..${sep}`) || isAbsolute(inside)) {
       throw new UsageError(`"${file.path}" would be written outside ${options.outDir}; pick a plain --name.`);
     }
     writeFileSync(path, file.contents);
