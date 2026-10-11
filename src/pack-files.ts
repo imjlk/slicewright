@@ -50,6 +50,8 @@ interface AtlasSource {
   readonly layout: SliceLayout | undefined;
   /** The frame's own image, when the frame covers all of it. */
   readonly wholeImage: string | undefined;
+  /** The image the frame is cut from. */
+  readonly image: string;
 }
 
 /**
@@ -59,13 +61,33 @@ interface AtlasSource {
  * stylesheet sit next to the PNG.
  *
  * @evidence docs/spec.md#atlas-packing Refuses trimmed, rotated, and out-of-image input frames, checks the packed atlas, writes one load call with a NineSlice per frame, and gives CSS classes only to frames that are a whole image.
- * @evidenceReview docs/spec.md#atlas-packing #1500d73 Checked this code against the section line by line and ran packsAtlasFiles green with pnpm test.
+ * @evidenceReview docs/spec.md#atlas-packing #13ea142 Checked this code against the section line by line and ran packsAtlasFiles green with pnpm test.
  */
 export function buildPack(options: PackFilesOptions): PackFilesResult {
   const outDir = dirname(options.out);
   const atlasPath = join(outDir, `${options.name}.json`);
   const cssPath = join(outDir, `${options.name}.css`);
   const sources = options.inputs.flatMap((path) => atlasSources(path));
+  // Packing next to its inputs must never overwrite them or their stylesheets.
+  const outputs = [options.out, atlasPath, cssPath].map((path) => resolve(path));
+  for (const input of options.inputs) {
+    const stem = resolve(input).replace(/\.json$/i, '');
+    const taken = [resolve(input), `${stem}.css`, `${stem}.png`];
+    const clash = outputs.find((path) => taken.includes(path));
+    if (clash !== undefined) {
+      throw new PackInputError(
+        `Packing would overwrite ${clash}, which belongs to the input ${input}; pick another --out or --name.`,
+      );
+    }
+  }
+  for (const source of sources) {
+    const clash = outputs.find((path) => path === source.image);
+    if (clash !== undefined) {
+      throw new PackInputError(
+        `Packing would overwrite the input image ${clash}; pick another --out.`,
+      );
+    }
+  }
   const packed = packFrames(
     sources.map(({ piece }) => piece),
     urlPath(relative(resolve(outDir), resolve(options.out))),
@@ -95,14 +117,15 @@ export function buildPack(options: PackFilesOptions): PackFilesResult {
     files: [
       { path: options.out, contents: encodePng(packed.raster) },
       { path: atlasPath, contents: `${JSON.stringify(packed.atlas, null, 2)}\n` },
-      ...(css === undefined ? [] : [{ path: cssPath, contents: css.contents }]),
+      // A stylesheet with no class would only be an empty file to link.
+      ...(css === undefined || css.contents === '' ? [] : [{ path: cssPath, contents: css.contents }]),
     ],
     frames: packed.frames,
     size: { width: packed.raster.width, height: packed.raster.height },
     report,
     cssFindings: css?.findings ?? [],
     ok: report.ok && (css?.ok ?? true),
-    usage: css === undefined ? usage : `${usage}\n\n${css.usage}`,
+    usage: css === undefined || css.contents === '' ? usage : `${usage}\n\n${css.usage}`,
   };
 }
 
@@ -148,6 +171,7 @@ function atlasSources(path: string): AtlasSource[] {
       layout: bordersFit ? frameLayout(frame) : undefined,
       wholeImage:
         x === 0 && y === 0 && w === raster.width && h === raster.height ? imagePath : undefined,
+      image: imagePath,
     };
   });
 }

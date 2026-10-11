@@ -40,7 +40,7 @@ export interface PackResult {
  * `spacing` transparent pixels.
  *
  * @evidence docs/spec.md#atlas-packing Places frames on shelves with extrusion and spacing, copies their pixels exactly, and writes untrimmed, unrotated frames that keep their borders and slicewright data.
- * @evidenceReview docs/spec.md#atlas-packing #1500d73 Checked this code against the section line by line and ran packsAtlases green with pnpm test.
+ * @evidenceReview docs/spec.md#atlas-packing #13ea142 Checked this code against the section line by line and ran packsAtlases green with pnpm test.
  */
 export function packFrames(
   pieces: readonly PackPiece[],
@@ -103,7 +103,7 @@ export function packFrames(
   const raster = createRaster(width, height);
 
   const frames: PackedFrame[] = [];
-  const atlasFrames: Record<string, PhaserAtlasFrame> = {};
+  const atlasFrames: Array<[string, PhaserAtlasFrame]> = [];
   // Atlas frames follow the order the pieces were given, not the shelf order.
   const byName = new Map(placed.map((item) => [item.cell.piece.name, item]));
   for (const piece of pieces) {
@@ -116,7 +116,9 @@ export function packFrames(
     blitExtruded(raster, piece.raster, left, top, extrude);
     const { width: w, height: h } = piece.raster;
     frames.push({ name: piece.name, x: left, y: top, width: w, height: h });
-    atlasFrames[piece.name] = {
+    atlasFrames.push([
+      piece.name,
+      {
       frame: { x: left, y: top, w, h },
       rotated: false,
       trimmed: false,
@@ -124,11 +126,13 @@ export function packFrames(
       sourceSize: { w, h },
       ...(piece.data.scale9Borders === undefined ? {} : { scale9Borders: piece.data.scale9Borders }),
       ...(piece.data.slicewright === undefined ? {} : { slicewright: piece.data.slicewright }),
-    };
+      },
+    ]);
   }
   return {
     raster,
-    atlas: { frames: atlasFrames, meta: { image, size: { w: width, h: height }, scale: '1' } },
+    // fromEntries defines own keys, so a frame named __proto__ stays a frame.
+    atlas: { frames: Object.fromEntries(atlasFrames), meta: { image, size: { w: width, h: height }, scale: '1' } },
     frames,
   };
 }

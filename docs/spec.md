@@ -338,7 +338,9 @@ The packed atlas gets the same check as any other atlas, and an error in it
 fails the command. Its usage loads the atlas once and creates each frame's NineSlice with its tiling
 flags. Because CSS `border-image` cannot address part of an image, the packed
 CSS is one stylesheet with a class per frame that still points at each frame's
-own image, and a frame that is only part of its image has no CSS class.
+own image, and a frame that is only part of its image has no CSS class; with no
+class at all, no stylesheet is written. Packing refuses to write over an input
+atlas, its image, or the stylesheet beside it.
 
 ## Generation prompts
 

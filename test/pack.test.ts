@@ -38,7 +38,7 @@ function pixel(raster: Raster, x: number, y: number): number[] {
 
 /**
  * @evidence docs/spec.md#atlas-packing Packs a panel, a bar, and a tiled rope panel: exact pixels, extrusion, spacing, kept borders and slicewright data, a passing atlas check, one usage, and refused inputs.
- * @evidenceReview docs/spec.md#atlas-packing #1500d73 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#atlas-packing #13ea142 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function packsAtlases(): void {
   const pieces = [
@@ -133,13 +133,16 @@ export function packsAtlases(): void {
 
   throws(() => packFrames([pieces[0] as PackPiece, pieces[0] as PackPiece], 'ui.png'), /unique/);
   throws(() => packFrames([], 'ui.png'), RangeError);
+  // Frame names are data: one named __proto__ is still a frame.
+  const proto = packFrames([{ ...(pieces[0] as PackPiece), name: '__proto__' }], 'ui.png');
+  deepStrictEqual(Object.keys(proto.atlas.frames), ['__proto__']);
   throws(() => packFrames(pieces, 'ui.png', { spacing: -1, extrude: 1 }), RangeError);
   throws(() => packFrames(pieces, 'ui.png', { spacing: 2, extrude: 1.5 }), RangeError);
 }
 
 /**
  * @evidence docs/spec.md#atlas-packing Packs committed atlases from files: one load call, tiling flags, a stylesheet whose classes point at each frame's own image, no classes for frames that are part of an image, and refused trimmed frames.
- * @evidenceReview docs/spec.md#atlas-packing #1500d73 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#atlas-packing #13ea142 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function packsAtlasFiles(): void {
   const dir = mkdtempSync(join(tmpdir(), 'slicewright-pack-'));
@@ -187,6 +190,30 @@ export function packsAtlasFiles(): void {
       again.cssFindings.map((finding) => finding.code),
       ['pack.css-skipped', 'pack.css-skipped'],
     );
+    // With no class to write, there is no stylesheet to link.
+    strictEqual(again.files.length, 2);
+    strictEqual(again.usage.includes('<link'), false);
+    // Packing must not overwrite its inputs or their companion files.
+    throws(
+      () =>
+        buildPack({
+          ...options,
+          inputs: [join(dir, 'ui.json')],
+          out: join(dir, 'ui.png'),
+          name: 'ui',
+        }),
+      /would overwrite/,
+    );
+    throws(
+      () =>
+        buildPack({
+          ...options,
+          inputs: [join(dir, 'ui.json')],
+          out: join(dir, 'other.png'),
+          name: 'ui',
+        }),
+      /would overwrite/,
+    );
     const first = decodePng(readFileSync(join(dir, 'ui.png')));
     const second = decodePng(again.files[0]?.contents as Uint8Array);
     for (const frame of again.frames) {
@@ -223,6 +250,21 @@ export function packsAtlasFiles(): void {
         }),
       PackInputError,
     );
+    // So is a rotated frame, and a frame outside its image.
+    const changed = JSON.parse(readFileSync(join(dir, 'ui.json'), 'utf8')) as {
+      frames: Record<string, { rotated: boolean; frame: { x: number } }>;
+    };
+    const [firstFrame] = Object.values(changed.frames);
+    ok(firstFrame !== undefined);
+    firstFrame.rotated = true;
+    writeFileSync(join(dir, 'rotated.json'), JSON.stringify(changed));
+    const packOne = (input: string): unknown =>
+      buildPack({ ...options, inputs: [join(dir, input)], out: join(dir, 'one.png'), name: 'one' });
+    throws(() => packOne('rotated.json'), /rotated/);
+    firstFrame.rotated = false;
+    firstFrame.frame.x = 10_000;
+    writeFileSync(join(dir, 'outside.json'), JSON.stringify(changed));
+    throws(() => packOne('outside.json'), /outside its/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
