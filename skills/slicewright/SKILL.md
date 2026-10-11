@@ -17,8 +17,9 @@ reaches the game.
 Use `npx slicewright` when the package is installed. From a clone, run
 `pnpm install && pnpm build` once in `$SLICEWRIGHT_ROOT`, then
 `node $SLICEWRIGHT_ROOT/dist/cli.js`. Every command prints JSON on stdout;
-`inspect`, `frame`, `normalize`, and `atlas` exit 1 when a finding is an
-error, and every command exits 2 on bad input. `--help` works on each command.
+`inspect`, `frame`, `normalize`, `export`, and `atlas` exit 1 when a finding is
+an error (for `export`, a layout the target cannot represent), and every
+command exits 2 on bad input. `--help` works on each command.
 
 ## Workflow
 
