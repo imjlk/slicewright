@@ -303,7 +303,14 @@ interface TileCheck {
 function detectTiles(): Map<string, TileCheck> {
   const manifestPath = join(root, values.manifest);
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
-    entries: Array<{ label: string; atlas: string; tile?: string; like?: string; frame?: string }>;
+    entries: Array<{
+      label: string;
+      atlas: string;
+      tile?: string;
+      like?: string;
+      frame?: string;
+      mode?: 'three' | 'three-vertical';
+    }>;
   };
   const checks = new Map<string, TileCheck>();
   for (const entry of manifest.entries) {
@@ -317,7 +324,8 @@ function detectTiles(): Map<string, TileCheck> {
       ? Object.values(atlas.frames)[0]
       : atlas.frames[entry.frame])?.frame ?? { x: 0, y: 0, w: image.width, h: image.height };
     const raster = cropRaster(image, { x: rect.x, y: rect.y, width: rect.w, height: rect.h });
-    const report = inspectRaster(raster);
+    // A sample normalized with --mode is detected with it too, as its export was.
+    const report = inspectRaster(raster, { ...defaultInspectOptions, mode: entry.mode ?? 'auto' });
     const axes = (flags: { x: boolean; y: boolean }): string =>
       `${flags.x ? 'x' : ''}${flags.y ? 'y' : ''}`;
     const tile = axes(report.tile);

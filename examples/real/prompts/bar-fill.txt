@@ -1,0 +1,9 @@
+The fill of a single horizontal game UI progress bar, drawn to sit inside a matching bar track, sci-fi HUD, glowing cyan energy, matching the reference track (dark metal with cyan neon end caps).
+Shape: a horizontal strip with short rounded or squared ends and no frame, rim, or track of its own; the body is one solid color that may shade from top to bottom, with at most a thin highlight along the top.
+Flat front view, no perspective, centered and filling the canvas edge to edge with only a few pixels of margin.
+Keep both ends short and simple, because the fill is drawn at any length down to its two ends. The middle is plain along its length: no stripes, segments, sparkles, or texture running along it.
+It will be stretched horizontally only: the middle strip must look identical at every horizontal position.
+No text, letters, icons, symbols, or characters on it.
+Clean edges, no blur, no noise or grain.
+Solid pure magenta (#FF00FF) background filling everything outside the element; no magenta anywhere on the element itself.
+Avoid: text or icons on the element; drop shadows or glows outside the element; perspective, tilt, or 3D camera angles; gradients or patterns along a stretch direction; decoration in the middle of an edge; rope, chain, bead, or vine patterns running along the edges; multiple elements or variants in one image; background scenery.

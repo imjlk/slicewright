@@ -39,6 +39,12 @@
       "css": "bar.css"
     },
     {
+      "label": "bar fill",
+      "atlas": "bar-fill.json",
+      "css": "bar-fill.css",
+      "mode": "three"
+    },
+    {
       "label": "bar --keep 4",
       "atlas": "bar-min.json",
       "like": "bar.json",

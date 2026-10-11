@@ -245,7 +245,7 @@ export function checksAtlasFrames(): void {
 
 /**
  * @evidence docs/spec.md#generation-prompts Plans structural prompts, three-slice bars, chroma backgrounds, and follow-up steps.
- * @evidenceReview docs/spec.md#generation-prompts #e17218a Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#generation-prompts #cd814f8 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function plansGenerationPrompts(): void {
   const button = buildPromptPlan({
@@ -277,6 +277,28 @@ export function plansGenerationPrompts(): void {
   ok(bar.prompt.includes('pixel art'));
   ok(bar.afterGeneration[0]?.includes('despill'));
   ok(bar.afterGeneration.some((step) => step.includes('slicewright inspect')));
+
+  const fill = buildPromptPlan({
+    kind: 'bar-fill',
+    style: 'sci-fi HUD, glowing cyan energy',
+    background: 'chroma-magenta',
+    pixelArt: false,
+  });
+  strictEqual(fill.mode, 'three');
+  ok(fill.prompt.startsWith('The fill of a single horizontal game UI progress bar'));
+  ok(fill.prompt.includes('no frame, rim, or track of its own'));
+  ok(fill.prompt.includes('Keep both ends short and simple'));
+  ok(fill.prompt.includes('stretched horizontally only'));
+  ok(fill.afterGeneration.some((step) => step.includes("track's content height")));
+  ok(fill.afterGeneration.some((step) => step.includes('--mode three')));
+  // atlas takes no --mode, so the plan names only the commands that do.
+  strictEqual(
+    fill.afterGeneration.some((step) => step.includes('every later command')),
+    false,
+  );
+  // The fill replaces the track's end-cap rule rather than adding to it.
+  strictEqual(fill.prompt.includes('two end caps'), false);
+  ok(bar.afterGeneration.some((step) => step.startsWith('Downscale to the target UI size')));
 }
 
 void test('PNG input', convertsPngLayoutsToRgba);

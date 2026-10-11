@@ -1,9 +1,17 @@
 import type { SliceMode } from './slices.js';
 
-export type UiKind = 'button' | 'panel' | 'dialog' | 'bar' | 'tooltip' | 'frame';
+export type UiKind = 'button' | 'panel' | 'dialog' | 'bar' | 'bar-fill' | 'tooltip' | 'frame';
 export type PromptBackground = 'transparent' | 'chroma-green' | 'chroma-magenta';
 
-export const uiKinds: readonly UiKind[] = ['button', 'panel', 'dialog', 'bar', 'tooltip', 'frame'];
+export const uiKinds: readonly UiKind[] = [
+  'button',
+  'panel',
+  'dialog',
+  'bar',
+  'bar-fill',
+  'tooltip',
+  'frame',
+];
 export const promptBackgrounds: readonly PromptBackground[] = [
   'transparent',
   'chroma-green',
@@ -59,6 +67,12 @@ const presets: Readonly<Record<UiKind, KindPreset>> = {
     aspect: '4:1',
     structure: 'rounded or capped left and right ends; the middle is one continuous horizontal strip that may shade from top to bottom',
   },
+  'bar-fill': {
+    subject: 'the fill of a single horizontal game UI progress bar, drawn to sit inside a matching bar track',
+    mode: 'three',
+    aspect: '8:1',
+    structure: 'a horizontal strip with short rounded or squared ends and no frame, rim, or track of its own; the body is one solid color that may shade from top to bottom, with at most a thin highlight along the top',
+  },
   tooltip: {
     subject: 'a single small game UI tooltip box background',
     mode: 'nine',
@@ -87,7 +101,7 @@ const backgroundLines: Readonly<Record<PromptBackground, string>> = {
  * structure and the inset numbers come from inspection afterwards.
  *
  * @evidence docs/spec.md#generation-prompts Builds the structural prompt, the avoid list, three-slice bars, and the follow-up steps.
- * @evidenceReview docs/spec.md#generation-prompts #e17218a Checked this code against the section line by line and ran plansGenerationPrompts green with pnpm test.
+ * @evidenceReview docs/spec.md#generation-prompts #cd814f8 Checked this code against the section line by line and ran plansGenerationPrompts green with pnpm test.
  */
 export function buildPromptPlan(request: PromptRequest): PromptPlan {
   const preset = presets[request.kind];
@@ -99,8 +113,10 @@ export function buildPromptPlan(request: PromptRequest): PromptPlan {
     `${capitalize(preset.subject)}, ${request.style.trim()}.`,
     `Shape: ${preset.structure}.`,
     'Flat front view, no perspective, centered and filling the canvas edge to edge with only a few pixels of margin.',
-    preset.mode === 'three'
-      ? 'Put all decoration in the two end caps. The middle is plain along its length: no wood grain or texture running along the bar, and no repeated motifs.'
+    request.kind === 'bar-fill'
+      ? 'Keep both ends short and simple, because the fill is drawn at any length down to its two ends. The middle is plain along its length: no stripes, segments, sparkles, or texture running along it.'
+      : preset.mode === 'three'
+        ? 'Put all decoration in the two end caps. The middle is plain along its length: no wood grain or texture running along the bar, and no repeated motifs.'
       : 'Put all decoration in the four corners. Between the corners the edges are plain smooth bands with no pattern along them: no wood grain or texture running along the edge, no rope, chain, beads, vines, rivets, or repeated motifs.',
     stretch,
     'No text, letters, icons, symbols, or characters on it.',
@@ -114,8 +130,12 @@ export function buildPromptPlan(request: PromptRequest): PromptPlan {
       ? 'Confirm the PNG really has an alpha channel; regenerate if the background is baked in.'
       : 'Remove the chroma background and despill the edge before inspecting.',
     'Crop transparent margins.',
-    'Downscale to the target UI size before slicing; pick insets at the final size.',
-    'Run `slicewright inspect` and fix every error.',
+    request.kind === 'bar-fill'
+      ? "Downscale it to the track's content height (the track height minus its top and bottom content padding) before slicing; pick insets at the final size."
+      : 'Downscale to the target UI size before slicing; pick insets at the final size.',
+    preset.mode === 'three'
+      ? 'Run `slicewright inspect --mode three` (and pass `--mode three` to preview, export, and frame too) and fix every error.'
+      : 'Run `slicewright inspect` and fix every error.',
     'Run `slicewright preview` and look at the stretched sizes.',
     'Pack it untrimmed, then run `slicewright atlas` on the atlas.',
   ];
