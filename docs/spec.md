@@ -21,7 +21,9 @@ store one. Corners keep their size, the top and bottom edges stretch
 horizontally, the left and right edges stretch vertically, and the center
 stretches both ways. The stretchable span on each axis must be at least one
 pixel wide, so `left + right` must be smaller than the width and `top + bottom`
-smaller than the height.
+smaller than the height. When the fixed segments take more than half of an
+axis that resizes, an `insets.large` warning says how little stretches and how
+far the art can shrink.
 
 ## Slice layouts
 
@@ -319,8 +321,8 @@ still render it as a nine-slice.
 A prompt plan turns a UI kind (button, panel, dialog, bar, tooltip, frame), a
 style, and a background choice into a generation prompt. The prompt asks for a
 flat, front-facing element that fills the canvas, decoration only in the
-corners (the end caps for a bar), edges that are plain bands with no pattern
-running along them (a rope or vine edge can neither stretch nor tile cleanly
+corners (the end caps for a bar), edges that are plain bands with no pattern,
+grain, or texture running along them (a rope or vine edge can neither stretch nor tile cleanly
 when a model draws it), a plain center, no text or icons, and the requested
 background. Bars are planned as three-slices. The plan lists what to avoid and
 the follow-up steps: remove the background, inspect, and preview.

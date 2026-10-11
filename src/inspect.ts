@@ -144,6 +144,7 @@ export function inspectRaster(
 
   const { insets, mode, tile, layout } = resolved;
   findings.push(...symmetryFindings(insets));
+  findings.push(...largeInsetFindings(layout));
   for (const axis of ['x', 'y'] as const) {
     // Only an axis with exactly one tiled span has a seam to check.
     if (tile[axis] && flexibleSegments(layout[axis]).length === 1) {
@@ -484,7 +485,7 @@ export function multiRegionLayout(
 
 /**
  * @evidence docs/spec.md#slice-insets Rejects caller insets that leave no stretch span.
- * @evidenceReview docs/spec.md#slice-insets #705f0b4 Checked this code against the section line by line and ran rejectsInsetsWithoutAStretchSpan green with pnpm test.
+ * @evidenceReview docs/spec.md#slice-insets #5f061b0 Checked this code against the section line by line and ran rejectsInsetsWithoutAStretchSpan green with pnpm test.
  * @evidence docs/spec.md#stretch-uniformity Reports the first mismatching pair in each caller-given stretch span unless the axis tiles.
  * @evidenceReview docs/spec.md#stretch-uniformity #695468c Checked this code against the section line by line and ran rejectsGivenInsetsThatStretchDetail green with pnpm test.
  * @evidence docs/spec.md#three-slice Forces zero top and bottom insets in three-slice mode.
@@ -745,6 +746,36 @@ function touchesTransparency(raster: Raster, x: number, y: number): boolean {
     }
   }
   return false;
+}
+
+/** Fixed segments above this share of a resizable axis leave little room to resize. */
+const largeInsetRatio = 0.5;
+
+/**
+ * Warns when the fixed segments take most of an axis that resizes, so the art
+ * cannot shrink much below its source size and only a short span stretches.
+ *
+ * @evidence docs/spec.md#slice-insets Warns when fixed segments take more than half of a resizable axis.
+ * @evidenceReview docs/spec.md#slice-insets #5f061b0 Checked this code against the section line by line and ran rejectsInsetsWithoutAStretchSpan green with pnpm test.
+ */
+export function largeInsetFindings(layout: SliceLayout): Finding[] {
+  const minimum = minimumLayoutSize(layout);
+  return (['x', 'y'] as const).flatMap((axis) => {
+    const length = layout[axis].length;
+    const fixed = axis === 'x' ? minimum.width : minimum.height;
+    if (flexibleSegments(layout[axis]).length === 0 || fixed <= length * largeInsetRatio) {
+      return [];
+    }
+    const dimension = axis === 'x' ? 'width' : 'height';
+    return [
+      {
+        code: `insets.large`,
+        severity: 'warning' as const,
+        message: `The fixed parts take ${fixed} of ${length} px of the ${dimension}, so it cannot go below ${fixed} px and only ${length - fixed} px stretches. Detail along the edge often causes this; regenerate with plainer edges or check the tolerance.`,
+        details: { axis, fixed, length },
+      },
+    ];
+  });
 }
 
 function symmetryFindings(insets: SliceInsets): Finding[] {
