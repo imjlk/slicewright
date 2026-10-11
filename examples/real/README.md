@@ -14,12 +14,23 @@ image was generated with the GPT `image_gen` route of
 | `baroque` | transparent PNG | `normalize --width 480` |
 | `scifi` | transparent PNG | `normalize --width 480` |
 | `bar-fill` | chroma-magenta PNG, `bar.png` as a reference | `key`, then `normalize --height 28 --mode three` |
+| `crest` | transparent PNG, hand-written prompt | `normalize --width 480 --regions multi` |
 | `bar-vertical` | the keyed bar turned a quarter turn | `normalize --height 320` |
 
 `bar-fill` is the fill for `bar`: 28 px is the track's 33 px height minus its
 top and bottom content padding (2 and 3 px).
 
-Every sample was normalized with `--target phaser,css`, which writes its
+`crest` has a crest in the middle of its top edge, so its prompt is written by
+hand: `slicewright prompt` keeps decoration in the corners. No target exports a
+multi-region layout yet, so it has no atlas or CSS. The manifest's
+`inspections` list makes the engine check detect it with `--regions multi`
+and compare the layout and finding codes with `crest.layout.json`. When a
+detection change is intended, a failing check prints the new result as
+`detected`; save that object as `crest.layout.json`. Single-region
+detection on the same image stretches only the span right of the crest and
+warns `insets.large`.
+
+Every sample except `crest` was normalized with `--target phaser,css`, which writes its
 `.json` atlas and `.css` class. `*-min` files add `--keep 4`. For painted art, most axes report
 `rebuild.<axis>.lossy` and keep their full span; the pixel panel keeps 4 rows.
 
@@ -35,5 +46,5 @@ with the current prompt.
 `../tiled/rope.png` is a synthetic panel whose rope edge repeats exactly every
 6 px, so the check also covers a tiled export (`tile.x.auto`).
 
-Render them with `pnpm engine:check`, or serve the repository and open
+Render the exported samples with `pnpm engine:check`, or serve the repository and open
 `examples/phaser/index.html` or `examples/css/index.html`.

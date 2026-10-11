@@ -112,5 +112,13 @@
       ],
       "css": true
     }
+  ],
+  "inspections": [
+    {
+      "label": "crest (multi-region)",
+      "image": "crest.png",
+      "regions": "multi",
+      "expected": "crest.layout.json"
+    }
   ]
 }

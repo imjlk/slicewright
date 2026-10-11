@@ -1,9 +1,10 @@
 import { createReadStream, existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { basename, dirname, extname, join, normalize, resolve, sep } from 'node:path';
-import { parseArgs } from 'node:util';
+import { isDeepStrictEqual, parseArgs } from 'node:util';
 
 import { chromium, type Page } from 'playwright-core';
+import typia from 'typia';
 
 import { defaultInspectOptions, inspectRaster } from '../src/inspect.js';
 import { buildPack } from '../src/pack-files.js';
@@ -93,6 +94,12 @@ failed ||= tileMismatches.length > 0;
 const staleExports = findStaleExports(detectedTile);
 output['staleExports'] = staleExports;
 failed ||= staleExports.length > 0;
+// Layouts no target exports yet, such as multiple regions, are checked against
+// the layout recorded when the sample was made, so detection on real art cannot
+// drift unnoticed.
+const inspections = checkInspections();
+output['inspections'] = inspections;
+failed ||= inspections.some((item) => item.problem !== undefined);
 try {
   if (engines.includes('phaser')) {
     const result = await checkPhaser(await openPage('phaser'));
@@ -356,6 +363,106 @@ function detectTiles(): Map<string, TileCheck> {
     });
   }
   return checks;
+}
+
+/** An inspection the manifest asks for. */
+interface ManifestInspection {
+  readonly label: string;
+  readonly image: string;
+  readonly regions: 'single' | 'multi';
+  readonly expected: string;
+}
+
+/** Parses and validates an expected file; invalid JSON is a reason, not a crash. */
+function validateExpected(
+  text: string,
+): { readonly data: ExpectedInspection } | { readonly reason: string } {
+  let json: unknown;
+  try {
+    json = JSON.parse(text);
+  } catch (error) {
+    return { reason: `not JSON: ${error instanceof Error ? error.message : String(error)}` };
+  }
+  const result = typia.validateEquals<ExpectedInspection>(json);
+  return result.success
+    ? { data: result.data }
+    : {
+        reason: result.errors.map((error) => `${error.path} expected ${error.expected}`).join('; '),
+      };
+}
+
+/** A recorded inspection result, as `detected` prints it. */
+interface ExpectedInspection {
+  readonly regions: 'single' | 'multi';
+  readonly layout: SliceLayout;
+  readonly findings: string[];
+}
+
+interface InspectionCheck {
+  readonly label: string;
+  readonly regions: 'single' | 'multi';
+  readonly findings: readonly string[];
+  readonly problem?: string;
+  /** What detection found, to compare or to record as the new expected file. */
+  readonly detected?: { readonly regions: string; readonly layout: unknown; readonly findings: readonly string[] };
+}
+
+/** Detects each manifest inspection again and compares it with its recorded layout and finding codes. */
+function checkInspections(): InspectionCheck[] {
+  const manifestPath = join(root, values.manifest);
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as Record<string, unknown>;
+  // A renamed or misspelled key would otherwise compare nothing and pass.
+  const unknownKeys = Object.keys(manifest).filter(
+    (key) => !['entries', 'packs', 'inspections'].includes(key),
+  );
+  if (unknownKeys.length > 0) {
+    usage(`${values.manifest} has unknown keys: ${unknownKeys.join(', ')}.`);
+  }
+  // Only an absent key means no inspections; null, a misspelled field, or a
+  // missing one must never fall back to a default and still pass.
+  const listed = Object.hasOwn(manifest, 'inspections')
+    ? typia.validateEquals<ManifestInspection[]>(manifest['inspections'])
+    : { success: true as const, data: [] };
+  if (!listed.success) {
+    usage(
+      `${values.manifest} has malformed inspections: ${listed.errors.map((error) => `${error.path} expected ${error.expected}`).join('; ')}.`,
+    );
+  }
+  return listed.data.map((entry) => {
+    const { regions } = entry;
+    const raster = decodePng(readFileSync(join(dirname(manifestPath), entry.image)));
+    const report = inspectRaster(raster, { ...defaultInspectOptions, regions });
+    const findings = report.findings.map((finding) => finding.code);
+    const detected = { regions, layout: report.layout, findings };
+    const expectedPath = join(dirname(manifestPath), entry.expected);
+    // The expected file must have exactly this shape: a missing field must
+    // never default to a value that happens to match.
+    const parsed = existsSync(expectedPath)
+      ? validateExpected(readFileSync(expectedPath, 'utf8'))
+      : undefined;
+    const expected = parsed !== undefined && 'data' in parsed ? parsed.data : undefined;
+    // Compared by value: key order and finding order carry no meaning.
+    const problem =
+      parsed === undefined
+        ? `${entry.expected} is missing`
+        : 'reason' in parsed
+          ? `${entry.expected} is malformed: ${parsed.reason}`
+          : expected === undefined
+            ? `${entry.expected} is malformed`
+        : expected.regions !== regions
+          ? `${entry.expected} records regions "${String(expected.regions)}" but the manifest asks for "${regions}"`
+          : !isDeepStrictEqual(report.layout, expected.layout)
+            ? `the detected layout differs from ${entry.expected}`
+            : !isDeepStrictEqual([...findings].sort(), [...expected.findings].sort())
+              ? `the findings ${findings.join(', ')} differ from ${expected.findings.join(', ')}`
+              : undefined;
+    return {
+      label: entry.label,
+      regions,
+      findings,
+      ...(problem === undefined ? {} : { problem, detected }),
+    };
+  });
 }
 
 /**
