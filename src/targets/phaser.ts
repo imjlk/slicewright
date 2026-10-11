@@ -1,4 +1,4 @@
-import { axisTiles } from '../layout.js';
+import { axisTiles, layoutShape } from '../layout.js';
 import { createSingleFrameAtlas } from '../phaser.js';
 import { exportInsets, fixedAxisNote } from './common.js';
 import type { ExportInput, ExportResult, SliceTarget } from './types.js';
@@ -21,7 +21,7 @@ export const phaserTarget: SliceTarget = {
  * NineSlice reads, plus the `tileX` / `tileY` constructor flags for tiled axes.
  *
  * @evidence docs/spec.md#phaser-scale9borders Exports the atlas frame and the nineslice call with tiling flags for the Phaser target.
- * @evidenceReview docs/spec.md#phaser-scale9borders #ae82d95 Checked this code against the section line by line and ran convertsToPhaserBorders green with pnpm test.
+ * @evidenceReview docs/spec.md#phaser-scale9borders #d192956 Checked this code against the section line by line and ran convertsToPhaserBorders green with pnpm test.
  */
 export function exportPhaser({
   name,
@@ -36,6 +36,7 @@ export function exportPhaser({
     raster.width,
     raster.height,
     exportInsets(layout),
+    layoutShape(layout) === 'three-vertical' ? 'three-vertical' : undefined,
   );
   const tileX = axisTiles(layout.x);
   const tileY = axisTiles(layout.y);

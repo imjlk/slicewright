@@ -26,7 +26,7 @@ function text(contents: string | Uint8Array | undefined): string {
 
 /**
  * @evidence docs/spec.md#slice-layouts Builds axes from spans, converts insets both ways, names shapes, sums minimum sizes, and renders proportional segments.
- * @evidenceReview docs/spec.md#slice-layouts #b1ab6bb Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#slice-layouts #fc52f65 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function describesSliceLayouts(): void {
   const axis = axisFromSpans(20, [
@@ -43,6 +43,9 @@ export function describesSliceLayouts(): void {
       [16, 20, 'fixed'],
     ],
   );
+
+  throws(() => axisFromSpans(20, [{ start: 2.5, end: 6.5, kind: 'stretch' }]), RangeError);
+  throws(() => axisFromSpans(20.5, []), RangeError);
 
   const insets = { left: 6, right: 6, top: 5, bottom: 7 };
   const nine = layoutFromInsets(insets, 40, 30);
@@ -135,6 +138,17 @@ export function detectsVerticalThreeSlices(): void {
   );
   strictEqual(atlasReport.ok, true);
   strictEqual(atlasReport.frames[0]?.inspection?.mode, 'three-vertical');
+  // Without the marker, full-width borders are an ordinary nine-slice: the
+  // track's columns differ, so the column check rejects stretching them.
+  const unmarked = JSON.parse(text(exported.files[0]?.contents)) as {
+    frames: Record<string, { slicewright?: unknown }>;
+  };
+  for (const frame of Object.values(unmarked.frames)) {
+    delete frame.slicewright;
+  }
+  const unmarkedReport = inspectAtlas(unmarked, bar, defaultInspectOptions);
+  strictEqual(unmarkedReport.frames[0]?.inspection?.mode, 'nine');
+  strictEqual(unmarkedReport.ok, false);
 
   const sheet = renderPreviewSheet(bar, report.layout);
   strictEqual(
@@ -236,7 +250,7 @@ export function checksTargetCapabilities(): void {
 
 /**
  * @evidence docs/spec.md#css-border-image Checks the slice with fill, border widths, round for tiled axes, and the fixed height of a three-slice.
- * @evidenceReview docs/spec.md#css-border-image #53bcb3f Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#css-border-image #61fe631 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function exportsCssBorderImage(): void {
   const raster = panel(40, 30);
@@ -253,6 +267,14 @@ export function exportsCssBorderImage(): void {
   ok(css.includes('border-image-source: url("ui/panel.png");'));
   strictEqual(cssString('a"b\\c.png'), '"a\\"b\\\\c.png"');
   ok(css.includes('min-width: 14px;'));
+  const linked = exportForTarget('css', {
+    name: 'panel',
+    imageRef: 'panel.png',
+    raster,
+    layout,
+    loaderPaths: { image: 'ui/panel.png', directory: 'ui' },
+  });
+  ok(linked.usage.includes('<link rel="stylesheet" href="ui/panel.css">'));
 
   const three = layoutFromInsets({ left: 6, right: 6, top: 0, bottom: 0 }, 40, 30, {
     shape: 'three',

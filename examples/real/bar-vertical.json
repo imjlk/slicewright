@@ -24,6 +24,9 @@
         "y": 39,
         "w": 33,
         "h": 242
+      },
+      "slicewright": {
+        "shape": "three-vertical"
       }
     }
   },

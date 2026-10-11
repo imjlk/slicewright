@@ -60,7 +60,7 @@ export function renderSlices(
  * @evidence docs/spec.md#preview-sheet Keeps fixed segments unscaled, shares the rest among flexible segments, and tiles whole tiles with nearest sampling.
  * @evidenceReview docs/spec.md#preview-sheet #ec2d281 Checked this code against the section line by line and ran rendersSlicesAndPreviewSheets green with pnpm test.
  * @evidence docs/spec.md#slice-layouts Renders any number of fixed, stretched, and tiled segments per axis.
- * @evidenceReview docs/spec.md#slice-layouts #b1ab6bb Checked this code against the section line by line and ran describesSliceLayouts green with pnpm test.
+ * @evidenceReview docs/spec.md#slice-layouts #fc52f65 Checked this code against the section line by line and ran describesSliceLayouts green with pnpm test.
  */
 export function renderLayout(
   source: Raster,

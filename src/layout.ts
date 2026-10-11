@@ -35,7 +35,7 @@ export type LayoutShape = 'nine' | 'three' | 'three-vertical' | 'multi' | 'fixed
  * segments. Spans must be in order, inside the axis, and not overlap.
  *
  * @evidence docs/spec.md#slice-layouts Covers the axis with the given flexible spans and fixed gaps, in order.
- * @evidenceReview docs/spec.md#slice-layouts #b1ab6bb Checked this code against the section line by line and ran describesSliceLayouts green with pnpm test.
+ * @evidenceReview docs/spec.md#slice-layouts #fc52f65 Checked this code against the section line by line and ran describesSliceLayouts green with pnpm test.
  */
 export function axisFromSpans(
   length: number,
@@ -43,7 +43,13 @@ export function axisFromSpans(
 ): AxisLayout {
   const segments: Segment[] = [];
   let cursor = 0;
+  if (!Number.isInteger(length) || length < 1) {
+    throw new RangeError(`An axis needs a whole, positive length, got ${length}.`);
+  }
   for (const span of spans) {
+    if (!Number.isInteger(span.start) || !Number.isInteger(span.end)) {
+      throw new RangeError(`Span ${span.start}..${span.end} must use whole pixels.`);
+    }
     if (span.start < cursor || span.end <= span.start || span.end > length) {
       throw new RangeError(
         `Span ${span.start}..${span.end} does not fit the axis after ${cursor} of ${length}.`,
@@ -67,7 +73,7 @@ export function axisFromSpans(
  * span between its insets, tiled when `tile` says so.
  *
  * @evidence docs/spec.md#slice-layouts Maps insets, three-slice, vertical three-slice, and tiling onto segmented axes.
- * @evidenceReview docs/spec.md#slice-layouts #b1ab6bb Checked this code against the section line by line and ran describesSliceLayouts green with pnpm test.
+ * @evidenceReview docs/spec.md#slice-layouts #fc52f65 Checked this code against the section line by line and ran describesSliceLayouts green with pnpm test.
  */
 export function layoutFromInsets(
   insets: SliceInsets,
@@ -96,7 +102,7 @@ export function flexibleSegments(axis: AxisLayout): Segment[] {
 
 /**
  * @evidence docs/spec.md#slice-layouts Names the shape from the number of flexible segments per axis.
- * @evidenceReview docs/spec.md#slice-layouts #b1ab6bb Checked this code against the section line by line and ran describesSliceLayouts green with pnpm test.
+ * @evidenceReview docs/spec.md#slice-layouts #fc52f65 Checked this code against the section line by line and ran describesSliceLayouts green with pnpm test.
  */
 export function layoutShape(layout: SliceLayout): LayoutShape {
   const x = flexibleSegments(layout.x).length;
@@ -140,7 +146,7 @@ export function layoutInsets(layout: SliceLayout): SliceInsets | undefined {
  * when nothing on it is flexible.
  *
  * @evidence docs/spec.md#slice-layouts Sums the fixed segments per axis, keeping a fully fixed axis whole.
- * @evidenceReview docs/spec.md#slice-layouts #b1ab6bb Checked this code against the section line by line and ran describesSliceLayouts green with pnpm test.
+ * @evidenceReview docs/spec.md#slice-layouts #fc52f65 Checked this code against the section line by line and ran describesSliceLayouts green with pnpm test.
  */
 export function minimumLayoutSize(layout: SliceLayout): { width: number; height: number } {
   const fixed = (axis: AxisLayout): number =>

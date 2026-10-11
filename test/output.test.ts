@@ -99,7 +99,7 @@ export function rendersSlicesAndPreviewSheets(): void {
 
 /**
  * @evidence docs/spec.md#phaser-scale9borders Converts both ways, applies Phaser's three-slice rule, and writes a loadable one-frame atlas.
- * @evidenceReview docs/spec.md#phaser-scale9borders #ae82d95 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#phaser-scale9borders #d192956 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function convertsToPhaserBorders(): void {
   const insets = { left: 6, right: 8, top: 5, bottom: 7 };
@@ -124,7 +124,7 @@ export function convertsToPhaserBorders(): void {
 
 /**
  * @evidence docs/spec.md#atlas-frames Checks hash and array atlases for trimming, rotation, out-of-frame borders, missing frames, and frame pixels.
- * @evidenceReview docs/spec.md#atlas-frames #b1f6b5f Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#atlas-frames #62396a0 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function checksAtlasFrames(): void {
   const image = createRaster(80, 30);

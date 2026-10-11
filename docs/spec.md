@@ -28,7 +28,8 @@ segments that cover it in order, and each segment is `fixed` (keeps its size),
 fixed ones; a three-slice has a fully fixed vertical axis; a vertical
 three-slice has a fully fixed horizontal axis; a multi-region layout has more
 than one flexible segment on an axis; a layout with nothing flexible is
-`fixed`. Insets convert to a layout and back whenever each axis has at most one
+`fixed`. Segment bounds are whole pixels. Insets convert to a layout and back
+whenever each axis has at most one
 flexible segment, and a fixed axis converts to zero insets on both sides. The
 minimum size of a layout is the sum of its fixed segments on each axis.
 
@@ -222,6 +223,10 @@ file, so the call uses paths from where the game is served (the working
 directory, from the CLI) while the atlas keeps the image path relative to
 itself. Phaser has no vertical three-slice, so it is emulated.
 
+The emulated vertical three-slice records its shape in the frame as
+`"slicewright": { "shape": "three-vertical" }`, which Phaser keeps in
+`frame.customData`.
+
 ## Targets
 
 A target turns a layout into an engine's files. Each target declares the shapes
@@ -243,7 +248,8 @@ are `phaser` and `css`, both verified; other engines are not supported.
 
 The CSS target writes a class with `border-image-slice` set to the insets plus
 `fill`, matching `border-width` in pixels, and `border-image-repeat` of
-`stretch` or, for a tiled axis, `round` (whole tiles scaled to fit). `round`
+`stretch` or, for a tiled axis, `round` (whole tiles scaled to fit). The usage
+links the stylesheet from the same served path the Phaser usage loads from. `round`
 takes the nearest whole number of tiles rather than rounding down, so a tiled
 CSS export carries a `target.tile` warning. A
 three-slice fixes the height and a vertical three-slice fixes the width; any
@@ -257,8 +263,10 @@ frame that has `scale9Borders`, or only the named frame. A trimmed frame is an
 error because Phaser's NineSlice does not support trimming. A rotated frame is a
 warning. Borders outside the frame are an error. Each frame's pixels are then
 inspected with its borders as explicit insets: borders spanning the full height
-inspect as a three-slice, and borders spanning the full width as a vertical
-three-slice, the way the Phaser target emulates it.
+inspect as a three-slice. Borders spanning the full width are an ordinary
+nine-slice whose columns must match, unless the frame carries
+`"slicewright": { "shape": "three-vertical" }`, which the Phaser target writes
+for its emulated vertical three-slice.
 
 ## Generation prompts
 

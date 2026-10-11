@@ -32,9 +32,10 @@ const entries = await Promise.all(
 function sizesFor(entry) {
   const { w, h } = entry.likeFrame.frame;
   const b = entry.likeFrame.scale9Borders;
-  // Phaser's three-slice keeps the height; zero side insets keep the width.
+  // Phaser's three-slice keeps the height.
   const three = b.y === 0 && b.h === h;
-  const vertical = b.x === 0 && b.w === w;
+  // Only the explicit marker means a fixed width; full-width borders alone do not.
+  const vertical = entry.likeFrame.slicewright?.shape === 'three-vertical';
   const sizes = [
     ['frame', w, h],
     ['min', vertical ? w : w - b.w, three ? h : h - b.h],
@@ -101,6 +102,7 @@ class Check extends Phaser.Scene {
           image: new URL(row.entry.imageUrl).pathname,
           frame: row.entry.frame.frame,
           borders: row.entry.frame.scale9Borders,
+          shape: row.entry.frame.slicewright?.shape,
           tile,
           requested: [w, h],
           rendered: [slice.width, slice.height],

@@ -170,6 +170,8 @@ interface RenderedCell {
   readonly frame: { readonly w: number; readonly h: number };
   /** Tiled axes: '', 'x', 'y', or 'xy'. */
   readonly tile?: string;
+  /** The frame's slicewright shape marker, when it has one. */
+  readonly shape?: string;
 }
 
 interface CellComparison {
@@ -217,7 +219,7 @@ function compareCells(
     const shape =
       cell.borders.y === 0 && cell.borders.h === h
         ? 'three'
-        : cell.borders.x === 0 && cell.borders.w === w
+        : cell.shape === 'three-vertical'
           ? 'three-vertical'
           : 'nine';
     const detected = detectedTile.get(cell.entry)?.tile ?? '';

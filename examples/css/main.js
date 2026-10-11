@@ -41,7 +41,7 @@ for (const entry of manifest.entries.filter((item) => item.css !== undefined)) {
     cell.style.width = `${w}px`;
     cell.style.height = `${h}px`;
     document.body.append(cell);
-    report.push({ entry: entry.label, image: new URL(atlas.meta.image, atlasUrl).pathname, size, at: [x, y], rendered: [w, h], borders: frame.scale9Borders, frame: frame.frame, tile: entry.tile ?? '' });
+    report.push({ entry: entry.label, image: new URL(atlas.meta.image, atlasUrl).pathname, size, at: [x, y], rendered: [w, h], borders: frame.scale9Borders, frame: frame.frame, shape: frame.slicewright?.shape, tile: entry.tile ?? '' });
     x += w + gap;
     rowHeight = Math.max(rowHeight, h);
   }
@@ -55,7 +55,8 @@ function sizesFor(frame) {
   const { w, h } = frame.frame;
   const b = frame.scale9Borders;
   const three = b.y === 0 && b.h === h;
-  const vertical = b.x === 0 && b.w === w;
+  // Only the explicit marker means a fixed width; full-width borders alone do not.
+  const vertical = frame.slicewright?.shape === 'three-vertical';
   const sizes = [['frame', w, h], ['min', vertical ? w : w - b.w, three ? h : h - b.h]];
   if (!vertical) {
     sizes.push(['wide', Math.round(w * 2.5), h]);

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { basename, dirname, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import { cli, define } from 'gunshi';
 
@@ -501,7 +501,8 @@ function writeExport(
   const files = result.files.map((file) => {
     const path = join(options.outDir, file.path);
     // A name such as ../config must not write outside the output directory.
-    if (!resolve(path).startsWith(outDir + sep)) {
+    const inside = relative(outDir, resolve(path));
+    if (inside === '' || inside.startsWith('..') || isAbsolute(inside)) {
       throw new UsageError(`"${file.path}" would be written outside ${options.outDir}; pick a plain --name.`);
     }
     writeFileSync(path, file.contents);

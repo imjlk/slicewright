@@ -23,6 +23,12 @@ export interface PhaserAtlasFrame {
   readonly spriteSourceSize?: PhaserFrameRect;
   readonly sourceSize?: { readonly w: number; readonly h: number };
   readonly scale9Borders?: Scale9Borders;
+  /**
+   * slicewright's own frame data, which Phaser keeps in `frame.customData`.
+   * `shape: 'three-vertical'` marks zero side insets as a fixed width rather
+   * than a full-width stretch span, which `scale9Borders` alone cannot say.
+   */
+  readonly slicewright?: { readonly shape?: 'three-vertical' };
 }
 
 export interface PhaserAtlasMeta {
@@ -64,7 +70,7 @@ export interface AtlasReport {
  * `this.load.atlas(key, image, json)` and NineSlice reads its borders.
  *
  * @evidence docs/spec.md#phaser-scale9borders Emits an untrimmed, unrotated JSON Hash frame carrying scale9Borders.
- * @evidenceReview docs/spec.md#phaser-scale9borders #ae82d95 Checked this code against the section line by line and ran convertsToPhaserBorders green with pnpm test.
+ * @evidenceReview docs/spec.md#phaser-scale9borders #d192956 Checked this code against the section line by line and ran convertsToPhaserBorders green with pnpm test.
  */
 export function createSingleFrameAtlas(
   name: string,
@@ -72,6 +78,7 @@ export function createSingleFrameAtlas(
   width: number,
   height: number,
   insets: SliceInsets,
+  shape?: 'three-vertical',
 ): PhaserJsonHashAtlas {
   const rect = { x: 0, y: 0, w: width, h: height };
   return {
@@ -83,6 +90,7 @@ export function createSingleFrameAtlas(
         spriteSourceSize: rect,
         sourceSize: { w: width, h: height },
         scale9Borders: insetsToScale9Borders(insets, width, height),
+        ...(shape === undefined ? {} : { slicewright: { shape } }),
       },
     },
     meta: { image, size: { w: width, h: height }, scale: '1' },
@@ -94,7 +102,7 @@ export function createSingleFrameAtlas(
  * only `frameName`, against the atlas image.
  *
  * @evidence docs/spec.md#atlas-frames Rejects trimmed frames and out-of-frame borders, warns on rotation, and inspects each frame with its borders.
- * @evidenceReview docs/spec.md#atlas-frames #b1f6b5f Checked this code against the section line by line and ran checksAtlasFrames green with pnpm test.
+ * @evidenceReview docs/spec.md#atlas-frames #62396a0 Checked this code against the section line by line and ran checksAtlasFrames green with pnpm test.
  */
 export function inspectAtlas(
   json: unknown,
@@ -200,12 +208,12 @@ function inspectFrame(
   const inspection = inspectRaster(cropRaster(image, { x, y, width: w, height: h }), {
     ...options,
     insets: scale9BordersToInsets(borders, w, h),
-    // Phaser's own three-slice keeps the height; zero side insets are how the
-    // Phaser target emulates a vertical three-slice that keeps the width.
+    // Phaser's own three-slice keeps the height. A fixed width needs the
+    // explicit marker: full-width borders alone are an ordinary nine-slice.
     mode:
       borders.y === 0 && borders.h === h
         ? 'three'
-        : borders.x === 0 && borders.w === w
+        : frame.slicewright?.shape === 'three-vertical'
           ? 'three-vertical'
           : 'nine',
   });

@@ -20,9 +20,9 @@ export const cssTarget: SliceTarget = {
  * border widths, `round` for tiled axes, and the minimum or fixed size.
  *
  * @evidence docs/spec.md#css-border-image Writes the slice, width, repeat, and size declarations for the CSS target.
- * @evidenceReview docs/spec.md#css-border-image #53bcb3f Checked this code against the section line by line and ran exportsCssBorderImage green with pnpm test.
+ * @evidenceReview docs/spec.md#css-border-image #61fe631 Checked this code against the section line by line and ran exportsCssBorderImage green with pnpm test.
  */
-export function exportCss({ name, imageRef, layout }: ExportInput): Omit<ExportResult, 'target' | 'findings'> {
+export function exportCss({ name, imageRef, layout, loaderPaths }: ExportInput): Omit<ExportResult, 'target' | 'findings'> {
   const insets = exportInsets(layout);
   const { top, right, bottom, left } = insets;
   const shape = layoutShape(layout);
@@ -34,6 +34,11 @@ export function exportCss({ name, imageRef, layout }: ExportInput): Omit<ExportR
         ? [`  width: ${layout.x.length}px;`, `  min-height: ${top + bottom}px;`]
         : [`  min-width: ${left + right}px;`, `  min-height: ${top + bottom}px;`];
   const className = cssIdentifier(name);
+  const directory = loaderPaths?.directory ?? '';
+  const stylesheetUrl =
+    directory === '' || directory === '.'
+      ? `${name}.css`
+      : `${directory.replace(/\/+$/, '')}/${name}.css`;
   const css = [
     `/* slicewright: ${name}, ${shape} */`,
     `.${className} {`,
@@ -49,7 +54,7 @@ export function exportCss({ name, imageRef, layout }: ExportInput): Omit<ExportR
   ].join('\n');
   return {
     files: [{ path: `${name}.css`, contents: css }],
-    usage: `<link rel="stylesheet" href="${htmlAttribute(`${name}.css`)}">\n<div class="${className}">…</div>`,
+    usage: `<link rel="stylesheet" href="${htmlAttribute(stylesheetUrl)}">\n<div class="${className}">…</div>`,
   };
 }
 
