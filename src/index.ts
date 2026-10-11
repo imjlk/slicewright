@@ -2,6 +2,7 @@ export * from './chroma.js';
 export * from './detect.js';
 export * from './inspect.js';
 export * from './normalize.js';
+export * from './padding.js';
 export * from './phaser.js';
 export * from './png.js';
 export * from './prompt.js';

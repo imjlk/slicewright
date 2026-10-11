@@ -20,6 +20,7 @@ import {
   type AxisLayout,
   type SliceLayout,
 } from './layout.js';
+import { detectContentPadding, paddingProblem } from './padding.js';
 import { alphaAt, pixelOffset, type Raster, type Rect } from './raster.js';
 import {
   insetsProblem,
@@ -53,6 +54,8 @@ export interface InspectOptions extends MatchOptions {
   readonly regions?: 'single' | 'multi';
   /** `auto` raises the tolerance to the measured noise floor of generated art. */
   readonly noise: 'auto' | 'off';
+  /** Caller-supplied content padding; omitted means detect it. */
+  readonly contentPadding?: SliceInsets;
 }
 
 /** Matching settings per axis; noise is measured separately along each. */
@@ -72,6 +75,9 @@ export interface InspectReport {
   readonly scale9Borders: Scale9Borders;
   /** The engine-neutral layout every renderer and target consumes. */
   readonly layout: SliceLayout;
+  /** Where content such as text sits inside the frame; null for an empty image. */
+  readonly contentPadding: SliceInsets | null;
+  readonly contentPaddingSource: 'detected' | 'given';
   readonly minSize: { readonly width: number; readonly height: number };
   readonly contentBounds: Rect | null;
   /** Axes that tile, as given or detected from repeating edges. */
@@ -144,6 +150,8 @@ export function inspectRaster(
     }
   }
 
+  const contentPadding = resolveContentPadding(raster, bounds, options, matching, findings);
+
   return {
     ok: !findings.some((finding) => finding.severity === 'error'),
     width: raster.width,
@@ -153,6 +161,8 @@ export function inspectRaster(
     insets,
     scale9Borders: insetsToScale9Borders(insets, raster.width, raster.height),
     layout,
+    contentPadding,
+    contentPaddingSource: options.contentPadding === undefined ? 'detected' : 'given',
     minSize: minimumLayoutSize(layout),
     contentBounds: bounds ?? null,
     tile,
@@ -208,6 +218,36 @@ export function noiseAdjusted(
     details: { noise, x: matching.x, y: matching.y },
   });
   return matching;
+}
+
+/**
+ * Given content padding is validated; otherwise it is detected from the
+ * content, using each axis's matching tolerance.
+ *
+ * @evidence docs/spec.md#content-padding Validates given padding as an error finding and detects it otherwise.
+ * @evidenceReview docs/spec.md#content-padding #80d013d Checked this code against the section line by line and ran detectsContentPadding green with pnpm test.
+ */
+export function resolveContentPadding(
+  raster: Raster,
+  bounds: Rect | undefined,
+  options: InspectOptions,
+  matching: AxisMatching,
+  findings: Finding[],
+): SliceInsets | null {
+  if (options.contentPadding !== undefined) {
+    const problem = paddingProblem(options.contentPadding, raster.width, raster.height);
+    if (problem !== undefined) {
+      findings.push({ code: 'padding.invalid', severity: 'error', message: problem });
+    }
+    return options.contentPadding;
+  }
+  if (bounds === undefined) {
+    return null;
+  }
+  return detectContentPadding(raster, bounds, {
+    x: matching.x.tolerance,
+    y: matching.y.tolerance,
+  });
 }
 
 export interface Layout {

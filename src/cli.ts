@@ -20,7 +20,7 @@ import type { SliceLayout } from './layout.js';
 import type { Raster } from './raster.js';
 import { renderPreviewSheet } from './render.js';
 import { resizeRaster, targetSize } from './resize.js';
-import { parseBorders, parseInsets, scale9BordersToInsets } from './slices.js';
+import { parseBorders, parseInsets, scale9BordersToInsets, type SliceInsets } from './slices.js';
 import { exportForTarget, findTarget, sliceTargets } from './targets/index.js';
 
 /** Exit codes: 0 ok, 1 error findings, 2 usage or input failure. */
@@ -61,6 +61,10 @@ const sliceArgs = {
     default: 'auto',
     description: 'Slice mode: three keeps the height, three-vertical keeps the width',
   },
+  padding: {
+    type: 'string',
+    description: 'Give content padding instead of detecting it: l,r,t,b or h,v or n',
+  },
   regions: {
     type: 'enum',
     choices: ['single', 'multi'],
@@ -93,6 +97,7 @@ const image = { type: 'positional', description: 'PNG image' } as const;
 
 interface SliceValues {
   readonly regions: string;
+  readonly padding?: string | undefined;
   readonly insets?: string | undefined;
   readonly borders?: string | undefined;
   readonly mode: string;
@@ -146,7 +151,7 @@ const preview = define({
     const raster = readPng(ctx.values.input);
     const settings = inspectOptions(ctx.values, raster);
     const report = inspectRaster(raster, settings);
-    const sheet = renderPreviewSheet(raster, report.layout);
+    const sheet = renderPreviewSheet(raster, report.layout, report.contentPadding);
     writeFileSync(ctx.values.out, encodePng(sheet.raster));
     print({
       image: ctx.values.input,
@@ -181,6 +186,7 @@ const frame = define({
       atlasPath: out,
       raster,
       layout: report.layout,
+      contentPadding: report.contentPadding,
     });
     print({
       image: input,
@@ -329,6 +335,7 @@ const normalize = define({
         atlasPath: ctx.values.atlas,
         raster: result.raster,
         layout: result.report.layout,
+        contentPadding: result.report.contentPadding,
       });
       atlasOk = phaser.ok;
       atlasOut = phaser.ok ? ctx.values.atlas : undefined;
@@ -342,6 +349,7 @@ const normalize = define({
         imageRef: ctx.values['image-ref'],
         raster: result.raster,
         layout: result.report.layout,
+        contentPadding: result.report.contentPadding,
       }),
     );
     print({
@@ -402,6 +410,7 @@ const exportCommand = define({
         imageRef: ctx.values['image-ref'],
         raster,
         layout: report.layout,
+        contentPadding: report.contentPadding,
       }),
     );
     print({ image: input, ...summary(report), exports });
@@ -421,6 +430,7 @@ function phaserAtlas(options: {
   readonly atlasPath: string | undefined;
   readonly raster: Raster;
   readonly layout: SliceLayout;
+  readonly contentPadding: SliceInsets | null;
 }): { ok: boolean; atlas: unknown; findings: readonly Finding[] } {
   const imageRef =
     options.imageRef ??
@@ -432,6 +442,7 @@ function phaserAtlas(options: {
     imageRef,
     raster: options.raster,
     layout: options.layout,
+    ...(options.contentPadding === null ? {} : { contentPadding: options.contentPadding }),
   });
   const ok = !result.findings.some((finding) => finding.severity === 'error');
   const contents = result.files[0]?.contents;
@@ -504,6 +515,7 @@ function writeExport(
     readonly imageRef?: string | undefined;
     readonly raster: Raster;
     readonly layout: SliceLayout;
+    readonly contentPadding: SliceInsets | null;
   },
 ): { target: string; ok: boolean; files: string[]; usage: string; findings: readonly Finding[] } {
   mkdirSync(options.outDir, { recursive: true });
@@ -516,6 +528,7 @@ function writeExport(
     imageRef,
     raster: options.raster,
     layout: options.layout,
+    ...(options.contentPadding === null ? {} : { contentPadding: options.contentPadding }),
     // Loader calls resolve from where the game is served; assume the working directory.
     loaderPaths: {
       image: urlPath(relative(process.cwd(), resolve(options.imagePath))),
@@ -560,6 +573,7 @@ function inspectOptions(values: SliceValues, raster: Raster | undefined): Inspec
     regions: values.regions === 'multi' ? 'multi' : 'single',
     tile: { x: tile.includes('x'), y: tile.includes('y') },
     ...(insets === undefined ? {} : { insets }),
+    ...(values.padding === undefined ? {} : { contentPadding: parseInsets(values.padding) }),
   };
 }
 
@@ -612,10 +626,10 @@ function atlasImage(json: unknown, path: string): string {
 
 function summary(report: InspectReport): Pick<
   InspectReport,
-  'ok' | 'mode' | 'insets' | 'scale9Borders' | 'minSize' | 'tile' | 'findings'
+  'ok' | 'mode' | 'insets' | 'scale9Borders' | 'minSize' | 'tile' | 'contentPadding' | 'findings'
 > {
-  const { ok, mode, insets, scale9Borders, minSize, tile, findings } = report;
-  return { ok, mode, insets, scale9Borders, minSize, tile, findings };
+  const { ok, mode, insets, scale9Borders, minSize, tile, contentPadding, findings } = report;
+  return { ok, mode, insets, scale9Borders, minSize, tile, contentPadding, findings };
 }
 
 function readPng(path: string | undefined): Raster {

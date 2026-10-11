@@ -10,7 +10,7 @@ import { layoutFromInsets, type SliceLayout } from '../src/layout.js';
 import { decodePng } from '../src/png.js';
 import { createRaster, pixelOffset, rasterDifference, type Raster } from '../src/raster.js';
 import { renderLayout } from '../src/render.js';
-import { scale9BordersToInsets, type Scale9Borders } from '../src/slices.js';
+import { scale9BordersToInsets, type Scale9Borders, type SliceInsets } from '../src/slices.js';
 import { exportForTarget } from '../src/targets/index.js';
 
 // Renders a manifest in real engines through headless Chrome and prints what
@@ -287,6 +287,7 @@ interface TileCheck {
   readonly layout: SliceLayout;
   /** A rebuilt (`like`) sample, whose layout only its atlas records. */
   readonly rebuilt: boolean;
+  readonly contentPadding: SliceInsets | null;
 }
 
 /** Detects each manifest image's tiling and checks the manifest and Phaser usage against it. */
@@ -327,6 +328,7 @@ function detectTiles(): Map<string, TileCheck> {
       ...(problem === undefined ? {} : { problem }),
       layout: report.layout,
       rebuilt: entry.like !== undefined,
+      contentPadding: report.contentPadding,
     });
   }
   return checks;
@@ -351,7 +353,7 @@ function findStaleExports(tiles: ReadonlyMap<string, TileCheck>): string[] {
         {
           frame: { w: number; h: number };
           scale9Borders: Scale9Borders;
-          slicewright?: { shape?: string };
+          slicewright?: { shape?: string; contentPadding?: SliceInsets };
         }
       >;
       meta: { image: string };
@@ -380,7 +382,17 @@ function findStaleExports(tiles: ReadonlyMap<string, TileCheck>): string[] {
             tile: { x: tile.includes('x'), y: tile.includes('y') },
           });
     const raster = decodePng(readFileSync(join(dirname(atlasPath), atlas.meta.image)));
-    const input = { name, imageRef: atlas.meta.image, raster, layout };
+    const contentPadding =
+      detection !== undefined && !detection.rebuilt
+        ? detection.contentPadding
+        : (frame.slicewright?.contentPadding ?? null);
+    const input = {
+      name,
+      imageRef: atlas.meta.image,
+      raster,
+      layout,
+      ...(contentPadding === null ? {} : { contentPadding }),
+    };
     const committed: Array<[string, string, string]> = [['phaser', atlasPath, atlasText]];
     if (entry.css !== undefined) {
       const cssPath = join(dirname(manifestPath), entry.css);

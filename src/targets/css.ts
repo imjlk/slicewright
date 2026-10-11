@@ -22,9 +22,16 @@ export const cssTarget: SliceTarget = {
  * @evidence docs/spec.md#css-border-image Writes the slice, width, repeat, and size declarations for the CSS target.
  * @evidenceReview docs/spec.md#css-border-image #9ee8b1e Checked this code against the section line by line and ran exportsCssBorderImage green with pnpm test.
  */
-export function exportCss({ name, imageRef, layout, loaderPaths }: ExportInput): Omit<ExportResult, 'target' | 'findings'> {
+export function exportCss({
+  name,
+  imageRef,
+  layout,
+  loaderPaths,
+  contentPadding,
+}: ExportInput): Omit<ExportResult, 'target' | 'findings'> {
   const insets = exportInsets(layout);
   const { top, right, bottom, left } = insets;
+  const padding = contentPadding ?? insets;
   const shape = layoutShape(layout);
   const repeat = (axis: AxisLayout): string => (axisTiles(axis) ? 'round' : 'stretch');
   const size =
@@ -32,7 +39,10 @@ export function exportCss({ name, imageRef, layout, loaderPaths }: ExportInput):
       ? [`  height: ${layout.y.length}px;`, `  min-width: ${left + right}px;`]
       : shape === 'three-vertical'
         ? [`  width: ${layout.x.length}px;`, `  min-height: ${top + bottom}px;`]
-        : [`  min-width: ${left + right}px;`, `  min-height: ${top + bottom}px;`];
+        : [
+            `  min-width: ${Math.max(left + right, padding.left + padding.right)}px;`,
+            `  min-height: ${Math.max(top + bottom, padding.top + padding.bottom)}px;`,
+          ];
   const className = cssIdentifier(name);
   const directory = loaderPaths?.directory ?? '';
   const stylesheetUrl = urlFromPath(
@@ -46,9 +56,11 @@ export function exportCss({ name, imageRef, layout, loaderPaths }: ExportInput):
     `.${className} {`,
     '  box-sizing: border-box;',
     '  border-style: solid;',
-    `  border-width: ${top}px ${right}px ${bottom}px ${left}px;`,
+    // border-width sets the content box; border-image-width keeps the art at its slices.
+    `  border-width: ${padding.top}px ${padding.right}px ${padding.bottom}px ${padding.left}px;`,
     `  border-image-source: url(${cssString(urlFromPath(imageRef))});`,
     `  border-image-slice: ${top} ${right} ${bottom} ${left} fill;`,
+    `  border-image-width: ${top}px ${right}px ${bottom}px ${left}px;`,
     `  border-image-repeat: ${repeat(layout.x)} ${repeat(layout.y)};`,
     ...size,
     '}',

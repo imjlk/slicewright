@@ -27,6 +27,7 @@ const padding = 16;
 const checkerSize = 8;
 const maximumCellSize = 4096;
 const tint = [255, 0, 200, 72] as const;
+const contentOutline = [0, 220, 255, 255] as const;
 
 /**
  * Renders insets at a new size; a thin wrapper over `renderLayout`.
@@ -95,13 +96,18 @@ export function renderLayout(
 }
 
 /**
- * Lays the source, its tinted flexible segments, and several resized versions
- * side by side over a checkerboard. Axes that cannot resize are not resized.
+ * Lays the source, its tinted flexible segments with the content box outlined,
+ * and several resized versions side by side over a checkerboard. Axes that
+ * cannot resize are not resized.
  *
  * @evidence docs/spec.md#preview-sheet Builds the guides, source, minimum, wide, tall, and doubled cells.
  * @evidenceReview docs/spec.md#preview-sheet #49443a9 Checked this code against the section line by line and ran rendersSlicesAndPreviewSheets green with pnpm test.
  */
-export function renderPreviewSheet(source: Raster, layout: SliceLayout): PreviewSheet {
+export function renderPreviewSheet(
+  source: Raster,
+  layout: SliceLayout,
+  contentPadding?: SliceInsets | null,
+): PreviewSheet {
   const cap = (value: number): number => Math.min(Math.round(value), maximumCellSize);
   const minimum = minimumLayoutSize(layout);
   const resizesX = flexibleSegments(layout.x).length > 0;
@@ -126,7 +132,9 @@ export function renderPreviewSheet(source: Raster, layout: SliceLayout): Preview
   const rendered = sizes.map(([label, width, height]) => ({
     label,
     raster:
-      label === 'guides' ? tintSegments(source, layout) : renderLayout(source, layout, width, height),
+      label === 'guides'
+        ? outlineContent(tintSegments(source, layout), contentPadding)
+        : renderLayout(source, layout, width, height),
   }));
 
   const sheetWidth =
@@ -208,6 +216,29 @@ function tintSegments(source: Raster, layout: SliceLayout): Raster {
     }
   }
   return out;
+}
+
+/** Draws the content box, inside the padding, as a 1 px outline. */
+function outlineContent(raster: Raster, padding: SliceInsets | null | undefined): Raster {
+  if (padding === null || padding === undefined) {
+    return raster;
+  }
+  const x0 = padding.left;
+  const x1 = raster.width - padding.right - 1;
+  const y0 = padding.top;
+  const y1 = raster.height - padding.bottom - 1;
+  if (x1 < x0 || y1 < y0) {
+    return raster;
+  }
+  for (let x = x0; x <= x1; x += 1) {
+    raster.data.set(contentOutline, pixelOffset(raster, x, y0));
+    raster.data.set(contentOutline, pixelOffset(raster, x, y1));
+  }
+  for (let y = y0; y <= y1; y += 1) {
+    raster.data.set(contentOutline, pixelOffset(raster, x0, y));
+    raster.data.set(contentOutline, pixelOffset(raster, x1, y));
+  }
+  return raster;
 }
 
 function checkerboard(width: number, height: number): Raster {

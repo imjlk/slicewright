@@ -2,9 +2,10 @@
 .bar {
   box-sizing: border-box;
   border-style: solid;
-  border-width: 0px 39px 0px 39px;
+  border-width: 2px 38px 3px 38px;
   border-image-source: url("bar.png");
   border-image-slice: 0 39 0 39 fill;
+  border-image-width: 0px 39px 0px 39px;
   border-image-repeat: stretch stretch;
   height: 33px;
   min-width: 78px;

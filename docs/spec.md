@@ -201,6 +201,29 @@ lines into their neighbors over about the stretched span divided by twice the
 keep length. When inspection reports an error, it returns the resized image
 without rebuilding.
 
+## Content padding
+
+Content padding is where content such as text sits inside the frame: four sizes
+in pixels measured from each edge, separate from the slice insets. An ornate
+frame's corners can reach far past its border, so the insets can be much larger
+than the room content needs. Unless the caller gives it, padding is detected:
+five sample lines at 40% to 60% of the content walk outward from its center,
+each stopping at the first step between neighboring pixels larger than 16 or
+twice the axis's matching tolerance, and each side takes the median stop. A
+smooth fill or gradient never stops a walk; the frame's inner edge does. A walk
+that reaches the image edge gives zero padding on that side. Given padding must
+be whole, non-negative, and leave a content area at least one pixel wide, or it
+is a `padding.invalid` error. Padding up to the inset on a side stays fixed when
+the art resizes; beyond it, it reaches into a stretch span and scales with it.
+
+The Phaser target records it in the frame as `"slicewright": { "contentPadding":
+… }`, which Phaser keeps in `frame.customData`, and its usage names that path.
+The CSS target sets `border-width` to the padding, which sizes the content box,
+and `border-image-width` to the insets, so the art still draws at its slices;
+the minimum size holds both. The atlas check refuses padding that does not fit
+the frame (`atlas.padding-invalid`). The preview outlines the content box on the
+guides cell.
+
 ## Preview sheet
 
 A preview sheet renders the layout at several sizes on one PNG over a

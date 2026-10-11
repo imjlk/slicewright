@@ -45,12 +45,16 @@ command exits 2 on bad input. `--help` works on each command.
    texture or shading.
 5. **Read the findings** with the table below. Fix every `error`. Pass
    `--insets l,r,t,b` to `inspect` to check insets chosen by hand, `--mode
-   three` for horizontal-only art, `--tile x` when an edge should repeat.
+   three` for horizontal-only art, `--mode three-vertical` for vertical-only
+   art (scroll bar tracks), `--tile x` when an edge should repeat, and
+   `--regions multi` when fixed detail sits in the middle of an edge (a crest
+   on a title plate). Pass `--padding l,r,t,b` when the detected content
+   padding (where text fits inside the frame) is wrong.
 6. **Look at the preview.** `slicewright preview ui/panel.png --out
    sheet.png`, then open `sheet.png`. Cells, left to right: flexible segments
-   tinted magenta, source, minimum size, wide (when the width resizes), tall
-   (when the height resizes), doubled. Corners must look identical in every cell and edges must not
-   smear.
+   tinted magenta with the content box outlined in cyan, source, minimum size,
+   wide (when the width resizes), tall (when the height resizes), doubled.
+   Corners must look identical in every cell and edges must not smear.
 7. **Hand it to the engine.** `slicewright export ui/panel.png --target
    phaser,css --out-dir ui` writes each engine's files
    and prints how to use them; `slicewright targets` lists what each target
@@ -84,6 +88,8 @@ command exits 2 on bad input. `--help` works on each command.
 | `margin.transparent` | Transparent border pixels become part of the corners. | `normalize` crops them; otherwise crop unless the spacing is intended. |
 | `rebuild.x.lossy`, `rebuild.y.lossy` | `--keep` would flatten texture or shading on that axis. | Informational: that axis kept its full span. |
 | `rebuild.filtering` | A small `--keep` fades under linear texture filtering. | Use `--keep 8` or more, or nearest filtering (Phaser `pixelArt`). |
+| `padding.invalid` | Given content padding leaves no content area. | Shrink `--padding`. |
+| `atlas.padding-invalid` | An atlas frame's content padding does not fit the frame. | Re-export the frame. |
 | `insets.asymmetric` | Opposite insets differ by more than 2 px. | Usually generator drift; check the preview. |
 | `insets.invalid` | Insets leave no stretch pixel. | Shrink the insets. |
 | `image.empty` | Every pixel is transparent. | The background removal took everything; redo it. |
@@ -98,6 +104,15 @@ this.load.atlas('ui', 'ui/panel.png', 'ui/panel.json');
 // Insets come from the frame's scale9Borders; width and height default to the frame.
 const panel = this.add.nineslice(400, 300, 'ui', 'panel', 320, 200);
 panel.setSize(360, 220); // never below left+right by top+bottom; scale instead.
+```
+
+Place text inside the content padding, not the slice insets:
+
+```ts
+const padding = this.textures.getFrame('ui', 'panel').customData.slicewright.contentPadding;
+const corner = panel.getTopLeft(); // works for any origin
+this.add.text(corner.x + padding.left, corner.y + padding.top, 'Hello', style)
+  .setWordWrapWidth(panel.width - padding.left - padding.right);
 ```
 
 `scale9Borders` is the stretchable center rectangle `{ x, y, w, h }`. A frame
