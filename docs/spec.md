@@ -238,7 +238,12 @@ guides cell.
 A preview sheet renders the layout at several sizes on one PNG over a
 checkerboard: the source with flexible segments tinted, the source size, the
 minimum size, wide and tall (each only when that axis can resize), and doubled
-on the axes that can resize. Rendering samples the nearest source pixel. Fixed
+on the axes that can resize. Cells sit in rows that wrap before a cell would
+cross the maximum width (2048 px by default); a cell wider than that sits alone
+in its row. The caller can choose cells, which keep this order, and zoom every
+cell by a whole number from 1 to 8, repeating each pixel, so small art stays
+inspectable in an image viewer. Asking for a cell the layout cannot show (wide
+when the width never resizes, tall when the height never does) is an error. Rendering samples the nearest source pixel. Fixed
 segments keep their size and the flexible segments share the rest in proportion
 to their source size. A tiled segment repeats a whole number of tiles, the
 segment length divided by the source length rounded down and at least one, each
