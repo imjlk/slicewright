@@ -1,0 +1,38 @@
+{
+  "frames": {
+    "baroque": {
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 480,
+        "h": 317
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 480,
+        "h": 317
+      },
+      "sourceSize": {
+        "w": 480,
+        "h": 317
+      },
+      "scale9Borders": {
+        "x": 97,
+        "y": 98,
+        "w": 286,
+        "h": 124
+      }
+    }
+  },
+  "meta": {
+    "image": "baroque.png",
+    "size": {
+      "w": 480,
+      "h": 317
+    },
+    "scale": "1"
+  }
+}

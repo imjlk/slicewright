@@ -1,0 +1,38 @@
+{
+  "frames": {
+    "bar": {
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 320,
+        "h": 33
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 320,
+        "h": 33
+      },
+      "sourceSize": {
+        "w": 320,
+        "h": 33
+      },
+      "scale9Borders": {
+        "x": 39,
+        "y": 0,
+        "w": 242,
+        "h": 33
+      }
+    }
+  },
+  "meta": {
+    "image": "bar.png",
+    "size": {
+      "w": 320,
+      "h": 33
+    },
+    "scale": "1"
+  }
+}

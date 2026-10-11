@@ -19,7 +19,7 @@ function pixel(raster: ReturnType<typeof createRaster>, x: number, y: number): n
 
 /**
  * @evidence docs/spec.md#png-input Round-trips RGBA8, keeps the high byte of 16-bit RGB, and refuses non-PNG bytes.
- * @evidenceReview docs/spec.md#png-input Read the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#png-input #4d0f875 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function convertsPngLayoutsToRgba(): void {
   const source = panel(20, 16, 2);
@@ -48,7 +48,7 @@ export function convertsPngLayoutsToRgba(): void {
 
 /**
  * @evidence docs/spec.md#preview-sheet Renders the source size losslessly, keeps corners at larger sizes, tiles whole periods, and lays out the sheet cells.
- * @evidenceReview docs/spec.md#preview-sheet Read the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#preview-sheet #40dc75a Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function rendersSlicesAndPreviewSheets(): void {
   const source = panel(40, 30);
@@ -99,7 +99,7 @@ export function rendersSlicesAndPreviewSheets(): void {
 
 /**
  * @evidence docs/spec.md#phaser-scale9borders Converts both ways, applies Phaser's three-slice rule, and writes a loadable one-frame atlas.
- * @evidenceReview docs/spec.md#phaser-scale9borders Read the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#phaser-scale9borders #649e388 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function convertsToPhaserBorders(): void {
   const insets = { left: 6, right: 8, top: 5, bottom: 7 };
@@ -124,7 +124,7 @@ export function convertsToPhaserBorders(): void {
 
 /**
  * @evidence docs/spec.md#atlas-frames Checks hash and array atlases for trimming, rotation, out-of-frame borders, missing frames, and frame pixels.
- * @evidenceReview docs/spec.md#atlas-frames Read the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#atlas-frames #879cca2 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function checksAtlasFrames(): void {
   const image = createRaster(80, 30);
@@ -188,7 +188,7 @@ export function checksAtlasFrames(): void {
 
 /**
  * @evidence docs/spec.md#generation-prompts Plans structural prompts, three-slice bars, chroma backgrounds, and follow-up steps.
- * @evidenceReview docs/spec.md#generation-prompts Read the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#generation-prompts #67de005 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function plansGenerationPrompts(): void {
   const button = buildPromptPlan({
@@ -201,6 +201,8 @@ export function plansGenerationPrompts(): void {
   ok(button.prompt.startsWith('A single game UI button background, glossy candy UI.'));
   ok(button.prompt.includes('No text'));
   ok(button.prompt.includes('decoration in the four corners'));
+  ok(button.prompt.includes('no rope, chain'));
+  ok(button.avoid.some((item) => item.includes('running along the edges')));
   ok(button.prompt.includes('Transparent background'));
   ok(button.avoid.includes('text or icons on the element'));
 

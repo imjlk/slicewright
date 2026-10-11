@@ -87,7 +87,7 @@ const backgroundLines: Readonly<Record<PromptBackground, string>> = {
  * structure and the inset numbers come from inspection afterwards.
  *
  * @evidence docs/spec.md#generation-prompts Builds the structural prompt, the avoid list, three-slice bars, and the follow-up steps.
- * @evidenceReview docs/spec.md#generation-prompts Read the section against this function and ran plansGenerationPrompts green with pnpm test.
+ * @evidenceReview docs/spec.md#generation-prompts #67de005 Checked this code against the section line by line and ran plansGenerationPrompts green with pnpm test.
  */
 export function buildPromptPlan(request: PromptRequest): PromptPlan {
   const preset = presets[request.kind];
@@ -101,7 +101,7 @@ export function buildPromptPlan(request: PromptRequest): PromptPlan {
     'Flat front view, no perspective, centered and filling the canvas edge to edge with only a few pixels of margin.',
     preset.mode === 'three'
       ? 'Put all decoration in the two end caps. The top and bottom edges of the middle are plain.'
-      : 'Put all decoration in the four corners. Edges are plain repeating borders.',
+      : 'Put all decoration in the four corners. Between the corners the edges are plain smooth bands with no pattern along them: no rope, chain, beads, vines, rivets, or repeated motifs.',
     stretch,
     'No text, letters, icons, symbols, or characters on it.',
     request.pixelArt
@@ -130,6 +130,7 @@ export function buildPromptPlan(request: PromptRequest): PromptPlan {
       'perspective, tilt, or 3D camera angles',
       'gradients or patterns along a stretch direction',
       'decoration in the middle of an edge',
+      'rope, chain, bead, or vine patterns running along the edges',
       'multiple elements or variants in one image',
       'background scenery',
     ],

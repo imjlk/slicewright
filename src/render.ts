@@ -25,7 +25,7 @@ const tint = [255, 0, 200, 72] as const;
  * Sizes below the fixed borders are raised to them, as Phaser does.
  *
  * @evidence docs/spec.md#preview-sheet Keeps corners unscaled and stretches or tiles spans with nearest sampling.
- * @evidenceReview docs/spec.md#preview-sheet Read the section against this function and ran rendersSlicesAndPreviewSheets green with pnpm test.
+ * @evidenceReview docs/spec.md#preview-sheet #40dc75a Checked this code against the section line by line and ran rendersSlicesAndPreviewSheets green with pnpm test.
  */
 export function renderSlices(
   source: Raster,
@@ -55,7 +55,7 @@ export function renderSlices(
  * by side over a checkerboard.
  *
  * @evidence docs/spec.md#preview-sheet Builds the guides, source, minimum, wide, tall, and doubled cells.
- * @evidenceReview docs/spec.md#preview-sheet Read the section against this function and ran rendersSlicesAndPreviewSheets green with pnpm test.
+ * @evidenceReview docs/spec.md#preview-sheet #40dc75a Checked this code against the section line by line and ran rendersSlicesAndPreviewSheets green with pnpm test.
  */
 export function renderPreviewSheet(
   source: Raster,

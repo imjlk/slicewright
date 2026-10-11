@@ -8,7 +8,7 @@ const acTL = [0x61, 0x63, 0x54, 0x4c];
  * Decodes a PNG into straight-alpha RGBA8.
  *
  * @evidence docs/spec.md#png-input Converts every supported PNG layout to RGBA8 and refuses the rest by name.
- * @evidenceReview docs/spec.md#png-input Read the section against this function and ran convertsPngLayoutsToRgba green with pnpm test.
+ * @evidenceReview docs/spec.md#png-input #4d0f875 Checked this code against the section line by line and ran convertsPngLayoutsToRgba green with pnpm test.
  */
 export function decodePng(bytes: Uint8Array): Raster {
   if (!hasPngSignature(bytes)) {

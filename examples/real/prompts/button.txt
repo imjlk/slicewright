@@ -1,0 +1,9 @@
+A single game UI button background, glossy casual mobile game style, candy orange with a soft white highlight rim.
+Shape: a rounded rectangle with a clear bevel or rim; the face is one flat color or a very soft top-to-bottom shade.
+Flat front view, no perspective, centered and filling the canvas edge to edge with only a few pixels of margin.
+Put all decoration in the four corners. Edges are plain repeating borders.
+It will be stretched horizontally and vertically: the top and bottom edges must look identical at every horizontal position, the left and right edges identical at every vertical position.
+No text, letters, icons, symbols, or characters on it.
+Clean edges, no blur, no noise or grain.
+Transparent background; nothing outside the element.
+Avoid: text or icons on the element; drop shadows or glows outside the element; perspective, tilt, or 3D camera angles; gradients or patterns along a stretch direction; decoration in the middle of an edge; multiple elements or variants in one image; background scenery.

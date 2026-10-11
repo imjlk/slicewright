@@ -1,0 +1,38 @@
+{
+  "frames": {
+    "scifi": {
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 480,
+        "h": 255
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 480,
+        "h": 255
+      },
+      "sourceSize": {
+        "w": 480,
+        "h": 255
+      },
+      "scale9Borders": {
+        "x": 46,
+        "y": 40,
+        "w": 388,
+        "h": 174
+      }
+    }
+  },
+  "meta": {
+    "image": "scifi.png",
+    "size": {
+      "w": 480,
+      "h": 255
+    },
+    "scale": "1"
+  }
+}

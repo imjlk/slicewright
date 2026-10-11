@@ -1,4 +1,4 @@
-import { deepStrictEqual, ok, strictEqual } from 'node:assert/strict';
+import { deepStrictEqual, notDeepStrictEqual, ok, strictEqual } from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { contentBounds, defaultMatchOptions, detectStretchSpan } from '../src/detect.js';
@@ -13,6 +13,7 @@ import {
   panel,
   setPixel,
   shadedBar,
+  type Color,
 } from './fixtures.js';
 
 function codes(report: InspectReport): string[] {
@@ -21,7 +22,7 @@ function codes(report: InspectReport): string[] {
 
 /**
  * @evidence docs/spec.md#slice-insets Checks negative, fractional, and span-consuming insets.
- * @evidenceReview docs/spec.md#slice-insets Read the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#slice-insets #31ab641 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function rejectsInsetsWithoutAStretchSpan(): void {
   strictEqual(insetsProblem({ left: 4, right: 4, top: 4, bottom: 4 }, 9, 9), undefined);
@@ -33,7 +34,7 @@ export function rejectsInsetsWithoutAStretchSpan(): void {
 
 /**
  * @evidence docs/spec.md#stretch-detection Detects the 6 px border of a panel, prefers the center run, and falls back with a warning.
- * @evidenceReview docs/spec.md#stretch-detection Read the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#stretch-detection #ff483ae Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function detectsPanelInsets(): void {
   const report = inspectRaster(panel(40, 30));
@@ -53,9 +54,16 @@ export function detectsPanelInsets(): void {
     { start: 3, end: 6 },
   );
 
-  const gradient = inspectRaster(horizontalGradient(30, 10));
+  // Exact matching: every column of the gradient differs from its neighbor.
+  const gradient = inspectRaster(horizontalGradient(30, 10), {
+    ...defaultInspectOptions,
+    noise: 'off',
+  });
   ok(codes(gradient).includes('stretch.x.none'));
   strictEqual(gradient.scale9Borders.w, 1);
+  // With noise handling, a gentle gradient counts as stretchable shading.
+  const shading = inspectRaster(horizontalGradient(30, 10));
+  strictEqual(codes(shading).includes('stretch.x.none'), false);
 
   const noisy = panel(40, 30);
   setPixel(noisy, 20, 15, [100, 60, 40, 255]);
@@ -70,8 +78,8 @@ export function detectsPanelInsets(): void {
 }
 
 /**
- * @evidence docs/spec.md#three-slice Turns a vertically shaded bar into a three-slice and honours forced three-slice mode.
- * @evidenceReview docs/spec.md#three-slice Read the section and ran this test green with pnpm test.
+ * @evidence docs/spec.md#three-slice Turns a bar whose rows never repeat into a three-slice and honours forced three-slice mode.
+ * @evidenceReview docs/spec.md#three-slice #08c1617 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function treatsShadedBarsAsThreeSlices(): void {
   const bar = inspectRaster(shadedBar(48, 12));
@@ -89,7 +97,7 @@ export function treatsShadedBarsAsThreeSlices(): void {
 
 /**
  * @evidence docs/spec.md#stretch-uniformity Reports the first mismatching pair for caller insets that cut into the border.
- * @evidenceReview docs/spec.md#stretch-uniformity Read the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#stretch-uniformity #53ef9b3 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function rejectsGivenInsetsThatStretchDetail(): void {
   const report = inspectRaster(panel(40, 30), {
@@ -110,7 +118,7 @@ export function rejectsGivenInsetsThatStretchDetail(): void {
 
 /**
  * @evidence docs/spec.md#transparent-margins Warns about margins, keeps them in the insets, and rejects an empty image.
- * @evidenceReview docs/spec.md#transparent-margins Read the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#transparent-margins #5bcc022 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function warnsAboutTransparentMargins(): void {
   const report = inspectRaster(panel(40, 30, 3));
@@ -126,7 +134,7 @@ export function warnsAboutTransparentMargins(): void {
 
 /**
  * @evidence docs/spec.md#chroma-spill Flags green-tinted alpha edges and ignores a clean outline.
- * @evidenceReview docs/spec.md#chroma-spill Read the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#chroma-spill #420e523 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function flagsChromaSpill(): void {
   const clean = panel(40, 30, 2);
@@ -146,14 +154,16 @@ export function flagsChromaSpill(): void {
 
 /**
  * @evidence docs/spec.md#tiling-seams Accepts a whole-period tile span and warns when the span breaks the period.
- * @evidenceReview docs/spec.md#tiling-seams Read the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#tiling-seams #ef3dc38 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function checksTilingSeams(): void {
   const striped = createRaster(24, 8);
   for (let x = 0; x < 24; x += 1) {
     fillRect(striped, x, 0, 1, 8, x % 4 < 2 ? [200, 0, 0, 255] : [0, 0, 200, 255]);
   }
-  const tiled = { ...defaultInspectOptions, mode: 'three' as const, tile: { x: true, y: false } };
+  const tiled = { ...defaultInspectOptions, mode: 'three' as const, tile: { x: true, y: false },
+    // Exact synthetic stripes: measured noise would be the stripes themselves.
+    noise: 'off' as const };
   const seamless = inspectRaster(striped, {
     ...tiled,
     insets: { left: 4, right: 4, top: 0, bottom: 0 },
@@ -178,6 +188,102 @@ export function checksTilingSeams(): void {
   ok(codes(rampTiled).includes('tile.x.seam'));
 }
 
+/**
+ * @evidence docs/spec.md#stretch-detection Detects a noisy panel only with the measured noise floor, and leaves clean art exact.
+ * @evidenceReview docs/spec.md#stretch-detection #ff483ae Checked the assertions against the section and ran this test green with pnpm test.
+ */
+export function toleratesGeneratedNoise(): void {
+  const noisy = panel(60, 40);
+  let seed = 7;
+  for (let index = 0; index < noisy.data.length; index += 4) {
+    seed = (seed * 1103515245 + 12345) % 2147483648;
+    const jitter = (seed % 7) - 3;
+    for (let channel = 0; channel < 3; channel += 1) {
+      noisy.data[index + channel] = Math.max(0, Math.min(255, (noisy.data[index + channel] ?? 0) + jitter));
+    }
+  }
+  const auto = inspectRaster(noisy);
+  deepStrictEqual(auto.insets, { left: 6, right: 6, top: 6, bottom: 6 });
+  const finding = auto.findings.find((item) => item.code === 'noise.tolerance');
+  ok(auto.matching.x.tolerance > defaultInspectOptions.tolerance);
+  strictEqual(auto.matching.y.outlierRatio, 0.02);
+  strictEqual(finding?.severity, 'info');
+
+  const exact = inspectRaster(noisy, { ...defaultInspectOptions, noise: 'off' });
+  // Exact matching splits the noisy fill into short, off-center runs.
+  notDeepStrictEqual(exact.insets, auto.insets);
+
+  strictEqual(codes(inspectRaster(panel(60, 40))).includes('noise.tolerance'), false);
+
+  // A vertical gradient raises only the vertical tolerance.
+  const shaded = panel(60, 40);
+  for (let y = 6; y < 34; y += 1) {
+    fillRect(shaded, 6, y, 48, 1, [60 + y * 2, 60, 40, 255]);
+  }
+  const shadedReport = inspectRaster(shaded);
+  strictEqual(shadedReport.matching.x.tolerance, defaultInspectOptions.tolerance);
+  ok(shadedReport.matching.y.tolerance > defaultInspectOptions.tolerance);
+  deepStrictEqual(shadedReport.insets, { left: 6, right: 6, top: 6, bottom: 6 });
+
+  const busy = createRaster(40, 40);
+  for (let y = 0; y < 40; y += 1) {
+    for (let x = 0; x < 40; x += 1) {
+      setPixel(busy, x, y, (x + y) % 2 === 0 ? [220, 220, 220, 255] : [40, 40, 40, 255]);
+    }
+  }
+  const busyReport = inspectRaster(busy);
+  ok(codes(busyReport).includes('noise.high'));
+  strictEqual(busyReport.matching.x.tolerance, 24);
+}
+
+/**
+ * @evidence docs/spec.md#repeating-edges Tiles a rope-patterned edge with its period, and warns about a non-repeating edge.
+ * @evidenceReview docs/spec.md#repeating-edges #2fe5a06 Checked the assertions against the section and ran this test green with pnpm test.
+ */
+export function tilesRepeatingEdges(): void {
+  // A panel whose top and bottom borders carry a 6 px rope pattern.
+  const rope = panel(96, 40);
+  for (let x = 6; x < 90; x += 1) {
+    const color: Color = x % 6 < 3 ? [230, 190, 60, 255] : [120, 80, 20, 255];
+    fillRect(rope, x, 2, 1, 3, color);
+    fillRect(rope, x, 35, 1, 3, color);
+  }
+  const report = inspectRaster(rope);
+  const finding = report.findings.find((item) => item.code === 'tile.x.auto');
+  strictEqual(finding?.details?.['period'], 6);
+  strictEqual(report.tile.x, true);
+  strictEqual(report.tile.y, false);
+  strictEqual((report.scale9Borders.w % 6), 0);
+  strictEqual(codes(report).includes('tile.x.seam'), false);
+
+  // Every column of the border differs from every other: nothing repeats.
+  const organic = panel(96, 40);
+  for (let x = 6; x < 90; x += 1) {
+    fillRect(organic, x, 2, 1, 3, [(x * 37) % 256, (x * 91) % 256, 60, 255]);
+  }
+  const organicReport = inspectRaster(organic, { ...defaultInspectOptions, noise: 'off' });
+  ok(
+    codes(organicReport).includes('stretch.x.none') || codes(organicReport).includes('stretch.x.short'),
+  );
+  strictEqual(organicReport.tile.x, false);
+}
+
+/**
+ * @evidence docs/spec.md#interior-alpha Flags a partly transparent hole in the fill and ignores an empty frame center.
+ * @evidenceReview docs/spec.md#interior-alpha #d87616b Checked the assertions against the section and ran this test green with pnpm test.
+ */
+export function flagsInteriorAlphaHoles(): void {
+  const holed = panel(60, 40);
+  fillRect(holed, 20, 12, 20, 16, [90, 60, 40, 120]);
+  const finding = inspectRaster(holed).findings.find((item) => item.code === 'alpha.interior');
+  strictEqual(finding?.severity, 'warning');
+
+  const frame = panel(60, 40);
+  fillRect(frame, 6, 6, 48, 28, clear);
+  strictEqual(codes(inspectRaster(frame)).includes('alpha.interior'), false);
+  strictEqual(codes(inspectRaster(panel(60, 40))).includes('alpha.interior'), false);
+}
+
 void test('slice insets need a stretch span', rejectsInsetsWithoutAStretchSpan);
 void test('stretch detection finds panel borders', detectsPanelInsets);
 void test('three-slice detection', treatsShadedBarsAsThreeSlices);
@@ -185,3 +291,6 @@ void test('stretch uniformity of given insets', rejectsGivenInsetsThatStretchDet
 void test('transparent margins', warnsAboutTransparentMargins);
 void test('chroma spill', flagsChromaSpill);
 void test('tiling seams', checksTilingSeams);
+void test('noise tolerance', toleratesGeneratedNoise);
+void test('repeating edges', tilesRepeatingEdges);
+void test('interior alpha', flagsInteriorAlphaHoles);

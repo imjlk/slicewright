@@ -47,17 +47,20 @@
     "fix": "ttsc fix",
     "test": "ttsx test/index.ts",
     "build": "ttsc -p tsconfig.build.json",
-    "examples": "ttsx tools/make-examples.ts"
+    "examples": "ttsx tools/make-examples.ts",
+    "phaser:check": "ttsx tools/phaser-check.ts"
   },
   "dependencies": {
     "fast-png": "8.0.0",
-    "typia": "13.0.2"
+    "gunshi": "0.37.3",
+    "typia": "15.1.0"
   },
   "devDependencies": {
     "@ttsc/evidence": "0.30.4",
     "@ttsc/graph": "0.30.4",
     "@ttsc/lint": "0.30.4",
     "@types/node": "^24.0.0",
+    "playwright-core": "^1.64.0",
     "ttsc": "0.30.4",
     "typescript": "7.0.2"
   }

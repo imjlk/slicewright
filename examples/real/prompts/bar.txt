@@ -1,0 +1,9 @@
+A single horizontal game UI bar, such as a progress or health bar track, sci-fi HUD, dark metal track with cyan neon end caps.
+Shape: rounded or capped left and right ends; the middle is one continuous horizontal strip that may shade from top to bottom.
+Flat front view, no perspective, centered and filling the canvas edge to edge with only a few pixels of margin.
+Put all decoration in the two end caps. The top and bottom edges of the middle are plain.
+It will be stretched horizontally only: the middle strip must look identical at every horizontal position.
+No text, letters, icons, symbols, or characters on it.
+Clean edges, no blur, no noise or grain.
+Solid pure green (#00FF00) background filling everything outside the element; no green anywhere on the element itself.
+Avoid: text or icons on the element; drop shadows or glows outside the element; perspective, tilt, or 3D camera angles; gradients or patterns along a stretch direction; decoration in the middle of an edge; multiple elements or variants in one image; background scenery.
