@@ -15,12 +15,15 @@ inspection finds or checks the exact slice insets afterwards.
 - `inspect` detects the stretch spans, or checks insets you give, and reports
   smearing, repeating edges, seams, noise, alpha holes, margins, and spill. It
   also finds the content padding: where text fits inside the frame.
-- `preview` renders the art at several stretched sizes on one PNG.
+- `preview` renders the art at several stretched sizes on one PNG; pick
+  cells with `--cells` and enlarge small art with `--zoom`.
 - `export` writes engine files for Phaser and CSS `border-image`; `targets`
   lists what each can represent.
 - `frame` writes a one-frame Phaser JSON Hash atlas with `scale9Borders`.
 - `atlas` checks every nine-slice frame of a Phaser JSON Hash or JSON Array
   atlas against its pixels.
+- `pack` packs several atlases, such as a matching dialog, button, and bar,
+  into one image and atlas, with an optional combined stylesheet.
 
 slicewright does not generate images. Pair it with any image generator; the
 agent skill in [`skills/slicewright`](skills/slicewright/SKILL.md) describes
@@ -36,6 +39,7 @@ node dist/cli.js key generated.png --out keyed.png
 node dist/cli.js normalize keyed.png --width 480 --out ui/panel.png --name panel --target phaser,css
 node dist/cli.js preview ui/panel.png --out panel-sheet.png
 node dist/cli.js atlas ui/panel.json
+node dist/cli.js pack ui/panel.json ui/button.json --out ui/ui.png --css
 ```
 
 Run `node dist/cli.js --help` for every option. The package is not on npm yet.

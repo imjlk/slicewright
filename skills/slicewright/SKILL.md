@@ -24,7 +24,7 @@ command exits 2 on bad input. `--help` works on each command.
 ## Workflow
 
 1. **Collect the brief.** UI kind (`button`, `panel`, `dialog`, `bar`,
-   `tooltip`, `frame`), art style in the user's words, the largest size the
+   `bar-fill`, `tooltip`, `frame`), art style in the user's words, the largest size the
    element is drawn at in the game, pixel art or not, and the background the
    generator can produce (`transparent`, `chroma-green`, `chroma-magenta`).
 2. **Plan the prompt.**
@@ -61,23 +61,35 @@ command exits 2 on bad input. `--help` works on each command.
    on a title plate). Pass `--padding l,r,t,b` when the detected content
    padding (where text fits inside the frame) is wrong.
 6. **Look at the preview.** `slicewright preview ui/panel.png --out
-   sheet.png`, then open `sheet.png`. Cells, left to right: flexible segments
+   sheet.png`, then open `sheet.png`. Cells, in order: flexible segments
    tinted magenta with the content box outlined in cyan, source, minimum size,
    wide (when the width resizes), tall (when the height resizes), doubled.
    Corners must look identical in every cell and edges must not smear.
+   Cells wrap into rows at `--max-width` (2048 px). An image viewer shrinks a
+   large sheet until seams vanish, so look closer with `--cells guides,wide`
+   (any of `guides,source,min,wide,tall,double`) and add `--zoom 3` or more
+   for small art such as bars and buttons; the printed `cells` give each
+   cell's rectangle for cropping.
 7. **Hand it to the engine.** `slicewright export ui/panel.png --target
    phaser,css --out-dir ui` writes each engine's files for a PNG that is
    already final. It detects insets and padding again, so repeat any
-   `--insets`, `--padding`, or `--tolerance` you used before. Printed URLs are
+   `--insets`, `--padding`, `--mode`, or `--tolerance` you used before. Printed URLs are
    relative to the directory you run from, as if the game were served from
    there; run it from the game's served root or pass `--image-ref`. Prefix
    `--name` (`ui-button`) so CSS class names do not collide in a page. It
    prints how to use them; `slicewright targets` lists what each target
    can represent. Only Phaser and CSS are supported; both are verified in the
-   real engine. For a packed atlas, disable trimming (and rotation) for
-   nine-slice sprites, add `scale9Borders` per frame (TexturePacker 7.1+ can
-   export them), then run `slicewright atlas ui.json` to check every frame
-   against the pixels.
+   real engine.
+8. **Pack a set.** `slicewright pack ui/dialog.json ui/button.json ui/bar.json
+   --out ui/ui.png` puts every piece in one image and atlas, so the game loads
+   them with one `this.load.atlas`; it prints a `nineslice` call per frame,
+   with tiling flags. Add `--css` for one stylesheet with a class per piece.
+   Packing keeps frames untrimmed and unrotated with their borders, padding,
+   and tiling, extrudes each edge by 1 px and leaves 2 px between frames
+   (`--extrude`, `--spacing`), and checks the result. With another packer,
+   disable trimming and rotation for nine-slice sprites, add `scale9Borders`
+   per frame (TexturePacker 7.1+ can export them), then run
+   `slicewright atlas ui.json` to check every frame against the pixels.
 
 ## Making a matching set
 
@@ -86,7 +98,73 @@ style description used word for word in every `prompt` call, generated in one
 session. When the generator accepts reference images, generate the main piece
 first and pass it as a reference for the others. Normalize each piece to its
 own in-game width, then put the preview sheets side by side and regenerate a
-piece that drifts in color or wood tone before slicing further.
+piece that drifts in color or wood tone before slicing further. Pack the
+finished pieces into one atlas (step 8).
+
+## Progress bars
+
+A progress or health bar is two pieces made as a matching set: the track
+(`--kind bar`) and the fill (`--kind bar-fill`), generated with the same style
+words and, when the generator takes references, the track as a reference.
+
+1. Normalize the track with `--mode three` and read its `contentPadding`: the
+   fill sits in that box.
+2. Normalize the fill to the box's height, `--height <track height - top -
+   bottom>`, also with `--mode three`. A fill's soft top-to-bottom shade can
+   otherwise pass as a vertical stretch span.
+3. Draw progress by resizing the fill. Phaser's NineSlice never gets narrower
+   than its two end caps, so below that width keep the caps' width and scale
+   the fill down horizontally. The fill follows the track's top-left corner and
+   scale, whatever the track's origin. Call it again whenever the track moves,
+   resizes, or scales; with both in one Container, moving or scaling the
+   Container needs no new call, but changing the track itself still does:
+
+```ts
+function setProgress(track, fill, padding, value) {
+  const progress = Number.isFinite(value) ? Phaser.Math.Clamp(value, 0, 1) : 0;
+  const inner = track.width - padding.left - padding.right;
+  const width = Math.round(inner * progress);
+  const caps = fill.leftWidth + fill.rightWidth;
+  const corner = track.getTopLeft(); // unrotated tracks
+  fill.setOrigin(0);
+  fill.setPosition(corner.x + padding.left * track.scaleX, corner.y + padding.top * track.scaleY);
+  fill.setVisible(width > 0);
+  fill.setSize(Math.max(width, caps), fill.height);
+  fill.setScale((width >= caps ? 1 : width / caps) * track.scaleX, track.scaleY);
+}
+const padding = this.textures.getFrame('ui', 'bar').customData.slicewright.contentPadding;
+const track = this.add.nineslice(x, y, 'ui', 'bar', 320); // a three-slice keeps its height
+const fill = this.add.nineslice(0, 0, 'ui', 'bar-fill');
+setProgress(track, fill, padding, 0.4);
+```
+
+This keeps the fill exactly inside the track's content box at every width,
+checked in Phaser 4.2 at 0 to 100% on two track widths, a centered track, and
+a track scaled twice as wide.
+
+In CSS, put the fill element inside the track element: the track's
+`border-width` is its content padding, so the fill lands in the content box and
+the track's `clientWidth` is the inner width. The fill's `min-width` is its
+two end caps, so the same rule applies below it:
+
+```js
+function setProgress(track, fill, value) {
+  const progress = Number.isFinite(value) ? Math.min(Math.max(value, 0), 1) : 0;
+  const width = Math.round(track.clientWidth * progress);
+  const caps = parseFloat(getComputedStyle(fill).minWidth);
+  fill.style.visibility = width > 0 ? 'visible' : 'hidden';
+  fill.style.width = `${Math.max(width, caps)}px`;
+  fill.style.transformOrigin = 'left';
+  fill.style.transform = width >= caps ? '' : `scaleX(${width / caps})`;
+}
+// <div class="ui-bar"><div class="ui-bar-fill"></div></div>
+```
+
+Checked in Chrome on the same widths and values. A fill whose look
+changes along its length (a left-to-right gradient, segments) cannot be
+resized this way, because resizing stretches it: draw it at full width and
+reveal part of it instead, for example with a Phaser mask filter. slicewright
+does not check that path.
 
 ## Findings
 
@@ -96,7 +174,7 @@ piece that drifts in color or wood tone before slicing further.
 | `insets.large` | The fixed parts take most of an axis, so little stretches and the art cannot shrink much. | Usually edge texture or detail: regenerate with plainer edges, or raise `--tolerance` slightly. |
 | `stretch.x.none`, `stretch.y.none` | No two adjacent lines match; any stretch smears. | Regenerate with plain edges and center, or use `--mode three` for a vertical gradient. |
 | `stretch.x.short`, `stretch.y.short` | Only a tiny run matches and nothing repeats: the edges carry non-repeating detail (vines, drawn rope). | Regenerate with plain edges between the corners; or choose insets by hand after the preview. |
-| `tile.x.auto`, `tile.y.auto` | The edges repeat with the named period, so that axis tiles. | Create the NineSlice with `tileX` / `tileY`; atlas data cannot carry it. |
+| `tile.x.auto`, `tile.y.auto` | The edges repeat with the named period, so that axis tiles. | Create the NineSlice with `tileX` / `tileY`; Phaser reads tiling only from the constructor (the frame's `slicewright.tile` records it). |
 | `tile.x.seam`, `tile.y.seam` | A tiled span cuts its pattern or jumps where it wraps. | Use one of the `nearestLengths`, or make the texture seamless. |
 | `three-slice.auto` | Rows never repeat, so the layout keeps a fixed height. | Fine for bars. For panels, regenerate with a flat center. |
 | `three-slice.vertical.auto` | Columns never repeat but rows do, so the layout keeps its width. | Fine for vertical tracks. For panels, regenerate with plain edges. |
@@ -113,8 +191,10 @@ piece that drifts in color or wood tone before slicing further.
 | `margin.transparent` | Transparent border pixels become part of the corners. | `normalize` crops them; otherwise crop unless the spacing is intended. |
 | `rebuild.x.lossy`, `rebuild.y.lossy` | `--keep` would flatten texture or shading on that axis. | Informational: that axis kept its full span. |
 | `rebuild.filtering` | A small `--keep` fades under linear texture filtering. | Use `--keep 8` or more, or nearest filtering (Phaser `pixelArt`). |
-| `padding.invalid` | Given content padding leaves no content area. | Shrink `--padding`. |
-| `atlas.padding-invalid` | An atlas frame's content padding does not fit the frame. | Re-export the frame. |
+| `padding.invalid` | Given content padding leaves no content area, is not whole and non-negative, or reaches past the fixed edge into a stretch span, where it would change with size. | Shrink `--padding` to within the insets on resizable axes. |
+| `pack.css-skipped` | A packed frame has no CSS class: it has no borders, or is only part of its image, which `border-image` cannot address. | Pack the piece's own one-frame atlas, or use Phaser for it. |
+| `pack.css-class-collision` | Two frame names become the same CSS class. | Rename one piece. |
+| `atlas.padding-invalid` | An atlas frame's content padding does not fit the frame or reaches past the fixed edge its `scale9Borders` leave. | Re-export the frame. |
 | `insets.asymmetric` | Opposite insets differ by more than 2 px. | Usually generator drift; check the preview. |
 | `insets.invalid` | Insets leave no stretch pixel. | Shrink the insets. |
 | `image.empty` | Every pixel is transparent. | The background removal took everything; redo it. |

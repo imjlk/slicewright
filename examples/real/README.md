@@ -13,8 +13,12 @@ image was generated with the GPT `image_gen` route of
 | `bar` | chroma-green PNG | `key`, then `normalize --width 320` |
 | `baroque` | transparent PNG | `normalize --width 480` |
 | `scifi` | transparent PNG | `normalize --width 480` |
+| `bar-fill` | chroma-magenta PNG, `bar.png` as a reference | `key`, then `normalize --height 28 --mode three` |
 | `crest` | transparent PNG, hand-written prompt | `normalize --width 480 --regions multi` |
 | `bar-vertical` | the keyed bar turned a quarter turn | `normalize --height 320` |
+
+`bar-fill` is the fill for `bar`: 28 px is the track's 33 px height minus its
+top and bottom content padding (2 and 3 px).
 
 `crest` has a crest in the middle of its top edge, so its prompt is written by
 hand: `slicewright prompt` keeps decoration in the corners. No target exports a
@@ -34,6 +38,10 @@ The button, dialog, pixel, bar, and scifi prompts predate the rule that edges
 carry no pattern along them. A first baroque frame drawn with that older prompt
 got a rope edge that could neither stretch nor tile; `baroque` is the redraw
 with the current prompt.
+
+`../packed/ui.*` is `pack dialog.json button.json bar.json ../tiled/rope.json
+--css`; the manifest's `packs` list lets the engine check rebuild it and the
+`packed …` entries render its frames next to the unpacked originals.
 
 `../tiled/rope.png` is a synthetic panel whose rope edge repeats exactly every
 6 px, so the check also covers a tiled export (`tile.x.auto`).
