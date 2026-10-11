@@ -65,8 +65,8 @@ Ornate edges often carry a pattern, such as a rope or a chain, that cannot
 stretch but can tile. When an axis has no trustworthy uniform run, detection
 looks for a span whose every line matches the line one period later, for
 periods from 2 to a quarter of the content length and at most 64. The longest
-such span, trimmed to whole periods (with the leftover lines placed so the span
-sits nearest the center) and holding at least two, becomes the
+such span, trimmed to whole periods (with the leftover lines placed so the span's
+midpoint sits nearest the center) and holding at least two, becomes the
 stretch span when it reaches 10% of the content; ties prefer the shorter period,
 then the span nearest the center. That axis is then tiled, and a
 `tile.<axis>.auto` finding names the period and tells the caller to enable
@@ -93,14 +93,19 @@ the column checks.
 Some art has fixed detail in the middle of an edge, such as a crest on a title
 plate, with stretchable lengths on both sides. With multiple regions requested,
 every uniform run on an axis that reaches 10% of the content becomes its own
-stretch segment, with fixed segments between them. An axis with only one such
-run keeps the single-region result, a tiled axis is never split, and a
+stretch segment, with fixed segments between them. This refines whichever
+single layout detection found, including a three-slice or vertical three-slice.
+An axis with only one such run keeps the single-region result, a tiled axis and
+an axis the layout keeps fixed are never split, and a
 `regions.multi` finding records the counts. The reported insets are the
-outermost flexible lines.
+outermost flexible lines. No current target can export a multi-region layout;
+it renders in previews and reports `target.unsupported` on export.
 
 ## Stretch uniformity
 
-When the caller supplies insets, every column inside the horizontal stretch span
+Insets that leave no stretch span are an `insets.invalid` error reported on a
+layout that resizes nothing. When the caller supplies valid insets, every column
+inside the horizontal stretch span
 must match its neighbor, and every row inside the vertical span must match its
 neighbor. A mismatch is an error that names the first offending pair, because
 stretching that span changes the art. An axis in tiling mode is exempt and is
@@ -131,7 +136,8 @@ is not counted.
 
 ## Tiling seams
 
-An axis may tile instead of stretch. Tiling repeats the stretch span, so the
+An axis may tile instead of stretch; only an axis with a single tiled span is
+checked. Tiling repeats the stretch span, so the
 span must end where its pattern starts again. When every line of the span
 matches the line one period later, for one or more periods of at most half the
 span, the span must be a whole number of one of those periods; otherwise a
@@ -218,46 +224,25 @@ per axis, both axes together, or not at all. Emulation exports the fixed axis
 with zero insets, so the engine would stretch it, and a `target.emulated`
 finding tells the caller to keep that axis at its source size. A shape the
 target can neither represent nor emulate is a `target.unsupported` error and
-writes no files. Tiling the target cannot express is a `target.tile` warning,
-and a layout that never resizes is a `target.fixed` warning. Each target also
-has a status: `verified` targets (`phaser`, `css`) are rendered in the real
-engine by the engine check, and `experimental` targets (`godot`, `unity`,
-`ninepatch`) follow the documented format without being run, which a
-`target.experimental` finding states on every export.
+writes no files, and so is a layout that never resizes (`target.fixed`), since
+every target would stretch zero-inset art. Tiling the target cannot express is
+a `target.tile` warning, and so is a target whose tile count differs from the
+layout's rule of rounding down (CSS `round` takes the nearest whole number). Each target also
+has a status: `verified` targets are rendered in the real engine by the engine
+check, and an `experimental` target follows the documented format without being
+run, which a `target.experimental` finding states on every export. The targets
+are `phaser` and `css`, both verified; other engines are not supported.
 
 ## CSS border-image
 
 The CSS target writes a class with `border-image-slice` set to the insets plus
 `fill`, matching `border-width` in pixels, and `border-image-repeat` of
-`stretch` or, for a tiled axis, `round` (whole tiles scaled to fit). A
+`stretch` or, for a tiled axis, `round` (whole tiles scaled to fit). `round`
+takes the nearest whole number of tiles rather than rounding down, so a tiled
+CSS export carries a `target.tile` warning. A
 three-slice fixes the height and a vertical three-slice fixes the width; any
 other layout sets the minimum width and height. CSS cannot express more than
 one region per axis.
-
-## Godot StyleBoxTexture
-
-The Godot target writes a Godot 4 `StyleBoxTexture` resource: the texture as a
-`res://` path (the image's path inside the output directory, or only its file
-name when it lies outside), `texture_margin_left`, `_top`, `_right`, and `_bottom` from the
-insets, and `axis_stretch_horizontal` and `axis_stretch_vertical` set to stretch
-(0) or, for a tiled axis, tile fit (2). Godot represents nine-slices; the
-three-slice shapes are emulated.
-
-## Unity sprite border
-
-The Unity target writes the sprite border in Unity's order: `x` left, `y`
-bottom, `z` right, `w` top, as `Sprite.border` and `TextureImporter.spriteBorder`
-use it, with Image type `Sliced`, or `Tiled` when an axis tiles. Unity tiles
-both axes together. Unity represents nine-slices; the three-slice shapes are
-emulated.
-
-## Android nine-patch
-
-The nine-patch target writes a `.9.png` that is the image inside a 1 px
-transparent frame. In the top line, opaque black marks every column of every
-flexible segment; in the left line, every row. A fixed axis is marked whole.
-Padding lines on the right and bottom are left out. Nine-patches support any
-number of regions per axis and cannot tile.
 
 ## Atlas frames
 
@@ -265,7 +250,9 @@ An atlas check reads a Phaser JSON Hash or JSON Array atlas and validates every
 frame that has `scale9Borders`, or only the named frame. A trimmed frame is an
 error because Phaser's NineSlice does not support trimming. A rotated frame is a
 warning. Borders outside the frame are an error. Each frame's pixels are then
-inspected with its borders as explicit insets.
+inspected with its borders as explicit insets: borders spanning the full height
+inspect as a three-slice, and borders spanning the full width as a vertical
+three-slice, the way the Phaser target emulates it.
 
 ## Generation prompts
 

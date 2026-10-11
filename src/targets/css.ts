@@ -6,7 +6,12 @@ export const cssTarget: SliceTarget = {
   id: 'css',
   label: 'CSS border-image',
   status: 'verified',
-  capabilities: { shapes: ['nine', 'three', 'three-vertical'], emulated: [], tile: 'per-axis' },
+  capabilities: {
+    shapes: ['nine', 'three', 'three-vertical'],
+    emulated: [],
+    tile: 'per-axis',
+    tileCount: 'round',
+  },
   exportLayout: exportCss,
 };
 
@@ -15,7 +20,7 @@ export const cssTarget: SliceTarget = {
  * border widths, `round` for tiled axes, and the minimum or fixed size.
  *
  * @evidence docs/spec.md#css-border-image Writes the slice, width, repeat, and size declarations for the CSS target.
- * @evidenceReview docs/spec.md#css-border-image #c509052 Checked this code against the section line by line and ran exportsCssBorderImage green with pnpm test.
+ * @evidenceReview docs/spec.md#css-border-image #53bcb3f Checked this code against the section line by line and ran exportsCssBorderImage green with pnpm test.
  */
 export function exportCss({ name, imageRef, layout }: ExportInput): Omit<ExportResult, 'target' | 'findings'> {
   const insets = exportInsets(layout);

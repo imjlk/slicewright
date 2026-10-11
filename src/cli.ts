@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { basename, dirname, join, relative, resolve } from 'node:path';
+import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 
 import { cli, define } from 'gunshi';
 
@@ -13,7 +13,7 @@ import {
   type InspectReport,
 } from './inspect.js';
 import { normalizeRaster } from './normalize.js';
-import { createSingleFrameAtlas, inspectAtlas } from './phaser.js';
+import { inspectAtlas } from './phaser.js';
 import { decodePng, encodePng } from './png.js';
 import { buildPromptPlan, promptBackgrounds, uiKinds } from './prompt.js';
 import type { SliceLayout } from './layout.js';
@@ -21,7 +21,7 @@ import type { Raster } from './raster.js';
 import { renderPreviewSheet } from './render.js';
 import { resizeRaster, targetSize } from './resize.js';
 import { parseBorders, parseInsets, scale9BordersToInsets } from './slices.js';
-import { exportForTarget, sliceTargets } from './targets/index.js';
+import { exportForTarget, findTarget, sliceTargets } from './targets/index.js';
 
 /** Exit codes: 0 ok, 1 error findings, 2 usage or input failure. */
 const findingsFailed = 1;
@@ -65,7 +65,7 @@ const sliceArgs = {
     type: 'enum',
     choices: ['single', 'multi'],
     default: 'single',
-    description: 'multi keeps every long stretch run on an axis (Android nine-patch style)',
+    description: 'multi keeps every long stretch run on an axis, around fixed detail',
   },
   tile: {
     type: 'enum',
@@ -164,21 +164,31 @@ const frame = define({
     input: image,
     name: { type: 'string', required: true, description: 'Frame name' },
     out: { type: 'string', description: 'Atlas JSON to write; printed when omitted' },
+    'image-ref': {
+      type: 'string',
+      description: 'How the atlas refers to the image; defaults to its path from the atlas',
+    },
     ...sliceArgs,
   },
   run: (ctx) => {
     const { input, name, out } = ctx.values;
     const raster = readPng(input);
     const report = inspectRaster(raster, inspectOptions(ctx.values, raster));
-    const imageRef = out === undefined
-      ? basename(input)
-      : relative(dirname(resolve(out)), resolve(input));
-    const atlas = createSingleFrameAtlas(name, imageRef, raster.width, raster.height, report.insets);
-    if (out !== undefined) {
-      writeFileSync(out, `${JSON.stringify(atlas, null, 2)}\n`);
-    }
-    print({ image: input, atlas: out ?? atlas, ...summary(report) });
-    failOnErrors(report.ok);
+    const phaser = phaserAtlas({
+      name,
+      imagePath: input,
+      imageRef: ctx.values['image-ref'],
+      atlasPath: out,
+      raster,
+      layout: report.layout,
+    });
+    print({
+      image: input,
+      atlas: phaser.atlas,
+      atlasFindings: phaser.findings,
+      ...summary(report),
+    });
+    failOnErrors(report.ok && phaser.ok);
   },
 });
 
@@ -303,18 +313,20 @@ const normalize = define({
     });
     writeFileSync(out, encodePng(result.raster));
     let atlasOut: string | undefined;
+    let atlasFindings: readonly Finding[] = [];
+    let atlasOk = true;
     if (ctx.values.atlas !== undefined) {
-      atlasOut = ctx.values.atlas;
-      const frameName = ctx.values.name ?? basename(out).replace(/\.png$/i, '');
-      const imageRef = relative(dirname(resolve(atlasOut)), resolve(out));
-      const json = createSingleFrameAtlas(
-        frameName,
-        imageRef,
-        result.raster.width,
-        result.raster.height,
-        result.report.insets,
-      );
-      writeFileSync(atlasOut, `${JSON.stringify(json, null, 2)}\n`);
+      const phaser = phaserAtlas({
+        name: ctx.values.name ?? basename(out).replace(/\.png$/i, ''),
+        imagePath: out,
+        imageRef: ctx.values['image-ref'],
+        atlasPath: ctx.values.atlas,
+        raster: result.raster,
+        layout: result.report.layout,
+      });
+      atlasOk = phaser.ok;
+      atlasOut = phaser.ok ? ctx.values.atlas : undefined;
+      atlasFindings = phaser.findings;
     }
     const exports = targetList(ctx.values.target).map((id) =>
       writeExport(id, {
@@ -330,11 +342,12 @@ const normalize = define({
       image: input,
       out,
       atlas: atlasOut,
+      ...(atlasFindings.length === 0 ? {} : { atlasFindings }),
       steps: result.steps,
       ...summary(result.report),
       ...(exports.length === 0 ? {} : { exports }),
     });
-    failOnErrors(result.report.ok && exports.every((item) => item.ok));
+    failOnErrors(result.report.ok && atlasOk && exports.every((item) => item.ok));
   },
 });
 
@@ -390,6 +403,50 @@ const exportCommand = define({
   },
 });
 
+/**
+ * Writes a Phaser atlas through the Phaser target, so `frame` and
+ * `normalize --atlas` get the same capability checks and image reference as
+ * `export --target phaser`. Without a path the atlas is returned instead.
+ */
+function phaserAtlas(options: {
+  readonly name: string;
+  readonly imagePath: string;
+  readonly imageRef: string | undefined;
+  readonly atlasPath: string | undefined;
+  readonly raster: Raster;
+  readonly layout: SliceLayout;
+}): { ok: boolean; atlas: unknown; findings: readonly Finding[] } {
+  const imageRef =
+    options.imageRef ??
+    (options.atlasPath === undefined
+      ? basename(options.imagePath)
+      : urlPath(relative(dirname(resolve(options.atlasPath)), resolve(options.imagePath))));
+  const result = exportForTarget('phaser', {
+    name: options.name,
+    imageRef,
+    raster: options.raster,
+    layout: options.layout,
+  });
+  const ok = !result.findings.some((finding) => finding.severity === 'error');
+  const contents = result.files[0]?.contents;
+  if (!ok || typeof contents !== 'string') {
+    return { ok: false, atlas: undefined, findings: result.findings };
+  }
+  if (options.atlasPath !== undefined) {
+    writeFileSync(options.atlasPath, contents);
+  }
+  return {
+    ok,
+    atlas: options.atlasPath ?? (JSON.parse(contents) as unknown),
+    findings: result.findings,
+  };
+}
+
+/** A path as a URL-style reference: forward slashes on every platform. */
+function urlPath(path: string): string {
+  return path.split(sep).join('/').replace(/\\/g, '/');
+}
+
 function targetList(value: string | undefined): string[] {
   if (value === undefined) {
     return [];
@@ -399,7 +456,7 @@ function targetList(value: string | undefined): string[] {
     .map((id) => id.trim())
     .filter((id) => id.length > 0);
   for (const id of ids) {
-    if (sliceTargets[id] === undefined) {
+    if (findTarget(id) === undefined) {
       throw new UsageError(
         `Unknown target "${id}". Known targets: ${Object.keys(sliceTargets).join(', ')}.`,
       );
@@ -422,7 +479,8 @@ function writeExport(
   mkdirSync(options.outDir, { recursive: true });
   const imageRef =
     options.imageRef ??
-    (relative(resolve(options.outDir), resolve(options.imagePath)) || basename(options.imagePath));
+    (urlPath(relative(resolve(options.outDir), resolve(options.imagePath))) ||
+      basename(options.imagePath));
   const result = exportForTarget(id, {
     name: options.name,
     imageRef,

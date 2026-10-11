@@ -15,9 +15,8 @@ inspection finds or checks the exact slice insets afterwards.
 - `inspect` detects the stretch spans, or checks insets you give, and reports
   smearing, repeating edges, seams, noise, alpha holes, margins, and spill.
 - `preview` renders the art at several stretched sizes on one PNG.
-- `export` writes engine files for one or more targets: Phaser, CSS
-  `border-image`, Godot `StyleBoxTexture`, Unity sprite border, and Android
-  `.9.png`. `targets` lists what each can represent.
+- `export` writes engine files for Phaser and CSS `border-image`; `targets`
+  lists what each can represent.
 - `frame` writes a one-frame Phaser JSON Hash atlas with `scale9Borders`.
 - `atlas` checks every nine-slice frame of a Phaser JSON Hash or JSON Array
   atlas against its pixels.
@@ -73,32 +72,27 @@ stretched, and tiled segments.
 | Three-slice | Ends fixed; stretches horizontally; height fixed | `--mode three`, or rows that never repeat |
 | Vertical three-slice | Ends fixed; stretches vertically; width fixed | `--mode three-vertical`, or columns that never repeat |
 | Tiled axis | A span repeats instead of stretching | `--tile x/y/xy`, or edges that repeat a pattern |
-| Multiple regions | Several stretch spans per axis around fixed detail | `--regions multi` |
+| Multiple regions | Several stretch spans per axis around fixed detail | `--regions multi` (preview only; no target exports it yet) |
 
-| Target | Status | Nine | Three | Vertical three | Multi | Tiling |
-| --- | --- | --- | --- | --- | --- | --- |
-| `phaser` | verified | ✓ | ✓ | emulated | ✗ | per axis |
-| `css` | verified | ✓ | ✓ | ✓ | ✗ | per axis |
-| `godot` | experimental | ✓ | emulated | emulated | ✗ | per axis |
-| `unity` | experimental | ✓ | emulated | emulated | ✗ | both axes |
-| `ninepatch` | experimental | ✓ | emulated | emulated | ✓ | ✗ |
+| Target | Nine | Three | Vertical three | Multi | Tiling |
+| --- | --- | --- | --- | --- | --- |
+| `phaser` | ✓ | ✓ | emulated | ✗ | per axis |
+| `css` | ✓ | ✓ | ✓ | ✗ | per axis, nearest tile count |
 
 Emulated means zero insets on the fixed axis; keep that axis at its size.
 Anything a target cannot represent is reported instead of exported.
 
 ### Engine support
 
-slicewright is developed against **Phaser 4**, and CSS `border-image` is
-checked alongside it; both are rendered in the real engine by
-`pnpm engine:check`. The `godot`, `unity`, and `ninepatch` targets are
-**experimental**: they follow each engine's documented format but are not run
-in that engine, and every export says so with a `target.experimental` finding.
-Other engines (Defold, GameMaker, Cocos, Pixi.js, Bevy, and so on) are **not
-supported**, and nothing beyond Phaser is planned for now.
+slicewright targets **Phaser 4**, with CSS `border-image` alongside it for DOM
+UI; both are rendered in the real engine by `pnpm engine:check`. Other engines
+(Godot, Unity, Android nine-patch, Defold, GameMaker, Cocos, Pixi.js, Bevy, and
+so on) are **not supported**, and none is planned for now.
 
-**Pull requests are welcome**: verification for an experimental target, or a
-new target. [`docs/extending.md`](docs/extending.md) explains how to add a
-target or a layout feature.
+**Pull requests are welcome** for new targets, ideally with a way to render the
+output in that engine. [`docs/extending.md`](docs/extending.md) explains how
+to add a target or a layout feature; a target starts as `experimental` until
+the engine check renders it.
 
 ## How it decides
 
@@ -120,8 +114,7 @@ pnpm engine:check
 renders every sample as a Phaser 4 NineSlice and as its exported CSS
 `border-image` in headless Chrome. It checks the sizes and insets Phaser read,
 compares rebuilt textures with their sources, and compares the browser's
-border-image pixels with slicewright's own renderer. Godot, Unity, and Android
-output follows their documented formats but is not run in an engine here.
+border-image pixels with slicewright's own renderer.
 
 ## Development
 
@@ -149,7 +142,7 @@ The core is pure TypeScript over RGBA buffers. PNG input and output use
 ## Roadmap
 
 - Approximate-period tiling for hand-drawn patterned edges.
-- Content padding (nine-patch padding lines, Godot content margins).
+- Content padding: where text sits inside an ornate frame (Phaser frame `customData`, CSS `border-width` separate from `border-image-width`).
 - A first npm release once the detection settles.
 
 ## License

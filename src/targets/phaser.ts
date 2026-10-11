@@ -7,7 +7,12 @@ export const phaserTarget: SliceTarget = {
   id: 'phaser',
   label: 'Phaser 4',
   status: 'verified',
-  capabilities: { shapes: ['nine', 'three'], emulated: ['three-vertical'], tile: 'per-axis' },
+  capabilities: {
+    shapes: ['nine', 'three'],
+    emulated: ['three-vertical'],
+    tile: 'per-axis',
+    tileCount: 'floor',
+  },
   exportLayout: exportPhaser,
 };
 

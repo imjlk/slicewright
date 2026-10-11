@@ -1,4 +1,4 @@
-import { deepStrictEqual, ok, strictEqual } from 'node:assert/strict';
+import { deepStrictEqual, ok, strictEqual, throws } from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { defaultInspectOptions, inspectRaster } from '../src/inspect.js';
@@ -9,12 +9,11 @@ import {
   layoutShape,
   minimumLayoutSize,
 } from '../src/layout.js';
-import { decodePng } from '../src/png.js';
-import { alphaAt, pixelOffset } from '../src/raster.js';
+import { pixelOffset } from '../src/raster.js';
+import { inspectAtlas } from '../src/phaser.js';
 import { renderLayout, renderPreviewSheet } from '../src/render.js';
-import { godotPath } from '../src/targets/godot.js';
 import { capabilityFindings, exportForTarget, sliceTargets } from '../src/targets/index.js';
-import { crestPanel, panel, sameRaster, shadedBar, transpose } from './fixtures.js';
+import { crestPanel, fillRect, panel, sameRaster, shadedBar, transpose } from './fixtures.js';
 
 function codes(findings: ReadonlyArray<{ code: string }>): string[] {
   return findings.map((finding) => finding.code);
@@ -104,6 +103,21 @@ export function detectsVerticalThreeSlices(): void {
   deepStrictEqual(forced.insets, { left: 0, right: 0, top: 6, bottom: 6 });
   strictEqual(forced.ok, true);
 
+  // The Phaser target's own vertical export passes the atlas check.
+  const exported = exportForTarget('phaser', {
+    name: 'track',
+    imageRef: 'track.png',
+    raster: bar,
+    layout: report.layout,
+  });
+  const atlasReport = inspectAtlas(
+    JSON.parse(text(exported.files[0]?.contents)) as unknown,
+    bar,
+    defaultInspectOptions,
+  );
+  strictEqual(atlasReport.ok, true);
+  strictEqual(atlasReport.frames[0]?.inspection?.mode, 'three-vertical');
+
   const sheet = renderPreviewSheet(bar, report.layout);
   strictEqual(
     sheet.cells.some((cell) => cell.label === 'wide'),
@@ -114,7 +128,7 @@ export function detectsVerticalThreeSlices(): void {
 
 /**
  * @evidence docs/spec.md#multiple-stretch-regions Splits the top edge around a crest only when multiple regions are asked for.
- * @evidenceReview docs/spec.md#multiple-stretch-regions #f7d00d8 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#multiple-stretch-regions #919c83e Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function detectsMultipleRegions(): void {
   const art = crestPanel(96, 40);
@@ -130,22 +144,26 @@ export function detectsMultipleRegions(): void {
   strictEqual(report.insets.left, stretch[0]?.start);
   strictEqual(layoutShape({ x: report.layout.x, y: report.layout.y }), 'multi');
 
+  // A three-slice bar with a crest keeps its fixed height and splits around the crest.
+  const crestBar = shadedBar(96, 12);
+  for (let x = 0; x < 10; x += 1) {
+    fillRect(crestBar, 43 + x, 0, 1, 12, [240, 120 + x * 12, 60, 255]);
+  }
+  const bar = inspectRaster(crestBar, { ...defaultInspectOptions, regions: 'multi' });
+  strictEqual(bar.mode, 'multi');
+  strictEqual(bar.layout.x.segments.filter((segment) => segment.kind === 'stretch').length, 2);
+  deepStrictEqual(bar.layout.y.segments, [{ start: 0, end: 12, kind: 'fixed' }]);
+
   const plain = inspectRaster(panel(96, 40), { ...defaultInspectOptions, regions: 'multi' });
   strictEqual(plain.mode, 'nine');
 }
 
 /**
  * @evidence docs/spec.md#targets Rejects unsupported shapes without files, notes emulation, warns about tiling gaps and fixed layouts, and lists every target.
- * @evidenceReview docs/spec.md#targets #47e058c Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#targets #0358c64 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function checksTargetCapabilities(): void {
-  deepStrictEqual(Object.keys(sliceTargets).sort(), [
-    'css',
-    'godot',
-    'ninepatch',
-    'phaser',
-    'unity',
-  ]);
+  deepStrictEqual(Object.keys(sliceTargets).sort(), ['css', 'phaser']);
   const raster = crestPanel(96, 40);
   const multi = inspectRaster(raster, { ...defaultInspectOptions, regions: 'multi' }).layout;
   const input = { name: 'crest', imageRef: 'crest.png', raster, layout: multi };
@@ -153,7 +171,7 @@ export function checksTargetCapabilities(): void {
   const phaser = exportForTarget('phaser', input);
   strictEqual(phaser.files.length, 0);
   ok(codes(phaser.findings).includes('target.unsupported'));
-  strictEqual(exportForTarget('ninepatch', input).files.length, 1);
+  strictEqual(exportForTarget('css', input).files.length, 0);
 
   const vertical = layoutFromInsets({ left: 0, right: 0, top: 6, bottom: 6 }, 40, 30, {
     shape: 'three-vertical',
@@ -165,12 +183,20 @@ export function checksTargetCapabilities(): void {
   const tiledX = layoutFromInsets({ left: 6, right: 6, top: 6, bottom: 6 }, 40, 30, {
     tile: { x: true, y: false },
   });
-  ok(codes(capabilityFindings(sliceTargets['unity']!, tiledX)).includes('target.tile'));
-  ok(codes(capabilityFindings(sliceTargets['ninepatch']!, tiledX)).includes('target.tile'));
   strictEqual(capabilityFindings(sliceTargets['phaser']!, tiledX).length, 0);
+  ok(codes(capabilityFindings(sliceTargets['css']!, tiledX)).includes('target.tile'));
 
   const still = { x: axisFromSpans(40, []), y: axisFromSpans(30, []) };
-  ok(codes(capabilityFindings(sliceTargets['css']!, still)).includes('target.fixed'));
+  const fixed = exportForTarget('css', {
+    name: 'still',
+    imageRef: 'still.png',
+    raster,
+    layout: still,
+  });
+  ok(codes(fixed.findings).includes('target.fixed'));
+  strictEqual(fixed.files.length, 0);
+  strictEqual(sliceTargets['constructor'] === undefined, false);
+  throws(() => exportForTarget('constructor', input), /Unknown target/);
 
   const nine = layoutFromInsets({ left: 6, right: 6, top: 6, bottom: 6 }, 40, 30);
   for (const target of Object.values(sliceTargets)) {
@@ -188,7 +214,7 @@ export function checksTargetCapabilities(): void {
 
 /**
  * @evidence docs/spec.md#css-border-image Checks the slice with fill, border widths, round for tiled axes, and the fixed height of a three-slice.
- * @evidenceReview docs/spec.md#css-border-image #c509052 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#css-border-image #53bcb3f Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function exportsCssBorderImage(): void {
   const raster = panel(40, 30);
@@ -215,96 +241,8 @@ export function exportsCssBorderImage(): void {
   ok(threeCss.includes('border-image-slice: 0 6 0 6 fill;'));
 }
 
-/**
- * @evidence docs/spec.md#godot-styleboxtexture Checks the resource header, res path, margins, and tile-fit stretch mode.
- * @evidenceReview docs/spec.md#godot-styleboxtexture #c03c96a Checked the assertions against the section and ran this test green with pnpm test.
- */
-export function exportsGodotStyleBox(): void {
-  const raster = panel(40, 30);
-  const layout = layoutFromInsets({ left: 6, right: 8, top: 5, bottom: 7 }, 40, 30, {
-    tile: { x: false, y: true },
-  });
-  const tres = text(
-    exportForTarget('godot', { name: 'panel', imageRef: 'ui/panel.png', raster, layout }).files[0]?.contents,
-  );
-  ok(tres.startsWith('[gd_resource type="StyleBoxTexture" load_steps=2 format=3]'));
-  ok(tres.includes('path="res://ui/panel.png"'));
-  ok(tres.includes('texture_margin_left = 6.0'));
-  ok(tres.includes('texture_margin_bottom = 7.0'));
-  ok(tres.includes('axis_stretch_horizontal = 0'));
-  ok(tres.includes('axis_stretch_vertical = 2'));
-  strictEqual(godotPath('../../art/panel.png'), 'res://panel.png');
-  strictEqual(godotPath('./ui/panel.png'), 'res://ui/panel.png');
-  strictEqual(godotPath('res://themes/panel.png'), 'res://themes/panel.png');
-}
-
-/**
- * @evidence docs/spec.md#unity-sprite-border Checks the left, bottom, right, top order and the Sliced and Tiled image types.
- * @evidenceReview docs/spec.md#unity-sprite-border #3c32535 Checked the assertions against the section and ran this test green with pnpm test.
- */
-export function exportsUnitySpriteBorder(): void {
-  const raster = panel(40, 30);
-  const layout = layoutFromInsets({ left: 6, right: 8, top: 5, bottom: 7 }, 40, 30);
-  const result = exportForTarget('unity', { name: 'panel', imageRef: 'panel.png', raster, layout });
-  const settings = JSON.parse(text(result.files[0]?.contents)) as {
-    spriteBorder: unknown;
-    imageType: string;
-  };
-  deepStrictEqual(settings.spriteBorder, { x: 6, y: 7, z: 8, w: 5 });
-  strictEqual(settings.imageType, 'Sliced');
-  ok(result.usage.includes('new Vector4(6, 7, 8, 5)'));
-
-  const tiled = layoutFromInsets({ left: 6, right: 8, top: 5, bottom: 7 }, 40, 30, {
-    tile: { x: true, y: true },
-  });
-  const tiledSettings = JSON.parse(
-    text(
-      exportForTarget('unity', { name: 'panel', imageRef: 'panel.png', raster, layout: tiled }).files[0]?.contents,
-    ),
-  ) as { imageType: string };
-  strictEqual(tiledSettings.imageType, 'Tiled');
-}
-
-/**
- * @evidence docs/spec.md#android-nine-patch Decodes the .9.png and checks the frame, the marked columns and rows, multiple regions, and a fixed axis marked whole.
- * @evidenceReview docs/spec.md#android-nine-patch #3191914 Checked the assertions against the section and ran this test green with pnpm test.
- */
-export function exportsAndroidNinePatch(): void {
-  const raster = crestPanel(96, 40);
-  const multi = inspectRaster(raster, { ...defaultInspectOptions, regions: 'multi' }).layout;
-  const file = exportForTarget('ninepatch', {
-    name: 'crest',
-    imageRef: 'crest.png',
-    raster,
-    layout: multi,
-  }).files[0];
-  strictEqual(file?.path, 'crest.9.png');
-  const patch = decodePng(file?.contents as Uint8Array);
-  deepStrictEqual([patch.width, patch.height], [98, 42]);
-  const marked = (x: number, y: number): boolean => alphaAt(patch, x, y) === 255;
-  strictEqual(marked(0, 0), false);
-  const stretch = multi.x.segments.filter((segment) => segment.kind === 'stretch');
-  ok(marked((stretch[0]?.start ?? 0) + 1, 0));
-  strictEqual(marked(49, 0), false);
-  ok(marked((stretch[1]?.start ?? 0) + 1, 0));
-  ok(marked(0, 21));
-  strictEqual(marked(0, 2), false);
-  strictEqual(marked(97, 21), false);
-
-  const three = layoutFromInsets({ left: 6, right: 6, top: 0, bottom: 0 }, 96, 40, {
-    shape: 'three',
-  });
-  const threePatch = decodePng(
-    exportForTarget('ninepatch', { name: 'bar', imageRef: 'bar.png', raster, layout: three }).files[0]?.contents as Uint8Array,
-  );
-  ok(Array.from({ length: 40 }, (_, y) => alphaAt(threePatch, 0, y + 1) === 255).every(Boolean));
-}
-
 void test('slice layouts', describesSliceLayouts);
 void test('vertical three-slice', detectsVerticalThreeSlices);
 void test('multiple stretch regions', detectsMultipleRegions);
 void test('target capabilities', checksTargetCapabilities);
 void test('CSS border-image', exportsCssBorderImage);
-void test('Godot StyleBoxTexture', exportsGodotStyleBox);
-void test('Unity sprite border', exportsUnitySpriteBorder);
-void test('Android nine-patch', exportsAndroidNinePatch);

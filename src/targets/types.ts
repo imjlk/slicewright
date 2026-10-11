@@ -14,6 +14,12 @@ export interface TargetCapabilities {
   readonly emulated: readonly LayoutShape[];
   /** Tiling per axis, only both axes together, or not at all. */
   readonly tile: 'per-axis' | 'both' | 'none';
+  /**
+   * How the engine picks the number of tiles: `floor` rounds the span divided
+   * by the tile down (the layout's rule, and Phaser's); `round` takes the
+   * nearest whole number (CSS `round`).
+   */
+  readonly tileCount: 'floor' | 'round';
 }
 
 export interface ExportInput {

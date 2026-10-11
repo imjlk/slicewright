@@ -94,7 +94,7 @@ export function createSingleFrameAtlas(
  * only `frameName`, against the atlas image.
  *
  * @evidence docs/spec.md#atlas-frames Rejects trimmed frames and out-of-frame borders, warns on rotation, and inspects each frame with its borders.
- * @evidenceReview docs/spec.md#atlas-frames #879cca2 Checked this code against the section line by line and ran checksAtlasFrames green with pnpm test.
+ * @evidenceReview docs/spec.md#atlas-frames #b1f6b5f Checked this code against the section line by line and ran checksAtlasFrames green with pnpm test.
  */
 export function inspectAtlas(
   json: unknown,
@@ -200,7 +200,14 @@ function inspectFrame(
   const inspection = inspectRaster(cropRaster(image, { x, y, width: w, height: h }), {
     ...options,
     insets: scale9BordersToInsets(borders, w, h),
-    mode: borders.y === 0 && borders.h === h ? 'three' : 'nine',
+    // Phaser's own three-slice keeps the height; zero side insets are how the
+    // Phaser target emulates a vertical three-slice that keeps the width.
+    mode:
+      borders.y === 0 && borders.h === h
+        ? 'three'
+        : borders.x === 0 && borders.w === w
+          ? 'three-vertical'
+          : 'nine',
   });
   return {
     name,

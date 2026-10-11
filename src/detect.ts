@@ -82,7 +82,7 @@ export function linesMatch(
  * Largest premultiplied pixel difference between two lines inside `bounds`.
  *
  * @evidence docs/spec.md#tiling-seams Measures how hard a non-repeating span jumps where it wraps.
- * @evidenceReview docs/spec.md#tiling-seams #ef3dc38 Checked this code against the section line by line and ran checksTilingSeams green with pnpm test.
+ * @evidenceReview docs/spec.md#tiling-seams #e6197a2 Checked this code against the section line by line and ran checksTilingSeams green with pnpm test.
  */
 export function lineDistance(
   raster: Raster,
@@ -152,7 +152,7 @@ export function estimateNoise(raster: Raster, bounds: Rect, axis: Axis): number 
  * first line of the pair, or undefined when the whole span is uniform.
  *
  * @evidence docs/spec.md#stretch-uniformity Locates the first mismatching pair inside a caller's stretch span.
- * @evidenceReview docs/spec.md#stretch-uniformity #53ef9b3 Checked this code against the section line by line and ran rejectsGivenInsetsThatStretchDetail green with pnpm test.
+ * @evidenceReview docs/spec.md#stretch-uniformity #695468c Checked this code against the section line by line and ran rejectsGivenInsetsThatStretchDetail green with pnpm test.
  */
 export function firstMismatch(
   raster: Raster,
@@ -213,7 +213,7 @@ export function detectStretchSpan(
  * long, in order.
  *
  * @evidence docs/spec.md#multiple-stretch-regions Collects every matching run that reaches the minimum length.
- * @evidenceReview docs/spec.md#multiple-stretch-regions #f7d00d8 Checked this code against the section line by line and ran detectsMultipleRegions green with pnpm test.
+ * @evidenceReview docs/spec.md#multiple-stretch-regions #919c83e Checked this code against the section line by line and ran detectsMultipleRegions green with pnpm test.
  */
 export function detectStretchRuns(
   raster: Raster,
@@ -254,7 +254,7 @@ export interface RepeatSpan {
  * then the span nearest the center.
  *
  * @evidence docs/spec.md#repeating-edges Finds the longest whole-period span for periods from 2 to a quarter of the content, at most 64.
- * @evidenceReview docs/spec.md#repeating-edges #4d54ace Checked this code against the section line by line and ran tilesRepeatingEdges green with pnpm test.
+ * @evidenceReview docs/spec.md#repeating-edges #795d113 Checked this code against the section line by line and ran tilesRepeatingEdges green with pnpm test.
  */
 export function detectRepeatSpan(
   raster: Raster,
@@ -275,17 +275,19 @@ export function detectRepeatSpan(
       }
       const covered = runEnd - runStart + period;
       const whole = Math.floor(covered / period) * period;
-      // The remainder can sit on either side; keep the alignment nearest the center.
+      // The leftover lines can sit on either side; keep the window whose
+      // midpoint is nearest the center.
+      const from = runStart;
+      const midpointDistance = (offset: number): number =>
+        Math.abs(from + offset + (whole - 1) / 2 - center);
       let offset = 0;
       for (let shift = 1; shift <= covered - whole; shift += 1) {
-        const shifted = { start: runStart + shift, end: runStart + shift + whole };
-        const current = { start: runStart + offset, end: runStart + offset + whole };
-        if (centerDistance(shifted, center) < centerDistance(current, center)) {
+        if (midpointDistance(shift) < midpointDistance(offset)) {
           offset = shift;
         }
       }
       const candidate = {
-        span: { start: runStart + offset, end: runStart + offset + whole },
+        span: { start: from + offset, end: from + offset + whole },
         period,
       };
       runStart = undefined;

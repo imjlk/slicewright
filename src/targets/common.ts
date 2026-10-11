@@ -4,12 +4,13 @@ import type { SliceInsets } from '../slices.js';
 import type { SliceTarget } from './types.js';
 
 /**
- * Compares a layout with a target's capabilities: an unsupported shape is an
- * error, an emulated shape and a fully fixed layout are noted, tiling the
- * target cannot express is a warning, and an experimental target says so.
+ * Compares a layout with a target's capabilities: an unsupported shape and a
+ * layout that resizes nothing are errors, an emulated shape is noted, tiling
+ * the target cannot express or counts differently is a warning, and an
+ * experimental target says so.
  *
  * @evidence docs/spec.md#targets Reports unsupported shapes as errors, emulation as info, and tiling gaps as warnings, from the declared capabilities.
- * @evidenceReview docs/spec.md#targets #47e058c Checked this code against the section line by line and ran checksTargetCapabilities green with pnpm test.
+ * @evidenceReview docs/spec.md#targets #0358c64 Checked this code against the section line by line and ran checksTargetCapabilities green with pnpm test.
  */
 export function capabilityFindings(target: SliceTarget, layout: SliceLayout): Finding[] {
   const findings: Finding[] = [];
@@ -25,8 +26,8 @@ export function capabilityFindings(target: SliceTarget, layout: SliceLayout): Fi
   if (shape === 'fixed') {
     findings.push({
       code: 'target.fixed',
-      severity: 'warning',
-      message: 'Nothing in this layout resizes; it exports as a plain image with zero insets.',
+      severity: 'error',
+      message: 'Nothing in this layout resizes, and every target would stretch zero-inset art. Use the image as a plain sprite.',
     });
   } else if (!capabilities.shapes.includes(shape)) {
     if (capabilities.emulated.includes(shape)) {
@@ -60,6 +61,13 @@ export function capabilityFindings(target: SliceTarget, layout: SliceLayout): Fi
         code: 'target.tile',
         severity: 'warning',
         message: `${target.label} tiles both axes together, so the axis meant to stretch tiles too.`,
+      });
+    }
+    if (capabilities.tile !== 'none' && capabilities.tileCount === 'round') {
+      findings.push({
+        code: 'target.tile',
+        severity: 'warning',
+        message: `${target.label} uses the nearest whole number of tiles where the layout and Phaser round down, so a span between n + 0.5 and n + 1 tiles shows one more tile.`,
       });
     }
   }

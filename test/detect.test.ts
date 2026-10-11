@@ -103,7 +103,7 @@ export function treatsShadedBarsAsThreeSlices(): void {
 
 /**
  * @evidence docs/spec.md#stretch-uniformity Reports the first mismatching pair for caller insets that cut into the border.
- * @evidenceReview docs/spec.md#stretch-uniformity #53ef9b3 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#stretch-uniformity #695468c Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function rejectsGivenInsetsThatStretchDetail(): void {
   const report = inspectRaster(panel(40, 30), {
@@ -113,6 +113,14 @@ export function rejectsGivenInsetsThatStretchDetail(): void {
   strictEqual(report.ok, false);
   const finding = report.findings.find((item) => item.code === 'stretch.x.nonuniform');
   deepStrictEqual(finding?.details, { axis: 'x', pair: [2, 3] });
+
+  // Insets that leave no span are a finding, not an exception.
+  const invalid = inspectRaster(panel(40, 30), {
+    ...defaultInspectOptions,
+    insets: { left: 30, right: 30, top: 6, bottom: 6 },
+  });
+  strictEqual(invalid.ok, false);
+  ok(codes(invalid).includes('insets.invalid'));
 
   const fine = inspectRaster(panel(40, 30), {
     ...defaultInspectOptions,
@@ -160,7 +168,7 @@ export function flagsChromaSpill(): void {
 
 /**
  * @evidence docs/spec.md#tiling-seams Accepts a whole-period tile span and warns when the span breaks the period.
- * @evidenceReview docs/spec.md#tiling-seams #ef3dc38 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#tiling-seams #e6197a2 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function checksTilingSeams(): void {
   const striped = createRaster(24, 8);
@@ -244,7 +252,7 @@ export function toleratesGeneratedNoise(): void {
 
 /**
  * @evidence docs/spec.md#repeating-edges Tiles a rope-patterned edge with its period, and warns about a non-repeating edge.
- * @evidenceReview docs/spec.md#repeating-edges #4d54ace Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#repeating-edges #795d113 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function tilesRepeatingEdges(): void {
   // A panel whose top and bottom borders carry a 6 px rope pattern.
@@ -279,6 +287,20 @@ export function tilesRepeatingEdges(): void {
   deepStrictEqual(
     detectRepeatSpan(offCenter, 'x', { x: 0, y: 0, width: 40, height: 4 }, defaultMatchOptions),
     { span: { start: 8, end: 20 }, period: 4 },
+  );
+
+  // A run straddling the center: every window touches it, so the midpoint decides.
+  const straddling = createRaster(40, 4);
+  for (let x = 0; x < 40; x += 1) {
+    const color: Color =
+      x >= 14 && x < 24
+        ? [x % 4 < 2 ? 220 : 40, 80, 80, 255]
+        : [(x * 53) % 256, (x * 29) % 256, 200, 255];
+    fillRect(straddling, x, 0, 1, 4, color);
+  }
+  deepStrictEqual(
+    detectRepeatSpan(straddling, 'x', { x: 0, y: 0, width: 40, height: 4 }, defaultMatchOptions),
+    { span: { start: 16, end: 24 }, period: 4 },
   );
 
   const organicReport = inspectRaster(organic, { ...defaultInspectOptions, noise: 'off' });

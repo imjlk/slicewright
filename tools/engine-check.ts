@@ -25,7 +25,23 @@ const { values } = parseArgs({
     'css-max-mean': { type: 'string', default: '4' },
   },
 });
-const engines = values.engine === 'all' ? ['phaser', 'css'] : [values.engine];
+const knownEngines = ['phaser', 'css'];
+if (values.engine !== 'all' && !knownEngines.includes(values.engine)) {
+  usage(`--engine must be all, ${knownEngines.join(', or ')}; got "${values.engine}".`);
+}
+for (const name of ['max-mean', 'css-max-mean'] as const) {
+  const threshold = Number(values[name]);
+  if (!Number.isFinite(threshold) || threshold < 0) {
+    usage(`--${name} must be a non-negative number; got "${values[name]}".`);
+  }
+}
+const engines = values.engine === 'all' ? knownEngines : [values.engine];
+
+/** A typo must never produce a green check that compared nothing. */
+function usage(message: string): never {
+  process.stderr.write(`engine-check: ${message}\n`);
+  process.exit(2);
+}
 
 const root = resolve('.');
 const types: Readonly<Record<string, string>> = {

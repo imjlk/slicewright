@@ -20,6 +20,8 @@ every layout it declares.
    - `capabilities.emulated`: shapes it can only show with zero insets on the
      fixed axis while the caller keeps that axis at its size.
    - `capabilities.tile`: `per-axis`, `both`, or `none`.
+   - `capabilities.tileCount`: `floor` if the engine rounds the tile count
+     down like the layout, `round` if it takes the nearest count.
    - `status`: `experimental` until the engine itself renders the output in
      `pnpm engine:check`; then `verified`.
    - `exportLayout`: an exported function returning files and usage text.

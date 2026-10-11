@@ -51,11 +51,10 @@ error, and every command exits 2 on bad input. `--help` works on each command.
    doubled. Corners must look identical in every cell and edges must not
    smear.
 7. **Hand it to the engine.** `slicewright export ui/panel.png --target
-   phaser,css,godot,unity,ninepatch --out-dir ui` writes each engine's files
+   phaser,css --out-dir ui` writes each engine's files
    and prints how to use them; `slicewright targets` lists what each target
-   can represent. Phaser and CSS are verified in the real engine; Godot,
-   Unity, and nine-patch are experimental, and other engines are not
-   supported. For a packed atlas, disable trimming (and rotation) for
+   can represent. Only Phaser and CSS are supported; both are verified in the
+   real engine. For a packed atlas, disable trimming (and rotation) for
    nine-slice sprites, add `scale9Borders` per frame (TexturePacker 7.1+ can
    export them), then run `slicewright atlas ui.json` to check every frame
    against the pixels.
@@ -71,11 +70,12 @@ error, and every command exits 2 on bad input. `--help` works on each command.
 | `tile.x.seam`, `tile.y.seam` | A tiled span cuts its pattern or jumps where it wraps. | Use one of the `nearestLengths`, or make the texture seamless. |
 | `three-slice.auto` | Rows never repeat, so the layout keeps a fixed height. | Fine for bars. For panels, regenerate with a flat center. |
 | `three-slice.vertical.auto` | Columns never repeat but rows do, so the layout keeps its width. | Fine for vertical tracks. For panels, regenerate with plain edges. |
-| `regions.multi` | The layout has several stretch regions per axis. | Export to `ninepatch`; other targets report `target.unsupported`. |
+| `regions.multi` | The layout has several stretch regions per axis. | Preview only: no current target exports it; re-slice as a nine-slice to export. |
 | `target.unsupported` | The target cannot represent this layout; no files were written. | Pick a target that can, or re-slice as a nine-slice. |
 | `target.emulated` | The target has no native form of this layout; the fixed axis has zero insets. | Keep that axis at its source size in the engine. |
-| `target.experimental` | Godot, Unity, and nine-patch output is not run in those engines. | Check it in the engine before shipping. |
-| `target.tile` | The target cannot tile as asked (Unity tiles both axes; nine-patch never). | Accept stretching, or pick a target that tiles per axis. |
+| `target.experimental` | The target's output is not yet rendered in its engine. | Check it in the engine before shipping. |
+| `target.tile` | The target cannot tile as asked, or counts tiles differently (CSS `round` takes the nearest count; Phaser rounds down). | Check the tiled edge at the sizes you use. |
+| `target.fixed` | Nothing in the layout resizes; no files were written. | Use the image as a plain sprite. |
 | `noise.tolerance` | Generated art is noisy, so matching tolerance was raised per axis. | Informational. `--noise off` restores exact matching. |
 | `noise.high` | The interior is busy along both axes. | Stretching smears it; use a flatter fill or tile it. |
 | `alpha.interior` | The middle of the element is partly transparent. | Usually a generator faking alpha: regenerate on a chroma key and run `key`. |
