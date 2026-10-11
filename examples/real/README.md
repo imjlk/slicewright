@@ -13,9 +13,18 @@ image was generated with the GPT `image_gen` route of
 | `bar` | chroma-green PNG | `key`, then `normalize --width 320` |
 | `baroque` | transparent PNG | `normalize --width 480` |
 | `scifi` | transparent PNG | `normalize --width 480` |
+| `crest` | transparent PNG, hand-written prompt | `normalize --width 480 --regions multi` |
 | `bar-vertical` | the keyed bar turned a quarter turn | `normalize --height 320` |
 
-Every sample was normalized with `--target phaser,css`, which writes its
+`crest` has a crest in the middle of its top edge, so its prompt is written by
+hand: `slicewright prompt` keeps decoration in the corners. No target exports a
+multi-region layout yet, so it has no atlas or CSS. The manifest's
+`inspections` list makes the engine check detect it with `--regions multi`
+and compare the layout and finding codes with `crest.layout.json`. Single-region
+detection on the same image stretches only the span right of the crest and
+warns `insets.large`.
+
+Every sample except `crest` was normalized with `--target phaser,css`, which writes its
 `.json` atlas and `.css` class. `*-min` files add `--keep 4`. For painted art, most axes report
 `rebuild.<axis>.lossy` and keep their full span; the pixel panel keeps 4 rows.
 

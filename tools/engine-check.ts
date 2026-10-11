@@ -5,7 +5,7 @@ import { parseArgs } from 'node:util';
 
 import { chromium, type Page } from 'playwright-core';
 
-import { inspectRaster } from '../src/inspect.js';
+import { defaultInspectOptions, inspectRaster } from '../src/inspect.js';
 import { layoutFromInsets, type SliceLayout } from '../src/layout.js';
 import { decodePng } from '../src/png.js';
 import { createRaster, pixelOffset, rasterDifference, type Raster } from '../src/raster.js';
@@ -85,6 +85,12 @@ failed ||= tileMismatches.length > 0;
 const staleExports = findStaleExports(detectedTile);
 output['staleExports'] = staleExports;
 failed ||= staleExports.length > 0;
+// Layouts no target exports yet, such as multiple regions, are checked against
+// the layout recorded when the sample was made, so detection on real art cannot
+// drift unnoticed.
+const inspections = checkInspections();
+output['inspections'] = inspections;
+failed ||= inspections.some((item) => item.problem !== undefined);
 try {
   if (engines.includes('phaser')) {
     const result = await checkPhaser(await openPage('phaser'));
@@ -330,6 +336,40 @@ function detectTiles(): Map<string, TileCheck> {
     });
   }
   return checks;
+}
+
+interface InspectionCheck {
+  readonly label: string;
+  readonly regions: 'single' | 'multi';
+  readonly findings: readonly string[];
+  readonly problem?: string;
+}
+
+/** Detects each manifest inspection again and compares it with its recorded layout and finding codes. */
+function checkInspections(): InspectionCheck[] {
+  const manifestPath = join(root, values.manifest);
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
+    inspections?: Array<{ label: string; image: string; regions?: 'multi'; expected: string }>;
+  };
+  return (manifest.inspections ?? []).map((entry) => {
+    const regions = entry.regions ?? 'single';
+    const raster = decodePng(readFileSync(join(dirname(manifestPath), entry.image)));
+    const report = inspectRaster(raster, { ...defaultInspectOptions, regions });
+    const findings = report.findings.map((finding) => finding.code);
+    const expectedPath = join(dirname(manifestPath), entry.expected);
+    const expected = existsSync(expectedPath)
+      ? (JSON.parse(readFileSync(expectedPath, 'utf8')) as { layout: unknown; findings: string[] })
+      : undefined;
+    const problem =
+      expected === undefined
+        ? `${entry.expected} is missing`
+        : JSON.stringify(report.layout) !== JSON.stringify(expected.layout)
+          ? `the detected layout differs from ${entry.expected}`
+          : findings.join() !== expected.findings.join()
+            ? `the findings ${findings.join(', ')} differ from ${expected.findings.join(', ')}`
+            : undefined;
+    return { label: entry.label, regions, findings, ...(problem === undefined ? {} : { problem }) };
+  });
 }
 
 /**

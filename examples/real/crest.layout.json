@@ -1,0 +1,66 @@
+{
+  "regions": "multi",
+  "layout": {
+    "x": {
+      "length": 480,
+      "segments": [
+        {
+          "start": 0,
+          "end": 49,
+          "kind": "fixed"
+        },
+        {
+          "start": 49,
+          "end": 188,
+          "kind": "stretch"
+        },
+        {
+          "start": 188,
+          "end": 291,
+          "kind": "fixed"
+        },
+        {
+          "start": 291,
+          "end": 432,
+          "kind": "stretch"
+        },
+        {
+          "start": 432,
+          "end": 480,
+          "kind": "fixed"
+        }
+      ]
+    },
+    "y": {
+      "length": 310,
+      "segments": [
+        {
+          "start": 0,
+          "end": 71,
+          "kind": "fixed"
+        },
+        {
+          "start": 71,
+          "end": 261,
+          "kind": "stretch"
+        },
+        {
+          "start": 261,
+          "end": 310,
+          "kind": "fixed"
+        }
+      ]
+    },
+    "content": {
+      "left": 19,
+      "right": 19,
+      "top": 43,
+      "bottom": 20
+    }
+  },
+  "findings": [
+    "noise.tolerance",
+    "regions.multi",
+    "insets.asymmetric"
+  ]
+}
