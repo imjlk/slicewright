@@ -351,7 +351,7 @@ interface InspectionCheck {
 function checkInspections(): InspectionCheck[] {
   const manifestPath = join(root, values.manifest);
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as Record<string, unknown> & {
-    inspections?: Array<{ label: string; image: string; regions?: string; expected: string }>;
+    inspections?: Array<{ label: string; image: string; regions: string; expected: string }>;
   };
   // A renamed or misspelled key would otherwise compare nothing and pass.
   const unknownKeys = Object.keys(manifest).filter(
@@ -360,8 +360,19 @@ function checkInspections(): InspectionCheck[] {
   if (unknownKeys.length > 0) {
     usage(`${values.manifest} has unknown keys: ${unknownKeys.join(', ')}.`);
   }
-  return (manifest.inspections ?? []).map((entry) => {
-    const regions = entry.regions ?? 'single';
+  return (manifest.inspections ?? []).map((entry, index) => {
+    // Every field is required and no other is allowed, so a misspelled key
+    // cannot fall back to a default and still pass.
+    const fields = ['label', 'image', 'regions', 'expected'];
+    const extra = Object.keys(entry).filter((key) => !fields.includes(key));
+    const missing = fields.filter((key) => typeof (entry as Record<string, unknown>)[key] !== 'string');
+    if (extra.length > 0 || missing.length > 0) {
+      usage(
+        `inspection ${index + 1} must have exactly ${fields.join(', ')} as strings` +
+          `${extra.length > 0 ? `; unknown: ${extra.join(', ')}` : ''}${missing.length > 0 ? `; missing: ${missing.join(', ')}` : ''}.`,
+      );
+    }
+    const regions = entry.regions;
     if (regions !== 'single' && regions !== 'multi') {
       usage(`inspection "${entry.label}" has regions "${regions}"; use single or multi.`);
     }
