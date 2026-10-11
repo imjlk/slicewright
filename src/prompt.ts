@@ -134,7 +134,7 @@ export function buildPromptPlan(request: PromptRequest): PromptPlan {
       ? "Downscale it to the track's content height (the track height minus its top and bottom content padding) before slicing; pick insets at the final size."
       : 'Downscale to the target UI size before slicing; pick insets at the final size.',
     preset.mode === 'three'
-      ? 'Run `slicewright inspect --mode three` (and pass `--mode three` to every later command) and fix every error.'
+      ? 'Run `slicewright inspect --mode three` (and pass `--mode three` to preview, export, and frame too) and fix every error.'
       : 'Run `slicewright inspect` and fix every error.',
     'Run `slicewright preview` and look at the stretched sizes.',
     'Pack it untrimmed, then run `slicewright atlas` on the atlas.',

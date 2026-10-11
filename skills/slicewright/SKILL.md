@@ -102,8 +102,9 @@ words and, when the generator takes references, the track as a reference.
 3. Draw progress by resizing the fill. Phaser's NineSlice never gets narrower
    than its two end caps, so below that width keep the caps' width and scale
    the fill down horizontally. The fill follows the track's top-left corner and
-   scale, whatever the track's origin; call it again after moving, resizing, or
-   scaling the track, or keep both in one Container:
+   scale, whatever the track's origin. Call it again whenever the track moves,
+   resizes, or scales; with both in one Container, moving or scaling the
+   Container needs no new call, but changing the track itself still does:
 
 ```ts
 function setProgress(track, fill, padding, value) {
@@ -126,7 +127,27 @@ setProgress(track, fill, padding, 0.4);
 
 This keeps the fill exactly inside the track's content box at every width,
 checked in Phaser 4.2 at 0 to 100% on two track widths, a centered track, and
-a track scaled twice as wide. A fill whose look
+a track scaled twice as wide.
+
+In CSS, put the fill element inside the track element: the track's
+`border-width` is its content padding, so the fill lands in the content box and
+the track's `clientWidth` is the inner width. The fill's `min-width` is its
+two end caps, so the same rule applies below it:
+
+```js
+function setProgress(track, fill, value) {
+  const progress = Number.isFinite(value) ? Math.min(Math.max(value, 0), 1) : 0;
+  const width = Math.round(track.clientWidth * progress);
+  const caps = parseFloat(getComputedStyle(fill).minWidth);
+  fill.style.visibility = width > 0 ? 'visible' : 'hidden';
+  fill.style.width = `${Math.max(width, caps)}px`;
+  fill.style.transformOrigin = 'left';
+  fill.style.transform = width >= caps ? '' : `scaleX(${width / caps})`;
+}
+// <div class="ui-bar"><div class="ui-bar-fill"></div></div>
+```
+
+Checked in Chrome on the same widths and values. A fill whose look
 changes along its length (a left-to-right gradient, segments) cannot be
 resized this way, because resizing stretches it: draw it at full width and
 reveal part of it instead, for example with a Phaser mask filter. slicewright
