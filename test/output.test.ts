@@ -48,7 +48,7 @@ export function convertsPngLayoutsToRgba(): void {
 
 /**
  * @evidence docs/spec.md#preview-sheet Renders the source size losslessly, keeps corners at larger sizes, tiles whole periods, and lays out the sheet cells.
- * @evidenceReview docs/spec.md#preview-sheet #444784f Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#preview-sheet #9cff538 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function rendersSlicesAndPreviewSheets(): void {
   const source = panel(40, 30);
@@ -120,23 +120,33 @@ export function rendersSlicesAndPreviewSheets(): void {
       ['wide', 360, 36],
     ],
   );
+  // Every pixel of a zoomed cell, block edges included, is its source pixel.
   const cell = zoomed.cells[0];
-  for (const [x, y] of [
-    [0, 0],
-    [2, 2],
-    [47 * 3, 11 * 3],
-  ] as const) {
-    deepStrictEqual(
-      pixel(zoomed.raster, (cell?.x ?? 0) + x, (cell?.y ?? 0) + y),
-      pixel(bar, Math.floor(x / 3), Math.floor(y / 3)),
-    );
+  for (let y = 0; y < 36; y += 1) {
+    for (let x = 0; x < 144; x += 1) {
+      deepStrictEqual(
+        pixel(zoomed.raster, (cell?.x ?? 0) + x, (cell?.y ?? 0) + y),
+        pixel(bar, Math.floor(x / 3), Math.floor(y / 3)),
+      );
+    }
   }
+  // A cell wider than the maximum width sits alone in its row.
+  const lone = renderPreviewSheet(bar, barReport.layout, { zoom: 8, maxWidth: 900 });
+  const wide = lone.cells.find((item) => item.label === 'wide');
+  strictEqual(wide?.x, 16);
+  ok(lone.cells.every((item) => item === wide || item.y !== wide?.y));
 
   // A cell the layout cannot show, a bad zoom, or no cells is refused.
   throws(() => renderPreviewSheet(bar, barReport.layout, { cells: ['tall'] }), /no tall/);
   throws(() => renderPreviewSheet(bar, barReport.layout, { zoom: 1.5 }), RangeError);
   throws(() => renderPreviewSheet(bar, barReport.layout, { zoom: 9 }), RangeError);
   throws(() => renderPreviewSheet(bar, barReport.layout, { cells: [] }), RangeError);
+  // A sheet over the size limit fails before anything renders.
+  throws(
+    () => renderPreviewSheet(panel(800, 800), inspectRaster(panel(800, 800)).layout, { zoom: 8 }),
+    /preview sheet would be/,
+  );
+  throws(() => renderPreviewSheet(bar, barReport.layout, { maxWidth: 0 }), RangeError);
 }
 
 /**

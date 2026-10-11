@@ -40,6 +40,8 @@ export interface PreviewOptions {
 export const defaultPreviewMaxWidth = 2048;
 const maximumZoom = 8;
 const maximumSheetSide = 16384;
+/** 64 megapixels: 256 MB of RGBA, about what an image viewer still opens. */
+const maximumSheetPixels = 64 * 2 ** 20;
 
 const padding = 16;
 const checkerSize = 8;
@@ -77,7 +79,7 @@ export function renderSlices(
  * flexible keeps its source length.
  *
  * @evidence docs/spec.md#preview-sheet Keeps fixed segments unscaled, shares the rest among flexible segments, and tiles whole tiles with nearest sampling.
- * @evidenceReview docs/spec.md#preview-sheet #444784f Checked this code against the section line by line and ran rendersSlicesAndPreviewSheets green with pnpm test.
+ * @evidenceReview docs/spec.md#preview-sheet #9cff538 Checked this code against the section line by line and ran rendersSlicesAndPreviewSheets green with pnpm test.
  * @evidence docs/spec.md#slice-layouts Renders any number of fixed, stretched, and tiled segments per axis.
  * @evidenceReview docs/spec.md#slice-layouts #fc52f65 Checked this code against the section line by line and ran describesSliceLayouts green with pnpm test.
  */
@@ -121,7 +123,7 @@ export function renderLayout(
  * cell by a whole number with nearest sampling.
  *
  * @evidence docs/spec.md#preview-sheet Builds the guides, source, minimum, wide, tall, and doubled cells, lets the caller pick and zoom them, and wraps rows at the maximum width.
- * @evidenceReview docs/spec.md#preview-sheet #444784f Checked this code against the section line by line and ran rendersSlicesAndPreviewSheets green with pnpm test.
+ * @evidenceReview docs/spec.md#preview-sheet #9cff538 Checked this code against the section line by line and ran rendersSlicesAndPreviewSheets green with pnpm test.
  */
 export function renderPreviewSheet(
   source: Raster,
@@ -170,52 +172,46 @@ export function renderPreviewSheet(
   if (labels.length === 0) {
     throw new RangeError('A preview sheet needs at least one cell.');
   }
-  for (const label of labels) {
-    const [width, height] = available.get(label) ?? [0, 0];
-    if (Math.max(width, height) * zoom > maximumSheetSide) {
-      throw new RangeError(
-        `The ${label} cell would be ${width * zoom}x${height * zoom} at zoom ${zoom}; lower the zoom.`,
-      );
-    }
-  }
-
-  const rendered = labels.map((label) => {
-    const [width, height] = available.get(label) ?? [0, 0];
-    const raster =
-      label === 'guides'
-        ? outlineContent(tintSegments(source, layout), layout.content)
-        : renderLayout(source, layout, width, height);
-    return { label, raster: zoomRaster(raster, zoom) };
-  });
-
-  // Rows wrap before a cell that would cross the maximum width.
-  const placed: Array<{ label: PreviewCellLabel; raster: Raster; x: number; y: number }> = [];
+  // Rows wrap before a cell that would cross the maximum width. The sheet is
+  // laid out before anything renders, so an oversized sheet fails at once.
+  const cells: PreviewCell[] = [];
   let x = padding;
   let y = padding;
   let rowHeight = 0;
-  for (const cell of rendered) {
-    if (x > padding && x + cell.raster.width + padding > maxWidth) {
+  for (const label of labels) {
+    const [width, height] = available.get(label) ?? [0, 0];
+    const cellWidth = width * zoom;
+    const cellHeight = height * zoom;
+    if (x > padding && x + cellWidth + padding > maxWidth) {
       x = padding;
       y += rowHeight + padding;
       rowHeight = 0;
     }
-    placed.push({ ...cell, x, y });
-    x += cell.raster.width + padding;
-    rowHeight = Math.max(rowHeight, cell.raster.height);
+    cells.push({ label, x, y, width: cellWidth, height: cellHeight });
+    x += cellWidth + padding;
+    rowHeight = Math.max(rowHeight, cellHeight);
   }
-  const sheetWidth = Math.max(...placed.map((cell) => cell.x + cell.raster.width + padding));
+  const sheetWidth = Math.max(...cells.map((cell) => cell.x + cell.width + padding));
   const sheetHeight = y + rowHeight + padding;
+  if (
+    sheetWidth > maximumSheetSide ||
+    sheetHeight > maximumSheetSide ||
+    sheetWidth * sheetHeight > maximumSheetPixels
+  ) {
+    throw new RangeError(
+      `The preview sheet would be ${sheetWidth}x${sheetHeight}, over the ${maximumSheetSide} px side or ${maximumSheetPixels / 2 ** 20} megapixel limit; lower the zoom or choose fewer cells.`,
+    );
+  }
+
   const sheet = checkerboard(sheetWidth, sheetHeight);
-  const cells: PreviewCell[] = placed.map((cell) => {
-    composite(sheet, cell.raster, cell.x, cell.y);
-    return {
-      label: cell.label,
-      x: cell.x,
-      y: cell.y,
-      width: cell.raster.width,
-      height: cell.raster.height,
-    };
-  });
+  for (const cell of cells) {
+    const [width, height] = available.get(cell.label) ?? [0, 0];
+    const raster =
+      cell.label === 'guides'
+        ? outlineContent(tintSegments(source, layout), layout.content)
+        : renderLayout(source, layout, width, height);
+    composite(sheet, zoomRaster(raster, zoom), cell.x, cell.y);
+  }
   return { raster: sheet, cells };
 }
 
@@ -225,10 +221,18 @@ function zoomRaster(raster: Raster, zoom: number): Raster {
     return raster;
   }
   const out = createRaster(raster.width * zoom, raster.height * zoom);
-  for (let y = 0; y < out.height; y += 1) {
-    for (let x = 0; x < out.width; x += 1) {
-      const from = pixelOffset(raster, Math.floor(x / zoom), Math.floor(y / zoom));
-      out.data.set(raster.data.subarray(from, from + 4), pixelOffset(out, x, y));
+  const rowBytes = out.width * 4;
+  for (let y = 0; y < raster.height; y += 1) {
+    // Build the first output row of this source row, then repeat it.
+    const first = y * zoom * rowBytes;
+    for (let x = 0; x < raster.width; x += 1) {
+      const from = pixelOffset(raster, x, y);
+      for (let copy = 0; copy < zoom; copy += 1) {
+        out.data.set(raster.data.subarray(from, from + 4), first + (x * zoom + copy) * 4);
+      }
+    }
+    for (let copy = 1; copy < zoom; copy += 1) {
+      out.data.copyWithin(first + copy * rowBytes, first, first + rowBytes);
     }
   }
   return out;
