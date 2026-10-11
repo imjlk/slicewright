@@ -804,13 +804,19 @@ const subCommands = {
 };
 
 // Every flag that takes a number, so `--tolerance -1` reaches validation.
-const numberFlags = new Set(
-  Object.values(subCommands).flatMap((command) =>
-    Object.entries(command.args ?? {})
-      .filter(([, arg]) => arg.type === 'number')
-      .map(([name]) => `--${name}`),
-  ),
+const flagTypes = Object.values(subCommands).flatMap((command) =>
+  Object.entries(command.args ?? {}).map(([name, arg]) => [`--${name}`, arg.type] as const),
 );
+const numberFlags = new Set(
+  flagTypes.filter(([, type]) => type === 'number').map(([flag]) => flag),
+);
+// The set is shared by every command, so a flag name must mean a number everywhere or nowhere.
+const clashes = flagTypes.filter(([flag, type]) => type !== 'number' && numberFlags.has(flag));
+if (clashes.length > 0) {
+  throw new Error(
+    `Flags that take a number in one command and not in another: ${clashes.map(([flag]) => flag).join(', ')}.`,
+  );
+}
 
 try {
   await cli(joinNegativeNumbers(process.argv.slice(2), numberFlags), main, {

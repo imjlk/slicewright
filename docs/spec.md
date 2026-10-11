@@ -358,8 +358,9 @@ A number option takes a negative value written either as `--tolerance=-1` or
 as `--tolerance -1`. The argument parser would read a separate `-1` as a short
 option and leave the flag without a value, so a negative number that follows
 a flag taking a number is joined to that flag first; the command then
-validates the value like any other. Other flags and everything after `--` are
-passed through unchanged.
+validates the value like any other. A number flag with nothing after it, or
+followed by another option, is refused with a message naming the flag. Other
+flags and everything after `--` are passed through unchanged.
 
 ## Generation prompts
 
