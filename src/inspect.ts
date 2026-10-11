@@ -230,7 +230,7 @@ export function noiseAdjusted(
  * so it never changes when the art resizes.
  *
  * @evidence docs/spec.md#content-padding Validates given padding, detects it otherwise, and keeps it within the fixed segments at each edge.
- * @evidenceReview docs/spec.md#content-padding #d8f1459 Checked this code against the section line by line and ran detectsContentPadding green with pnpm test.
+ * @evidenceReview docs/spec.md#content-padding #51d3985 Checked this code against the section line by line and ran detectsContentPadding green with pnpm test.
  */
 export function resolveContentPadding(
   raster: Raster,

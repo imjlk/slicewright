@@ -215,6 +215,7 @@ export function plansGenerationPrompts(): void {
   strictEqual(bar.mode, 'three');
   ok(bar.prompt.includes('stretched horizontally only'));
   ok(bar.prompt.includes('two end caps'));
+  ok(bar.prompt.includes('no wood grain or texture running along the bar'));
   ok(bar.prompt.includes('#00FF00'));
   ok(bar.prompt.includes('pixel art'));
   ok(bar.afterGeneration[0]?.includes('despill'));

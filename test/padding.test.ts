@@ -14,7 +14,7 @@ function text(contents: string | Uint8Array | undefined): string {
 
 /**
  * @evidence docs/spec.md#content-padding Detects padding on flat, shaded, empty-centered, and borderless art, validates given padding, exports it to Phaser and CSS, checks it in atlases, and outlines it in the preview.
- * @evidenceReview docs/spec.md#content-padding #d8f1459 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#content-padding #51d3985 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function detectsContentPadding(): void {
   const flat = inspectRaster(panel(40, 30));
@@ -60,6 +60,18 @@ export function detectsContentPadding(): void {
   });
   strictEqual(clamped.contentPadding?.left, 6);
   ok(clamped.findings.some((finding) => finding.code === 'padding.clamped'));
+
+  // A target also refuses padding past the fixed edge, even if inspection was ignored.
+  throws(
+    () =>
+      exportForTarget('phaser', {
+        name: 'panel',
+        imageRef: 'panel.png',
+        raster: panel(40, 30),
+        layout: { ...flat.layout, content: { left: 9, right: 3, top: 4, bottom: 4 } },
+      }),
+    /reaches past the fixed/,
+  );
 
   // A target refuses padding that does not fit the image, like a layout of another size.
   throws(

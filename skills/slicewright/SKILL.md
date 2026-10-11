@@ -137,9 +137,10 @@ more where corner ornaments reach inward:
 
 ```ts
 const padding = this.textures.getFrame('ui', 'panel').customData.slicewright.contentPadding;
+const margin = 8; // breathing room between text and the frame
 const corner = panel.getTopLeft(); // works for any origin
-this.add.text(corner.x + padding.left, corner.y + padding.top, 'Hello', style)
-  .setWordWrapWidth(panel.width - padding.left - padding.right);
+this.add.text(corner.x + padding.left + margin, corner.y + padding.top + margin, 'Hello', style)
+  .setWordWrapWidth(panel.width - padding.left - padding.right - margin * 2);
 ```
 
 `scale9Borders` is the stretchable center rectangle `{ x, y, w, h }`. A frame

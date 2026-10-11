@@ -221,7 +221,8 @@ edge, so it never changes with size: detected padding that would reach into a
 stretch span is clamped to the fixed edge with a `padding.clamped` note, and
 given padding past the fixed edge is a `padding.invalid` error, as is padding
 that is not whole and non-negative or leaves no content area at least one pixel
-wide. A target refuses a layout whose padding does not fit the image.
+wide. A target refuses a layout whose padding does not fit the image or reaches
+past the fixed segments at an edge.
 
 The Phaser target records it in the frame as `"slicewright": { "contentPadding":
 … }`, which Phaser keeps in `frame.customData`, and its usage names that path.

@@ -176,7 +176,7 @@ export function axisTiles(axis: AxisLayout): boolean {
  * segment: the fixed run at that edge, or the whole axis when it never resizes.
  *
  * @evidence docs/spec.md#content-padding Bounds each side's padding by the fixed segments at that edge.
- * @evidenceReview docs/spec.md#content-padding #d8f1459 Checked this code against the section line by line and ran detectsContentPadding green with pnpm test.
+ * @evidenceReview docs/spec.md#content-padding #51d3985 Checked this code against the section line by line and ran detectsContentPadding green with pnpm test.
  */
 export function contentLimits(layout: SliceLayout): SliceInsets {
   const ends = (axis: AxisLayout): [number, number] => {

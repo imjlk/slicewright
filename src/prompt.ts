@@ -100,7 +100,7 @@ export function buildPromptPlan(request: PromptRequest): PromptPlan {
     `Shape: ${preset.structure}.`,
     'Flat front view, no perspective, centered and filling the canvas edge to edge with only a few pixels of margin.',
     preset.mode === 'three'
-      ? 'Put all decoration in the two end caps. The top and bottom edges of the middle are plain.'
+      ? 'Put all decoration in the two end caps. The middle is plain along its length: no wood grain or texture running along the bar, and no repeated motifs.'
       : 'Put all decoration in the four corners. Between the corners the edges are plain smooth bands with no pattern along them: no wood grain or texture running along the edge, no rope, chain, beads, vines, rivets, or repeated motifs.',
     stretch,
     'No text, letters, icons, symbols, or characters on it.',
