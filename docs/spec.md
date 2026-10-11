@@ -76,7 +76,8 @@ midpoint sits nearest the center) and holding at least two, becomes the
 stretch span when it reaches 10% of the content; ties prefer the shorter period,
 then the span nearest the center. That axis is then tiled, and a
 `tile.<axis>.auto` finding names the period and tells the caller to enable
-tiling on the engine object, because atlas data cannot carry it.
+tiling on the engine object, because engines read tiling from the object rather
+than from atlas data.
 
 ## Three-slice
 
@@ -238,7 +239,14 @@ guides cell.
 A preview sheet renders the layout at several sizes on one PNG over a
 checkerboard: the source with flexible segments tinted, the source size, the
 minimum size, wide and tall (each only when that axis can resize), and doubled
-on the axes that can resize. Rendering samples the nearest source pixel. Fixed
+on the axes that can resize. Cells sit in rows that wrap before a cell would
+cross the maximum width (2048 px by default); a cell wider than that sits alone
+in its row. The caller can choose cells, which keep this order, and zoom every
+cell by a whole number from 1 to 8, repeating each pixel, so small art stays
+inspectable in an image viewer. Asking for a cell the layout cannot show (wide
+when the width never resizes, tall when the height never does) is an error, and
+so is a sheet over 16384 px on a side or 64 megapixels, which is refused before
+anything renders. Rendering samples the nearest source pixel. Fixed
 segments keep their size and the flexible segments share the rest in proportion
 to their source size. A tiled segment repeats a whole number of tiles, the
 segment length divided by the source length rounded down and at least one, each
@@ -254,7 +262,7 @@ Phaser treats a frame as a three-slice when `y` is zero and `h` equals the frame
 height. slicewright converts both ways and writes a single-frame JSON Hash atlas,
 untrimmed and unrotated, that `this.load.atlas` accepts. The Phaser target adds
 the `this.load.atlas` and `nineslice` calls, passing `tileX` and `tileY` for
-tiled axes, because atlas data cannot carry them. Phaser resolves the image and
+tiled axes, because Phaser reads tiling only from the constructor. Phaser resolves the image and
 atlas URLs in `this.load.atlas` against its loader path rather than the atlas
 file, so the call uses paths from where the game is served (the working
 directory, from the CLI) while the atlas keeps the image path relative to
@@ -262,7 +270,9 @@ itself. Phaser has no vertical three-slice, so it is emulated.
 
 The emulated vertical three-slice records its shape in the frame as
 `"slicewright": { "shape": "three-vertical" }`, which Phaser keeps in
-`frame.customData`.
+`frame.customData`. A frame with a tiled axis records it as `"slicewright": {
+"tile": { "x": …, "y": … } }`; Phaser ignores it, but the atlas check inspects
+those axes as tiled and packing carries the flags into its usage.
 
 Because Phaser reads borders spanning the full height as its own three-slice, a
 layout whose height stretches as one full-height span (zero top and bottom
@@ -317,6 +327,30 @@ nine-slice whose columns must match, unless the frame carries
 for its emulated vertical three-slice. A frame carrying that marker without
 full-width borders is an `atlas.marker-mismatch` error, because Phaser would
 still render it as a nine-slice.
+
+## Atlas packing
+
+Packing combines frames from several atlases, usually the one-frame atlases
+that `normalize` and `export` write, into one image and one JSON Hash atlas so
+a game loads a matching set with a single `this.load.atlas` call. Every frame
+keeps its pixels exactly, untrimmed and unrotated, with its `scale9Borders` and
+slicewright data; frames without borders pack as plain sprites, which the
+usage adds with `this.add.image`. Frames go on
+shelves, tallest first, in a sheet about as wide as it is tall. Each frame is
+surrounded by its own outermost pixels repeated outward (`extrude`, 1 px by
+default), so linear filtering at the frame edge never samples a neighbor, and
+then by transparent spacing (2 px by default); both are whole numbers from 0 to
+64. Frame names must be unique across the inputs, and a trimmed, rotated, or
+fractional input frame is refused, because its pixels cannot be copied as they
+render.
+The packed atlas gets the same check as any other atlas, and an error in it
+fails the command. Its usage loads the atlas once and creates each frame's NineSlice with its tiling
+flags. Because CSS `border-image` cannot address part of an image, the packed
+CSS is one stylesheet with a class per frame that still points at each frame's
+own image, and a frame that is only part of its image has no CSS class; with no
+class at all, no stylesheet is written. Packing refuses to write over an input
+atlas, its image, or the stylesheet beside it, comparing existing files by their
+real path, and refuses an image path that is also its own atlas or stylesheet.
 
 ## Generation prompts
 

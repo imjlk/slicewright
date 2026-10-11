@@ -48,7 +48,7 @@ export function convertsPngLayoutsToRgba(): void {
 
 /**
  * @evidence docs/spec.md#preview-sheet Renders the source size losslessly, keeps corners at larger sizes, tiles whole periods, and lays out the sheet cells.
- * @evidenceReview docs/spec.md#preview-sheet #49443a9 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#preview-sheet #9cff538 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function rendersSlicesAndPreviewSheets(): void {
   const source = panel(40, 30);
@@ -95,11 +95,68 @@ export function rendersSlicesAndPreviewSheets(): void {
     false,
   );
   ok(barSheet.cells.every((cell) => cell.height === 12));
+
+  // Rows wrap before a cell that would cross the maximum width.
+  const wrapped = renderPreviewSheet(source, inspectRaster(source).layout, { maxWidth: 200 });
+  deepStrictEqual(
+    wrapped.cells.map((cell) => [cell.label, cell.x, cell.y]),
+    [
+      ['guides', 16, 16],
+      ['source', 72, 16],
+      ['min', 128, 16],
+      ['wide', 16, 62],
+      ['tall', 132, 62],
+      ['double', 16, 153],
+    ],
+  );
+  deepStrictEqual([wrapped.raster.width, wrapped.raster.height], [188, 229]);
+
+  // Chosen cells keep sheet order, and zoom repeats each pixel.
+  const zoomed = renderPreviewSheet(bar, barReport.layout, { cells: ['wide', 'source'], zoom: 3 });
+  deepStrictEqual(
+    zoomed.cells.map((cell) => [cell.label, cell.width, cell.height]),
+    [
+      ['source', 144, 36],
+      ['wide', 360, 36],
+    ],
+  );
+  // Every pixel of a zoomed cell, block edges included, is its source pixel.
+  const cell = zoomed.cells[0];
+  for (let y = 0; y < 36; y += 1) {
+    for (let x = 0; x < 144; x += 1) {
+      deepStrictEqual(
+        pixel(zoomed.raster, (cell?.x ?? 0) + x, (cell?.y ?? 0) + y),
+        pixel(bar, Math.floor(x / 3), Math.floor(y / 3)),
+      );
+    }
+  }
+  // A cell wider than the maximum width sits alone in its row.
+  const lone = renderPreviewSheet(bar, barReport.layout, { zoom: 8, maxWidth: 900 });
+  const wide = lone.cells.find((item) => item.label === 'wide');
+  strictEqual(wide?.x, 16);
+  ok(lone.cells.every((item) => item === wide || item.y !== wide?.y));
+
+  // A cell the layout cannot show, a bad zoom, or no cells is refused.
+  throws(() => renderPreviewSheet(bar, barReport.layout, { cells: ['tall'] }), /no tall/);
+  throws(() => renderPreviewSheet(bar, barReport.layout, { zoom: 1.5 }), RangeError);
+  throws(() => renderPreviewSheet(bar, barReport.layout, { zoom: 9 }), RangeError);
+  throws(() => renderPreviewSheet(bar, barReport.layout, { cells: [] }), RangeError);
+  // A sheet over the size limit fails before anything renders.
+  throws(
+    () => renderPreviewSheet(panel(800, 800), inspectRaster(panel(800, 800)).layout, { zoom: 8 }),
+    /preview sheet would be/,
+  );
+  throws(() => renderPreviewSheet(bar, barReport.layout, { maxWidth: 0 }), RangeError);
+  // A layout for another image is refused even when no cell would render it.
+  throws(
+    () => renderPreviewSheet(source, barReport.layout, { cells: ['guides'] }),
+    /layout is 48x12/,
+  );
 }
 
 /**
  * @evidence docs/spec.md#phaser-scale9borders Converts both ways, applies Phaser's three-slice rule, and writes a loadable one-frame atlas.
- * @evidenceReview docs/spec.md#phaser-scale9borders #4c250ad Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#phaser-scale9borders #4aec64c Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function convertsToPhaserBorders(): void {
   const insets = { left: 6, right: 8, top: 5, bottom: 7 };

@@ -266,7 +266,7 @@ export function toleratesGeneratedNoise(): void {
 
 /**
  * @evidence docs/spec.md#repeating-edges Tiles a rope-patterned edge with its period, and warns about a non-repeating edge.
- * @evidenceReview docs/spec.md#repeating-edges #795d113 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#repeating-edges #04c566e Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function tilesRepeatingEdges(): void {
   const report = inspectRaster(ropePanel(96, 40));

@@ -13,12 +13,20 @@ import {
   type InspectReport,
 } from './inspect.js';
 import { normalizeRaster } from './normalize.js';
+import type { SliceLayout } from './layout.js';
+import { buildPack } from './pack-files.js';
+import { defaultPackOptions } from './pack.js';
 import { inspectAtlas } from './phaser.js';
 import { decodePng, encodePng } from './png.js';
 import { buildPromptPlan, promptBackgrounds, uiKinds } from './prompt.js';
-import type { SliceLayout } from './layout.js';
 import type { Raster } from './raster.js';
-import { renderPreviewSheet } from './render.js';
+import {
+  defaultPreviewMaxWidth,
+  previewCellLabels,
+  renderPreviewSheet,
+  type PreviewCellLabel,
+  type PreviewOptions,
+} from './render.js';
 import { resizeRaster, targetSize } from './resize.js';
 import { parseBorders, parseInsets, scale9BordersToInsets, type SliceInsets } from './slices.js';
 import { exportForTarget, findTarget, sliceTargets } from './targets/index.js';
@@ -145,13 +153,28 @@ const preview = define({
   args: {
     input: image,
     out: { type: 'string', required: true, description: 'Preview sheet PNG to write' },
+    cells: {
+      type: 'string',
+      description: `Cells to show, comma-separated: ${previewCellLabels.join(',')}`,
+    },
+    zoom: {
+      type: 'number',
+      default: 1,
+      description: 'Scale every cell by this whole number (1-8), nearest-neighbor',
+    },
+    'max-width': {
+      type: 'number',
+      default: defaultPreviewMaxWidth,
+      description: 'Wrap cells to a new row past this sheet width',
+    },
     ...sliceArgs,
   },
   run: (ctx) => {
     const raster = readPng(ctx.values.input);
     const settings = inspectOptions(ctx.values, raster);
+    const options = previewOptions(ctx.values);
     const report = inspectRaster(raster, settings);
-    const sheet = renderPreviewSheet(raster, report.layout);
+    const sheet = renderPreviewSheet(raster, report.layout, options);
     writeFileSync(ctx.values.out, encodePng(sheet.raster));
     print({
       image: ctx.values.input,
@@ -359,6 +382,82 @@ const normalize = define({
       ...(exports.length === 0 ? {} : { exports }),
     });
     failOnErrors(result.report.ok && atlasOk && exports.every((item) => item.ok));
+  },
+});
+
+const pack = define({
+  name: 'pack',
+  description: 'Pack the frames of several atlases into one image and JSON Hash atlas',
+  args: {
+    inputs: {
+      type: 'positional',
+      multiple: true,
+      required: true,
+      description: 'Atlas JSON files, such as the one-frame atlases normalize and export write',
+    },
+    out: {
+      type: 'string',
+      required: true,
+      description: 'Packed PNG to write; the atlas goes next to it',
+    },
+    name: {
+      type: 'string',
+      description: 'Texture key and file name for the atlas and stylesheet; defaults to the PNG name',
+    },
+    spacing: {
+      type: 'number',
+      default: defaultPackOptions.spacing,
+      description: 'Transparent pixels between frames',
+    },
+    extrude: {
+      type: 'number',
+      default: defaultPackOptions.extrude,
+      description: "Pixels of each frame's edge repeated outward",
+    },
+    css: {
+      type: 'boolean',
+      description: "Also write one stylesheet with a border-image class per frame, using each frame's own image",
+    },
+    ...matchArgs,
+  },
+  run: (ctx) => {
+    const { out } = ctx.values;
+    const outDir = dirname(out);
+    const name = ctx.values.name ?? basename(out).replace(/\.png$/i, '');
+    // Validate every option before any file is written.
+    insideDirectory(outDir, `${name}.json`);
+    insideDirectory(outDir, `${name}.css`);
+    const result = buildPack({
+      inputs: ctx.values.inputs,
+      out,
+      name,
+      css: ctx.values.css === true,
+      spacing: ctx.values.spacing,
+      extrude: ctx.values.extrude,
+      match: matchOptions(ctx.values),
+      // Loader calls resolve from where the game is served; assume the working directory.
+      servedFrom: process.cwd(),
+    });
+    mkdirSync(outDir, { recursive: true });
+    for (const file of result.files) {
+      writeFileSync(file.path, file.contents);
+    }
+    print({
+      inputs: ctx.values.inputs,
+      files: result.files.map((file) => file.path),
+      size: result.size,
+      frames: result.frames,
+      ok: result.ok,
+      findings: result.report.findings,
+      frameFindings: result.report.frames.map((frame) => ({
+        name: frame.name,
+        ok: frame.ok,
+        findings: [...frame.findings, ...(frame.inspection?.findings ?? [])],
+      })),
+      ...(ctx.values.css === true ? { cssFindings: result.cssFindings } : {}),
+      usage: result.usage,
+    });
+    failOnErrors(result.ok);
   },
 });
 
@@ -606,6 +705,33 @@ function sizeRequest(values: {
   };
 }
 
+function previewOptions(values: {
+  readonly cells?: string | undefined;
+  readonly zoom: number;
+  readonly 'max-width': number;
+}): PreviewOptions {
+  const zoom = values.zoom;
+  const maxWidth = values['max-width'];
+  if (!Number.isInteger(zoom) || zoom < 1 || zoom > 8) {
+    throw new UsageError('--zoom must be a whole number from 1 to 8.');
+  }
+  if (!Number.isInteger(maxWidth) || maxWidth < 1) {
+    throw new UsageError('--max-width must be a positive whole number.');
+  }
+  if (values.cells === undefined) {
+    return { zoom, maxWidth };
+  }
+  const names = values.cells.split(',').map((name) => name.trim());
+  const cells = names.filter((name): name is PreviewCellLabel =>
+    (previewCellLabels as readonly string[]).includes(name),
+  );
+  const unknown = names.filter((name) => !cells.includes(name as PreviewCellLabel));
+  if (unknown.length > 0 || cells.length === 0) {
+    throw new UsageError(`--cells takes ${previewCellLabels.join(', ')}; got ${values.cells}.`);
+  }
+  return { cells, zoom, maxWidth };
+}
+
 function atlasImage(json: unknown, path: string): string {
   if (typeof json === 'object' && json !== null && 'meta' in json) {
     const meta = (json as { meta?: { image?: unknown } }).meta;
@@ -675,6 +801,7 @@ try {
       key,
       resize,
       normalize,
+      pack,
       export: exportCommand,
       targets,
     },

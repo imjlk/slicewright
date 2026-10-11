@@ -304,7 +304,7 @@ type AxisPick =
  * enough, else the longest repeating span, which then tiles.
  *
  * @evidence docs/spec.md#repeating-edges Falls back from a short uniform run to a repeating span and marks the axis as tiled.
- * @evidenceReview docs/spec.md#repeating-edges #795d113 Checked this code against the section line by line and ran tilesRepeatingEdges green with pnpm test.
+ * @evidenceReview docs/spec.md#repeating-edges #04c566e Checked this code against the section line by line and ran tilesRepeatingEdges green with pnpm test.
  */
 export function pickAxisSpan(
   raster: Raster,

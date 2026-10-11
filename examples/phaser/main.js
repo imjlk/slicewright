@@ -11,7 +11,10 @@ const entries = await Promise.all(
   manifest.entries.map(async (entry, index) => {
     const atlasUrl = new URL(entry.atlas, manifestUrl);
     const atlas = await (await fetch(atlasUrl)).json();
-    const [frameName, frame] = Object.entries(atlas.frames)[0];
+    // A packed atlas names the frame to draw; a one-frame atlas has only one.
+    const [frameName, frame] = entry.frame === undefined
+      ? Object.entries(atlas.frames)[0]
+      : [entry.frame, atlas.frames[entry.frame]];
     // `like` renders this frame at the sizes of another atlas's frame, so a
     // rebuilt texture can be compared pixel for pixel with its source.
     const likeFrame = entry.like === undefined
@@ -78,7 +81,7 @@ class Check extends Phaser.Scene {
       this.add.text(gap, y, row.entry.label, { fontSize: '13px', color: '#e8e8e8' });
       let x = labelWidth;
       for (const [label, w, h] of row.sizes) {
-        // Tile flags are constructor arguments; atlas data cannot carry them.
+        // Tile flags are constructor arguments; Phaser ignores them in atlas data.
         const tile = row.entry.tile ?? '';
         const slice = this.add
           .nineslice(

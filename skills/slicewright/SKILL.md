@@ -61,10 +61,15 @@ command exits 2 on bad input. `--help` works on each command.
    on a title plate). Pass `--padding l,r,t,b` when the detected content
    padding (where text fits inside the frame) is wrong.
 6. **Look at the preview.** `slicewright preview ui/panel.png --out
-   sheet.png`, then open `sheet.png`. Cells, left to right: flexible segments
+   sheet.png`, then open `sheet.png`. Cells, in order: flexible segments
    tinted magenta with the content box outlined in cyan, source, minimum size,
    wide (when the width resizes), tall (when the height resizes), doubled.
    Corners must look identical in every cell and edges must not smear.
+   Cells wrap into rows at `--max-width` (2048 px). An image viewer shrinks a
+   large sheet until seams vanish, so look closer with `--cells guides,wide`
+   (any of `guides,source,min,wide,tall,double`) and add `--zoom 3` or more
+   for small art such as bars and buttons; the printed `cells` give each
+   cell's rectangle for cropping.
 7. **Hand it to the engine.** `slicewright export ui/panel.png --target
    phaser,css --out-dir ui` writes each engine's files for a PNG that is
    already final. It detects insets and padding again, so repeat any
@@ -74,10 +79,17 @@ command exits 2 on bad input. `--help` works on each command.
    `--name` (`ui-button`) so CSS class names do not collide in a page. It
    prints how to use them; `slicewright targets` lists what each target
    can represent. Only Phaser and CSS are supported; both are verified in the
-   real engine. For a packed atlas, disable trimming (and rotation) for
-   nine-slice sprites, add `scale9Borders` per frame (TexturePacker 7.1+ can
-   export them), then run `slicewright atlas ui.json` to check every frame
-   against the pixels.
+   real engine.
+8. **Pack a set.** `slicewright pack ui/dialog.json ui/button.json ui/bar.json
+   --out ui/ui.png` puts every piece in one image and atlas, so the game loads
+   them with one `this.load.atlas`; it prints a `nineslice` call per frame,
+   with tiling flags. Add `--css` for one stylesheet with a class per piece.
+   Packing keeps frames untrimmed and unrotated with their borders, padding,
+   and tiling, extrudes each edge by 1 px and leaves 2 px between frames
+   (`--extrude`, `--spacing`), and checks the result. With another packer,
+   disable trimming and rotation for nine-slice sprites, add `scale9Borders`
+   per frame (TexturePacker 7.1+ can export them), then run
+   `slicewright atlas ui.json` to check every frame against the pixels.
 
 ## Making a matching set
 
@@ -86,7 +98,8 @@ style description used word for word in every `prompt` call, generated in one
 session. When the generator accepts reference images, generate the main piece
 first and pass it as a reference for the others. Normalize each piece to its
 own in-game width, then put the preview sheets side by side and regenerate a
-piece that drifts in color or wood tone before slicing further.
+piece that drifts in color or wood tone before slicing further. Pack the
+finished pieces into one atlas (step 8).
 
 ## Progress bars
 
@@ -161,7 +174,7 @@ does not check that path.
 | `insets.large` | The fixed parts take most of an axis, so little stretches and the art cannot shrink much. | Usually edge texture or detail: regenerate with plainer edges, or raise `--tolerance` slightly. |
 | `stretch.x.none`, `stretch.y.none` | No two adjacent lines match; any stretch smears. | Regenerate with plain edges and center, or use `--mode three` for a vertical gradient. |
 | `stretch.x.short`, `stretch.y.short` | Only a tiny run matches and nothing repeats: the edges carry non-repeating detail (vines, drawn rope). | Regenerate with plain edges between the corners; or choose insets by hand after the preview. |
-| `tile.x.auto`, `tile.y.auto` | The edges repeat with the named period, so that axis tiles. | Create the NineSlice with `tileX` / `tileY`; atlas data cannot carry it. |
+| `tile.x.auto`, `tile.y.auto` | The edges repeat with the named period, so that axis tiles. | Create the NineSlice with `tileX` / `tileY`; Phaser reads tiling only from the constructor (the frame's `slicewright.tile` records it). |
 | `tile.x.seam`, `tile.y.seam` | A tiled span cuts its pattern or jumps where it wraps. | Use one of the `nearestLengths`, or make the texture seamless. |
 | `three-slice.auto` | Rows never repeat, so the layout keeps a fixed height. | Fine for bars. For panels, regenerate with a flat center. |
 | `three-slice.vertical.auto` | Columns never repeat but rows do, so the layout keeps its width. | Fine for vertical tracks. For panels, regenerate with plain edges. |
@@ -178,8 +191,10 @@ does not check that path.
 | `margin.transparent` | Transparent border pixels become part of the corners. | `normalize` crops them; otherwise crop unless the spacing is intended. |
 | `rebuild.x.lossy`, `rebuild.y.lossy` | `--keep` would flatten texture or shading on that axis. | Informational: that axis kept its full span. |
 | `rebuild.filtering` | A small `--keep` fades under linear texture filtering. | Use `--keep 8` or more, or nearest filtering (Phaser `pixelArt`). |
-| `padding.invalid` | Given content padding leaves no content area. | Shrink `--padding`. |
-| `atlas.padding-invalid` | An atlas frame's content padding does not fit the frame. | Re-export the frame. |
+| `padding.invalid` | Given content padding leaves no content area, is not whole and non-negative, or reaches past the fixed edge into a stretch span, where it would change with size. | Shrink `--padding` to within the insets on resizable axes. |
+| `pack.css-skipped` | A packed frame has no CSS class: it has no borders, or is only part of its image, which `border-image` cannot address. | Pack the piece's own one-frame atlas, or use Phaser for it. |
+| `pack.css-class-collision` | Two frame names become the same CSS class. | Rename one piece. |
+| `atlas.padding-invalid` | An atlas frame's content padding does not fit the frame or reaches past the fixed edge its `scale9Borders` leave. | Re-export the frame. |
 | `insets.asymmetric` | Opposite insets differ by more than 2 px. | Usually generator drift; check the preview. |
 | `insets.invalid` | Insets leave no stretch pixel. | Shrink the insets. |
 | `image.empty` | Every pixel is transparent. | The background removal took everything; redo it. |

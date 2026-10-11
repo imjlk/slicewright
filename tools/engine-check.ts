@@ -1,14 +1,22 @@
 import { createReadStream, existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { dirname, extname, join, normalize, resolve, sep } from 'node:path';
+import { basename, dirname, extname, join, normalize, resolve, sep } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { chromium, type Page } from 'playwright-core';
 
 import { defaultInspectOptions, inspectRaster } from '../src/inspect.js';
+import { buildPack } from '../src/pack-files.js';
+import { defaultPackOptions } from '../src/pack.js';
 import { layoutFromInsets, type SliceLayout } from '../src/layout.js';
 import { decodePng } from '../src/png.js';
-import { createRaster, pixelOffset, rasterDifference, type Raster } from '../src/raster.js';
+import {
+  createRaster,
+  cropRaster,
+  pixelOffset,
+  rasterDifference,
+  type Raster,
+} from '../src/raster.js';
 import { renderLayout } from '../src/render.js';
 import { scale9BordersToInsets, type Scale9Borders, type SliceInsets } from '../src/slices.js';
 import { exportForTarget } from '../src/targets/index.js';
@@ -172,7 +180,7 @@ interface RenderedCell {
   readonly at: [number, number];
   readonly rendered: [number, number];
   readonly borders: Scale9Borders;
-  readonly frame: { readonly w: number; readonly h: number };
+  readonly frame: { readonly x: number; readonly y: number; readonly w: number; readonly h: number };
   /** Tiled axes: '', 'x', 'y', or 'xy'. */
   readonly tile?: string;
   /** The frame's slicewright shape marker, when it has one. */
@@ -217,10 +225,12 @@ function compareCells(
   const background = [0x1d, 0x1d, 0x24] as const;
   const sources = new Map<string, Raster>();
   return cells.map((cell) => {
-    const source =
+    const image =
       sources.get(cell.image) ?? decodePng(readFileSync(join(root, cell.image.replace(/^\//, ''))));
-    sources.set(cell.image, source);
+    sources.set(cell.image, image);
     const { w, h } = cell.frame;
+    // A packed frame is part of its image; a one-frame atlas covers all of it.
+    const source = cropRaster(image, { x: cell.frame.x, y: cell.frame.y, width: w, height: h });
     const shape =
       cell.borders.y === 0 && cell.borders.h === h
         ? 'three'
@@ -298,14 +308,22 @@ function detectTiles(): Map<string, TileCheck> {
       atlas: string;
       tile?: string;
       like?: string;
+      frame?: string;
       mode?: 'three' | 'three-vertical';
     }>;
   };
   const checks = new Map<string, TileCheck>();
   for (const entry of manifest.entries) {
     const atlasPath = join(dirname(manifestPath), entry.atlas);
-    const atlas = JSON.parse(readFileSync(atlasPath, 'utf8')) as { meta: { image: string } };
-    const raster = decodePng(readFileSync(join(dirname(atlasPath), atlas.meta.image)));
+    const atlas = JSON.parse(readFileSync(atlasPath, 'utf8')) as {
+      frames: Record<string, { frame: { x: number; y: number; w: number; h: number } }>;
+      meta: { image: string };
+    };
+    const image = decodePng(readFileSync(join(dirname(atlasPath), atlas.meta.image)));
+    const rect = (entry.frame === undefined
+      ? Object.values(atlas.frames)[0]
+      : atlas.frames[entry.frame])?.frame ?? { x: 0, y: 0, w: image.width, h: image.height };
+    const raster = cropRaster(image, { x: rect.x, y: rect.y, width: rect.w, height: rect.h });
     // A sample normalized with --mode is detected with it too, as its export was.
     const report = inspectRaster(raster, { ...defaultInspectOptions, mode: entry.mode ?? 'auto' });
     const axes = (flags: { x: boolean; y: boolean }): string =>
@@ -333,7 +351,8 @@ function detectTiles(): Map<string, TileCheck> {
       manifest: manifestTile,
       ...(problem === undefined ? {} : { problem }),
       layout: report.layout,
-      rebuilt: entry.like !== undefined,
+      // A packed frame keeps its pixels, so detection still applies to it.
+      rebuilt: entry.like !== undefined && entry.frame === undefined,
     });
   }
   return checks;
@@ -346,10 +365,37 @@ function detectTiles(): Map<string, TileCheck> {
 function findStaleExports(tiles: ReadonlyMap<string, TileCheck>): string[] {
   const manifestPath = join(root, values.manifest);
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
-    entries: Array<{ label: string; atlas: string; css?: string }>;
+    entries: Array<{ label: string; atlas: string; css?: string; frame?: string }>;
+    packs?: Array<{ out: string; inputs: string[]; css?: boolean }>;
   };
   const stale: string[] = [];
+  // A packed atlas must be what packing its inputs writes now.
+  for (const pack of manifest.packs ?? []) {
+    const out = join(dirname(manifestPath), pack.out);
+    const result = buildPack({
+      inputs: pack.inputs.map((input) => join(dirname(manifestPath), input)),
+      out,
+      name: basename(out).replace(/\.png$/i, ''),
+      css: pack.css === true,
+      ...defaultPackOptions,
+      match: defaultInspectOptions,
+      servedFrom: root,
+    });
+    if (!result.ok) {
+      stale.push(`${out.slice(root.length + 1)} does not pass the atlas check`);
+    }
+    for (const file of result.files) {
+      const committed = existsSync(file.path) ? readFileSync(file.path) : undefined;
+      if (committed === undefined || !Buffer.from(file.contents).equals(committed)) {
+        stale.push(`${file.path.slice(root.length + 1)} differs from packing its inputs`);
+      }
+    }
+  }
   for (const entry of manifest.entries) {
+    // Packed frames are covered by rebuilding their pack above.
+    if (entry.frame !== undefined) {
+      continue;
+    }
     const atlasPath = join(dirname(manifestPath), entry.atlas);
     const atlasText = readFileSync(atlasPath, 'utf8');
     const atlas = JSON.parse(atlasText) as {
