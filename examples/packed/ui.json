@@ -1,0 +1,152 @@
+{
+  "frames": {
+    "dialog": {
+      "frame": {
+        "x": 1,
+        "y": 1,
+        "w": 480,
+        "h": 289
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 480,
+        "h": 289
+      },
+      "sourceSize": {
+        "w": 480,
+        "h": 289
+      },
+      "scale9Borders": {
+        "x": 63,
+        "y": 57,
+        "w": 354,
+        "h": 175
+      },
+      "slicewright": {
+        "contentPadding": {
+          "left": 21,
+          "right": 21,
+          "top": 24,
+          "bottom": 25
+        }
+      }
+    },
+    "button": {
+      "frame": {
+        "x": 1,
+        "y": 294,
+        "w": 240,
+        "h": 99
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 240,
+        "h": 99
+      },
+      "sourceSize": {
+        "w": 240,
+        "h": 99
+      },
+      "scale9Borders": {
+        "x": 25,
+        "y": 20,
+        "w": 190,
+        "h": 59
+      },
+      "slicewright": {
+        "contentPadding": {
+          "left": 4,
+          "right": 4,
+          "top": 8,
+          "bottom": 9
+        }
+      }
+    },
+    "bar": {
+      "frame": {
+        "x": 1,
+        "y": 397,
+        "w": 320,
+        "h": 33
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 320,
+        "h": 33
+      },
+      "sourceSize": {
+        "w": 320,
+        "h": 33
+      },
+      "scale9Borders": {
+        "x": 39,
+        "y": 0,
+        "w": 242,
+        "h": 33
+      },
+      "slicewright": {
+        "contentPadding": {
+          "left": 38,
+          "right": 38,
+          "top": 2,
+          "bottom": 3
+        }
+      }
+    },
+    "rope": {
+      "frame": {
+        "x": 245,
+        "y": 294,
+        "w": 120,
+        "h": 48
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 120,
+        "h": 48
+      },
+      "sourceSize": {
+        "w": 120,
+        "h": 48
+      },
+      "scale9Borders": {
+        "x": 6,
+        "y": 6,
+        "w": 108,
+        "h": 36
+      },
+      "slicewright": {
+        "contentPadding": {
+          "left": 6,
+          "right": 6,
+          "top": 6,
+          "bottom": 6
+        },
+        "tile": {
+          "x": true,
+          "y": false
+        }
+      }
+    }
+  },
+  "meta": {
+    "image": "ui.png",
+    "size": {
+      "w": 482,
+      "h": 431
+    },
+    "scale": "1"
+  }
+}

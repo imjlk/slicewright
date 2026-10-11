@@ -12,16 +12,20 @@ let y = gap;
 for (const entry of manifest.entries.filter((item) => item.css !== undefined)) {
   const atlasUrl = new URL(entry.atlas, manifestUrl);
   const atlas = await (await fetch(atlasUrl)).json();
-  const [, frame] = Object.entries(atlas.frames)[0];
-  const css = await (await fetch(new URL(entry.css, manifestUrl))).text();
-  const className = /\.([A-Za-z_][A-Za-z0-9_-]*)\s*\{/.exec(css)[1];
-  // Border images load lazily; decode the image first so the cells paint at once.
-  const preload = new Image();
-  preload.src = new URL(atlas.meta.image, atlasUrl).href;
-  await preload.decode();
+  const frame = entry.frame === undefined ? Object.values(atlas.frames)[0] : atlas.frames[entry.frame];
+  const cssUrl = new URL(entry.css, manifestUrl);
+  const css = await (await fetch(cssUrl)).text();
+  // A packed stylesheet has a class per frame, named after it.
+  const className = entry.frame ?? /\.([A-Za-z_][A-Za-z0-9_-]*)\s*\{/.exec(css)[1];
+  // Border images load lazily; decode every image first so the cells paint at once.
+  for (const [, path] of css.matchAll(/url\("([^"]+)"\)/g)) {
+    const preload = new Image();
+    preload.src = new URL(path, cssUrl).href;
+    await preload.decode();
+  }
   const style = document.createElement('style');
   // Resolve the image against the CSS file, as a linked stylesheet would.
-  style.textContent = css.replace(/url\("([^"]+)"\)/g, (_, path) => `url("${new URL(path, new URL(entry.css, manifestUrl)).href}")`);
+  style.textContent = css.replace(/url\("([^"]+)"\)/g, (_, path) => `url("${new URL(path, cssUrl).href}")`);
   document.head.append(style);
 
   const label = document.createElement('div');
