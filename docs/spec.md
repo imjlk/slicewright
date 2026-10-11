@@ -168,8 +168,9 @@ averages every source pixel an output pixel covers, weighted by overlap, in
 premultiplied alpha so transparent pixels do not darken edges; when enlarging
 it samples the covering source pixel. The nearest filter samples the source
 pixel under each output pixel center, for pixel art. A target is a width and
-height in whole pixels, one side with the aspect ratio kept, or a positive scale;
-anything else is refused rather than clamped.
+height in whole pixels, one side with the aspect ratio kept, or a positive scale,
+never a scale together with a size; anything else is refused rather than
+clamped.
 
 ## Normalization
 

@@ -12,6 +12,7 @@ import {
 import { pixelOffset } from '../src/raster.js';
 import { inspectAtlas } from '../src/phaser.js';
 import { renderLayout, renderPreviewSheet } from '../src/render.js';
+import { cssString } from '../src/targets/css.js';
 import { capabilityFindings, exportForTarget, sliceTargets } from '../src/targets/index.js';
 import { crestPanel, fillRect, panel, sameRaster, shadedBar, transpose } from './fixtures.js';
 
@@ -111,7 +112,14 @@ export function detectsVerticalThreeSlices(): void {
     layout: report.layout,
     loaderPaths: { image: 'ui/track.png', directory: 'ui' },
   });
-  ok(loaded.usage.includes("this.load.atlas('track', 'ui/track.png', 'ui/track.json');"));
+  ok(loaded.usage.includes('this.load.atlas("track", "ui/track.png", "ui/track.json");'));
+  const quoted = exportForTarget('phaser', {
+    name: "king's",
+    imageRef: "king's.png",
+    raster: bar,
+    layout: report.layout,
+  });
+  ok(quoted.usage.includes(`this.load.atlas("king's", "king's.png", "king's.json");`));
 
   // The Phaser target's own vertical export passes the atlas check.
   const exported = exportForTarget('phaser', {
@@ -243,6 +251,7 @@ export function exportsCssBorderImage(): void {
   ok(css.includes('border-image-slice: 5 8 7 6 fill;'));
   ok(css.includes('border-image-repeat: round stretch;'));
   ok(css.includes('border-image-source: url("ui/panel.png");'));
+  strictEqual(cssString('a"b\\c.png'), '"a\\"b\\\\c.png"');
   ok(css.includes('min-width: 14px;'));
 
   const three = layoutFromInsets({ left: 6, right: 6, top: 0, bottom: 0 }, 40, 30, {

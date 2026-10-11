@@ -58,7 +58,7 @@ export function removesChromaBackgrounds(): void {
 
 /**
  * @evidence docs/spec.md#resizing Averages in premultiplied alpha without colour halos, keeps uniform areas exact, samples nearest pixels, and fits target sizes.
- * @evidenceReview docs/spec.md#resizing #50e7c67 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#resizing #6c29064 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function resizesWithoutHalos(): void {
   const edge = createRaster(2, 1);
@@ -92,6 +92,7 @@ export function resizesWithoutHalos(): void {
     { scale: Number.NaN },
     { width: 1.5 },
     { height: 0 },
+    { scale: 2, width: 100 },
   ]) {
     throws(() => targetSize(400, 200, request), RangeError);
   }

@@ -45,12 +45,17 @@ export function exportPhaser({
     files: [{ path: `${name}.json`, contents: `${JSON.stringify(atlas, null, 2)}\n` }],
     usage:
       // Phaser resolves both URLs against its loader path, not the atlas file.
-      `this.load.atlas('${name}', '${loaderPaths?.image ?? imageRef}', '${joinUrl(loaderPaths?.directory ?? '', `${name}.json`)}');\n` +
-      `this.add.nineslice(x, y, '${name}', '${name}', width, height${tileArgs});` +
+      // Values are serialized as string literals so quotes in names stay valid code.
+      `this.load.atlas(${js(name)}, ${js(loaderPaths?.image ?? imageRef)}, ${js(joinUrl(loaderPaths?.directory ?? '', `${name}.json`))});\n` +
+      `this.add.nineslice(x, y, ${js(name)}, ${js(name)}, width, height${tileArgs});` +
       fixedAxisNote(layout),
   };
 }
 
 function joinUrl(directory: string, file: string): string {
   return directory === '' || directory === '.' ? file : `${directory.replace(/\/+$/, '')}/${file}`;
+}
+
+function js(value: string): string {
+  return JSON.stringify(value);
 }

@@ -7,7 +7,7 @@ export type ResizeFilter = 'area' | 'nearest';
  * neighbor for pixel art.
  *
  * @evidence docs/spec.md#resizing Averages covered source area in premultiplied alpha, or samples the nearest pixel.
- * @evidenceReview docs/spec.md#resizing #50e7c67 Checked this code against the section line by line and ran resizesWithoutHalos green with pnpm test.
+ * @evidenceReview docs/spec.md#resizing #6c29064 Checked this code against the section line by line and ran resizesWithoutHalos green with pnpm test.
  */
 export function resizeRaster(
   raster: Raster,
@@ -45,6 +45,9 @@ export function targetSize(
     if (value !== undefined && !Number.isInteger(value)) {
       throw new RangeError(`--${name} must be a whole number of pixels, got ${value}.`);
     }
+  }
+  if (request.scale !== undefined && (request.width !== undefined || request.height !== undefined)) {
+    throw new RangeError('Give a scale or a width and height, not both.');
   }
   if (request.scale !== undefined) {
     return {

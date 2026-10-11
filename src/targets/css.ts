@@ -40,7 +40,7 @@ export function exportCss({ name, imageRef, layout }: ExportInput): Omit<ExportR
     '  box-sizing: border-box;',
     '  border-style: solid;',
     `  border-width: ${top}px ${right}px ${bottom}px ${left}px;`,
-    `  border-image-source: url("${imageRef}");`,
+    `  border-image-source: url(${cssString(imageRef)});`,
     `  border-image-slice: ${top} ${right} ${bottom} ${left} fill;`,
     `  border-image-repeat: ${repeat(layout.x)} ${repeat(layout.y)};`,
     ...size,
@@ -49,7 +49,7 @@ export function exportCss({ name, imageRef, layout }: ExportInput): Omit<ExportR
   ].join('\n');
   return {
     files: [{ path: `${name}.css`, contents: css }],
-    usage: `<link rel="stylesheet" href="${name}.css">\n<div class="${className}">…</div>`,
+    usage: `<link rel="stylesheet" href="${htmlAttribute(`${name}.css`)}">\n<div class="${className}">…</div>`,
   };
 }
 
@@ -57,4 +57,13 @@ export function exportCss({ name, imageRef, layout }: ExportInput): Omit<ExportR
 export function cssIdentifier(name: string): string {
   const cleaned = name.replace(/[^A-Za-z0-9_-]/g, '-');
   return /^[A-Za-z_]/.test(cleaned) ? cleaned : `sw-${cleaned}`;
+}
+
+/** A double-quoted CSS string: backslashes, quotes, and line breaks escaped. */
+export function cssString(value: string): string {
+  return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\a ')}"`;
+}
+
+function htmlAttribute(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }
