@@ -61,10 +61,15 @@ command exits 2 on bad input. `--help` works on each command.
    on a title plate). Pass `--padding l,r,t,b` when the detected content
    padding (where text fits inside the frame) is wrong.
 6. **Look at the preview.** `slicewright preview ui/panel.png --out
-   sheet.png`, then open `sheet.png`. Cells, left to right: flexible segments
+   sheet.png`, then open `sheet.png`. Cells, in order: flexible segments
    tinted magenta with the content box outlined in cyan, source, minimum size,
    wide (when the width resizes), tall (when the height resizes), doubled.
    Corners must look identical in every cell and edges must not smear.
+   Cells wrap into rows at `--max-width` (2048 px). An image viewer shrinks a
+   large sheet until seams vanish, so look closer with `--cells guides,wide`
+   (any of `guides,source,min,wide,tall,double`) and add `--zoom 3` or more
+   for small art such as bars and buttons; the printed `cells` give each
+   cell's rectangle for cropping.
 7. **Hand it to the engine.** `slicewright export ui/panel.png --target
    phaser,css --out-dir ui` writes each engine's files for a PNG that is
    already final. It detects insets and padding again, so repeat any
@@ -121,10 +126,10 @@ finished pieces into one atlas (step 8).
 | `margin.transparent` | Transparent border pixels become part of the corners. | `normalize` crops them; otherwise crop unless the spacing is intended. |
 | `rebuild.x.lossy`, `rebuild.y.lossy` | `--keep` would flatten texture or shading on that axis. | Informational: that axis kept its full span. |
 | `rebuild.filtering` | A small `--keep` fades under linear texture filtering. | Use `--keep 8` or more, or nearest filtering (Phaser `pixelArt`). |
-| `padding.invalid` | Given content padding leaves no content area. | Shrink `--padding`. |
+| `padding.invalid` | Given content padding leaves no content area, is not whole and non-negative, or reaches past the fixed edge into a stretch span, where it would change with size. | Shrink `--padding` to within the insets on resizable axes. |
 | `pack.css-skipped` | A packed frame has no CSS class: it has no borders, or is only part of its image, which `border-image` cannot address. | Pack the piece's own one-frame atlas, or use Phaser for it. |
 | `pack.css-class-collision` | Two frame names become the same CSS class. | Rename one piece. |
-| `atlas.padding-invalid` | An atlas frame's content padding does not fit the frame. | Re-export the frame. |
+| `atlas.padding-invalid` | An atlas frame's content padding does not fit the frame or reaches past the fixed edge its `scale9Borders` leave. | Re-export the frame. |
 | `insets.asymmetric` | Opposite insets differ by more than 2 px. | Usually generator drift; check the preview. |
 | `insets.invalid` | Insets leave no stretch pixel. | Shrink the insets. |
 | `image.empty` | Every pixel is transparent. | The background removal took everything; redo it. |

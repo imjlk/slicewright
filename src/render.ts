@@ -14,14 +14,34 @@ export interface RenderOptions {
   readonly tileY: boolean;
 }
 
+/** The cells a preview sheet can show, in sheet order. */
+export const previewCellLabels = ['guides', 'source', 'min', 'wide', 'tall', 'double'] as const;
+export type PreviewCellLabel = (typeof previewCellLabels)[number];
+
 export interface PreviewCell extends Rect {
-  readonly label: 'guides' | 'source' | 'min' | 'wide' | 'tall' | 'double';
+  readonly label: PreviewCellLabel;
 }
 
 export interface PreviewSheet {
   readonly raster: Raster;
   readonly cells: readonly PreviewCell[];
 }
+
+export interface PreviewOptions {
+  /** Cells to show, in sheet order; every cell the layout allows when omitted. */
+  readonly cells?: readonly PreviewCellLabel[];
+  /** Whole-number nearest-neighbor scale for every cell, 1 to 8. */
+  readonly zoom?: number;
+  /** Width at which cells wrap to a new row; a wider cell sits alone in its row. */
+  readonly maxWidth?: number;
+}
+
+/** Default row width: wide enough for most art, narrow enough for image viewers. */
+export const defaultPreviewMaxWidth = 2048;
+const maximumZoom = 8;
+const maximumSheetSide = 16384;
+/** 64 megapixels: 256 MB of RGBA, about what an image viewer still opens. */
+const maximumSheetPixels = 64 * 2 ** 20;
 
 const padding = 16;
 const checkerSize = 8;
@@ -59,7 +79,7 @@ export function renderSlices(
  * flexible keeps its source length.
  *
  * @evidence docs/spec.md#preview-sheet Keeps fixed segments unscaled, shares the rest among flexible segments, and tiles whole tiles with nearest sampling.
- * @evidenceReview docs/spec.md#preview-sheet #49443a9 Checked this code against the section line by line and ran rendersSlicesAndPreviewSheets green with pnpm test.
+ * @evidenceReview docs/spec.md#preview-sheet #9cff538 Checked this code against the section line by line and ran rendersSlicesAndPreviewSheets green with pnpm test.
  * @evidence docs/spec.md#slice-layouts Renders any number of fixed, stretched, and tiled segments per axis.
  * @evidenceReview docs/spec.md#slice-layouts #fc52f65 Checked this code against the section line by line and ran describesSliceLayouts green with pnpm test.
  */
@@ -97,60 +117,131 @@ export function renderLayout(
 
 /**
  * Lays the source, its tinted flexible segments with the content box outlined,
- * and several resized versions side by side over a checkerboard. Axes that
- * cannot resize are not resized.
+ * and several resized versions over a checkerboard, in rows that wrap at a
+ * maximum width. Axes that cannot resize are not resized, so the cells that
+ * would resize them are left out. The caller can choose cells and zoom every
+ * cell by a whole number with nearest sampling.
  *
- * @evidence docs/spec.md#preview-sheet Builds the guides, source, minimum, wide, tall, and doubled cells.
- * @evidenceReview docs/spec.md#preview-sheet #49443a9 Checked this code against the section line by line and ran rendersSlicesAndPreviewSheets green with pnpm test.
+ * @evidence docs/spec.md#preview-sheet Builds the guides, source, minimum, wide, tall, and doubled cells, lets the caller pick and zoom them, and wraps rows at the maximum width.
+ * @evidenceReview docs/spec.md#preview-sheet #9cff538 Checked this code against the section line by line and ran rendersSlicesAndPreviewSheets green with pnpm test.
  */
-export function renderPreviewSheet(source: Raster, layout: SliceLayout): PreviewSheet {
+export function renderPreviewSheet(
+  source: Raster,
+  layout: SliceLayout,
+  options: PreviewOptions = {},
+): PreviewSheet {
+  // Checked here too: a guides-only sheet never reaches renderLayout's check.
+  if (layout.x.length !== source.width || layout.y.length !== source.height) {
+    throw new RangeError(
+      `The layout is ${layout.x.length}x${layout.y.length} but the image is ${source.width}x${source.height}.`,
+    );
+  }
+  const zoom = options.zoom ?? 1;
+  const maxWidth = options.maxWidth ?? defaultPreviewMaxWidth;
+  if (!Number.isInteger(zoom) || zoom < 1 || zoom > maximumZoom) {
+    throw new RangeError(
+      `The preview zoom must be a whole number from 1 to ${maximumZoom}, got ${zoom}.`,
+    );
+  }
+  if (!Number.isInteger(maxWidth) || maxWidth < 1) {
+    throw new RangeError(`The preview width must be a positive whole number, got ${maxWidth}.`);
+  }
   const cap = (value: number): number => Math.min(Math.round(value), maximumCellSize);
   const minimum = minimumLayoutSize(layout);
   const resizesX = flexibleSegments(layout.x).length > 0;
   const resizesY = flexibleSegments(layout.y).length > 0;
-  const sizes: Array<[PreviewCell['label'], number, number]> = [
-    ['guides', source.width, source.height],
-    ['source', source.width, source.height],
-    ['min', Math.max(minimum.width, 1), Math.max(minimum.height, 1)],
-  ];
+  const available = new Map<PreviewCellLabel, readonly [number, number]>([
+    ['guides', [source.width, source.height]],
+    ['source', [source.width, source.height]],
+    ['min', [Math.max(minimum.width, 1), Math.max(minimum.height, 1)]],
+  ]);
   if (resizesX) {
-    sizes.push(['wide', cap(source.width * 2.5), source.height]);
+    available.set('wide', [cap(source.width * 2.5), source.height]);
   }
   if (resizesY) {
-    sizes.push(['tall', source.width, cap(source.height * 2.5)]);
+    available.set('tall', [source.width, cap(source.height * 2.5)]);
   }
-  sizes.push([
-    'double',
+  available.set('double', [
     resizesX ? cap(source.width * 2) : source.width,
     resizesY ? cap(source.height * 2) : source.height,
   ]);
 
-  const rendered = sizes.map(([label, width, height]) => ({
-    label,
-    raster:
-      label === 'guides'
-        ? outlineContent(tintSegments(source, layout), layout.content)
-        : renderLayout(source, layout, width, height),
-  }));
-
-  const sheetWidth =
-    padding + rendered.reduce((sum, cell) => sum + cell.raster.width + padding, 0);
-  const sheetHeight = padding * 2 + Math.max(...rendered.map((cell) => cell.raster.height));
-  const sheet = checkerboard(sheetWidth, sheetHeight);
+  const requested = options.cells ?? previewCellLabels.filter((label) => available.has(label));
+  const unavailable = requested.filter((label) => !available.has(label));
+  if (unavailable.length > 0) {
+    const reasons = unavailable.map(
+      (label) => `${label} (the ${label === 'wide' ? 'width' : 'height'} does not resize)`,
+    );
+    throw new RangeError(`This layout has no ${reasons.join(' or ')} cell.`);
+  }
+  const labels = previewCellLabels.filter((label) => requested.includes(label));
+  if (labels.length === 0) {
+    throw new RangeError('A preview sheet needs at least one cell.');
+  }
+  // Rows wrap before a cell that would cross the maximum width. The sheet is
+  // laid out before anything renders, so an oversized sheet fails at once.
   const cells: PreviewCell[] = [];
   let x = padding;
-  for (const cell of rendered) {
-    composite(sheet, cell.raster, x, padding);
-    cells.push({
-      label: cell.label,
-      x,
-      y: padding,
-      width: cell.raster.width,
-      height: cell.raster.height,
-    });
-    x += cell.raster.width + padding;
+  let y = padding;
+  let rowHeight = 0;
+  for (const label of labels) {
+    const [width, height] = available.get(label) ?? [0, 0];
+    const cellWidth = width * zoom;
+    const cellHeight = height * zoom;
+    if (x > padding && x + cellWidth + padding > maxWidth) {
+      x = padding;
+      y += rowHeight + padding;
+      rowHeight = 0;
+    }
+    cells.push({ label, x, y, width: cellWidth, height: cellHeight });
+    x += cellWidth + padding;
+    rowHeight = Math.max(rowHeight, cellHeight);
+  }
+  const sheetWidth = Math.max(...cells.map((cell) => cell.x + cell.width + padding));
+  const sheetHeight = y + rowHeight + padding;
+  if (
+    sheetWidth > maximumSheetSide ||
+    sheetHeight > maximumSheetSide ||
+    sheetWidth * sheetHeight > maximumSheetPixels
+  ) {
+    throw new RangeError(
+      `The preview sheet would be ${sheetWidth}x${sheetHeight}, over the ${maximumSheetSide} px side or ${maximumSheetPixels / 2 ** 20} megapixel limit; lower the zoom or choose fewer cells.`,
+    );
+  }
+
+  const sheet = checkerboard(sheetWidth, sheetHeight);
+  for (const cell of cells) {
+    const [width, height] = available.get(cell.label) ?? [0, 0];
+    const raster =
+      cell.label === 'guides'
+        ? outlineContent(tintSegments(source, layout), layout.content)
+        : renderLayout(source, layout, width, height);
+    composite(sheet, zoomRaster(raster, zoom), cell.x, cell.y);
   }
   return { raster: sheet, cells };
+}
+
+/** Scales a raster up by a whole number, repeating each pixel. */
+function zoomRaster(raster: Raster, zoom: number): Raster {
+  if (zoom === 1) {
+    return raster;
+  }
+  const out = createRaster(raster.width * zoom, raster.height * zoom);
+  const rowBytes = out.width * 4;
+  for (let y = 0; y < raster.height; y += 1) {
+    // Build the first output row of this source row, then repeat it.
+    const first = y * zoom * rowBytes;
+    for (let x = 0; x < raster.width; x += 1) {
+      const from = pixelOffset(raster, x, y);
+      for (let copy = 0; copy < zoom; copy += 1) {
+        out.data.set(raster.data.subarray(from, from + 4), first + (x * zoom + copy) * 4);
+      }
+    }
+    for (let copy = 1; copy < zoom; copy += 1) {
+      out.data.copyWithin(first + copy * rowBytes, first, first + rowBytes);
+    }
+  }
+  return out;
 }
 
 /** For each output line of one axis, the source line it samples. */
