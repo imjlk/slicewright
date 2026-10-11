@@ -320,11 +320,14 @@ still render it as a nine-slice.
 
 ## Generation prompts
 
-A prompt plan turns a UI kind (button, panel, dialog, bar, tooltip, frame), a
-style, and a background choice into a generation prompt. The prompt asks for a
+A prompt plan turns a UI kind (button, panel, dialog, bar, bar fill, tooltip,
+frame), a style, and a background choice into a generation prompt. The prompt asks for a
 flat, front-facing element that fills the canvas, decoration only in the
 corners (the end caps for a bar), edges that are plain bands with no pattern,
 grain, or texture running along them (a rope or vine edge can neither stretch nor tile cleanly
 when a model draws it), a plain center, no text or icons, and the requested
-background. Bars are planned as three-slices. The plan lists what to avoid and
+background. Bars are planned as three-slices. A bar fill is the part of a
+progress bar drawn inside the track: a three-slice strip with no frame of its
+own and short, simple ends, because it is drawn at any length down to its two
+ends, sized afterwards to the track's content height. The plan lists what to avoid and
 the follow-up steps: remove the background, inspect, and preview.

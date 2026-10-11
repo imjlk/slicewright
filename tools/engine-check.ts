@@ -5,7 +5,7 @@ import { parseArgs } from 'node:util';
 
 import { chromium, type Page } from 'playwright-core';
 
-import { inspectRaster } from '../src/inspect.js';
+import { defaultInspectOptions, inspectRaster } from '../src/inspect.js';
 import { layoutFromInsets, type SliceLayout } from '../src/layout.js';
 import { decodePng } from '../src/png.js';
 import { createRaster, pixelOffset, rasterDifference, type Raster } from '../src/raster.js';
@@ -293,14 +293,21 @@ interface TileCheck {
 function detectTiles(): Map<string, TileCheck> {
   const manifestPath = join(root, values.manifest);
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
-    entries: Array<{ label: string; atlas: string; tile?: string; like?: string }>;
+    entries: Array<{
+      label: string;
+      atlas: string;
+      tile?: string;
+      like?: string;
+      mode?: 'three' | 'three-vertical';
+    }>;
   };
   const checks = new Map<string, TileCheck>();
   for (const entry of manifest.entries) {
     const atlasPath = join(dirname(manifestPath), entry.atlas);
     const atlas = JSON.parse(readFileSync(atlasPath, 'utf8')) as { meta: { image: string } };
     const raster = decodePng(readFileSync(join(dirname(atlasPath), atlas.meta.image)));
-    const report = inspectRaster(raster);
+    // A sample normalized with --mode is detected with it too, as its export was.
+    const report = inspectRaster(raster, { ...defaultInspectOptions, mode: entry.mode ?? 'auto' });
     const axes = (flags: { x: boolean; y: boolean }): string =>
       `${flags.x ? 'x' : ''}${flags.y ? 'y' : ''}`;
     const tile = axes(report.tile);

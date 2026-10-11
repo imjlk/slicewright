@@ -13,7 +13,11 @@ image was generated with the GPT `image_gen` route of
 | `bar` | chroma-green PNG | `key`, then `normalize --width 320` |
 | `baroque` | transparent PNG | `normalize --width 480` |
 | `scifi` | transparent PNG | `normalize --width 480` |
+| `bar-fill` | chroma-magenta PNG, `bar.png` as a reference | `key`, then `normalize --height 28 --mode three` |
 | `bar-vertical` | the keyed bar turned a quarter turn | `normalize --height 320` |
+
+`bar-fill` is the fill for `bar`: 28 px is the track's 33 px height minus its
+top and bottom content padding (2 and 3 px).
 
 Every sample was normalized with `--target phaser,css`, which writes its
 `.json` atlas and `.css` class. `*-min` files add `--keep 4`. For painted art, most axes report

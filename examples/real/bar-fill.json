@@ -1,0 +1,46 @@
+{
+  "frames": {
+    "bar-fill": {
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 360,
+        "h": 28
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 360,
+        "h": 28
+      },
+      "sourceSize": {
+        "w": 360,
+        "h": 28
+      },
+      "scale9Borders": {
+        "x": 7,
+        "y": 0,
+        "w": 346,
+        "h": 28
+      },
+      "slicewright": {
+        "contentPadding": {
+          "left": 0,
+          "right": 0,
+          "top": 2,
+          "bottom": 0
+        }
+      }
+    }
+  },
+  "meta": {
+    "image": "bar-fill.png",
+    "size": {
+      "w": 360,
+      "h": 28
+    },
+    "scale": "1"
+  }
+}

@@ -24,7 +24,7 @@ command exits 2 on bad input. `--help` works on each command.
 ## Workflow
 
 1. **Collect the brief.** UI kind (`button`, `panel`, `dialog`, `bar`,
-   `tooltip`, `frame`), art style in the user's words, the largest size the
+   `bar-fill`, `tooltip`, `frame`), art style in the user's words, the largest size the
    element is drawn at in the game, pixel art or not, and the background the
    generator can produce (`transparent`, `chroma-green`, `chroma-magenta`).
 2. **Plan the prompt.**
@@ -87,6 +87,44 @@ session. When the generator accepts reference images, generate the main piece
 first and pass it as a reference for the others. Normalize each piece to its
 own in-game width, then put the preview sheets side by side and regenerate a
 piece that drifts in color or wood tone before slicing further.
+
+## Progress bars
+
+A progress or health bar is two pieces made as a matching set: the track
+(`--kind bar`) and the fill (`--kind bar-fill`), generated with the same style
+words and, when the generator takes references, the track as a reference.
+
+1. Normalize the track with `--mode three` and read its `contentPadding`: the
+   fill sits in that box.
+2. Normalize the fill to the box's height, `--height <track height - top -
+   bottom>`, also with `--mode three`. A fill's soft top-to-bottom shade can
+   otherwise pass as a vertical stretch span.
+3. Draw progress by resizing the fill. Phaser's NineSlice never gets narrower
+   than its two end caps, so below that width keep the caps' width and scale
+   the fill down horizontally:
+
+```ts
+function setProgress(track, fill, padding, value) {
+  const inner = track.width - padding.left - padding.right;
+  const width = Math.round(inner * Phaser.Math.Clamp(value, 0, 1));
+  const caps = fill.leftWidth + fill.rightWidth;
+  fill.setPosition(track.x + padding.left, track.y + padding.top); // both with origin 0
+  fill.setVisible(width > 0);
+  fill.setSize(Math.max(width, caps), fill.height);
+  fill.setScale(width >= caps ? 1 : width / caps, 1);
+}
+const padding = this.textures.getFrame('ui', 'bar').customData.slicewright.contentPadding;
+const track = this.add.nineslice(x, y, 'ui', 'bar', 320, 33).setOrigin(0);
+const fill = this.add.nineslice(0, 0, 'ui', 'bar-fill', 100, 28).setOrigin(0);
+setProgress(track, fill, padding, 0.4);
+```
+
+This keeps the fill exactly inside the track's content box at every width,
+checked in Phaser 4.2 at 0 to 100% on two track widths. A fill whose look
+changes along its length (a left-to-right gradient, segments) cannot be
+resized this way, because resizing stretches it: draw it at full width and
+reveal part of it instead, for example with a Phaser mask filter. slicewright
+does not check that path.
 
 ## Findings
 
