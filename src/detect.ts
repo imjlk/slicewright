@@ -18,20 +18,20 @@ export interface AxisSpan {
 export const defaultMatchOptions: MatchOptions = { tolerance: 4, outlierRatio: 0 };
 
 /**
- * Bounds of the pixels that are not fully transparent, or undefined when
- * every pixel is.
+ * Bounds of the pixels whose alpha exceeds `alphaThreshold` (0 means not
+ * fully transparent), or undefined when no pixel does.
  *
  * @evidence docs/spec.md#transparent-margins Finds the fully transparent border rows and columns.
- * @evidenceReview docs/spec.md#transparent-margins Read the section against this function and ran warnsAboutTransparentMargins green with pnpm test.
+ * @evidenceReview docs/spec.md#transparent-margins #5bcc022 Checked this code against the section line by line and ran warnsAboutTransparentMargins green with pnpm test.
  */
-export function contentBounds(raster: Raster): Rect | undefined {
+export function contentBounds(raster: Raster, alphaThreshold = 0): Rect | undefined {
   let minX = raster.width;
   let minY = raster.height;
   let maxX = -1;
   let maxY = -1;
   for (let y = 0; y < raster.height; y += 1) {
     for (let x = 0; x < raster.width; x += 1) {
-      if (alphaAt(raster, x, y) > 0) {
+      if (alphaAt(raster, x, y) > alphaThreshold) {
         minX = Math.min(minX, x);
         maxX = Math.max(maxX, x);
         minY = Math.min(minY, y);
@@ -50,7 +50,7 @@ export function contentBounds(raster: Raster): Rect | undefined {
  * Columns are lines on the x axis, rows on the y axis.
  *
  * @evidence docs/spec.md#stretch-detection Compares adjacent lines with the tolerance and outlier ratio.
- * @evidenceReview docs/spec.md#stretch-detection Read the section against this function and ran detectsPanelInsets green with pnpm test.
+ * @evidenceReview docs/spec.md#stretch-detection #ff483ae Checked this code against the section line by line and ran detectsPanelInsets green with pnpm test.
  */
 export function linesMatch(
   raster: Raster,
@@ -62,7 +62,8 @@ export function linesMatch(
 ): boolean {
   const crossStart = axis === 'x' ? bounds.y : bounds.x;
   const crossLength = axis === 'x' ? bounds.height : bounds.width;
-  const allowed = Math.floor(crossLength * options.outlierRatio);
+  // Rounded up so a small ratio still forgives a pixel on short lines.
+  const allowed = Math.ceil(crossLength * options.outlierRatio);
   let outliers = 0;
   for (let cross = crossStart; cross < crossStart + crossLength; cross += 1) {
     const a = axis === 'x' ? pixelOffset(raster, index, cross) : pixelOffset(raster, cross, index);
@@ -81,7 +82,7 @@ export function linesMatch(
  * Largest premultiplied pixel difference between two lines inside `bounds`.
  *
  * @evidence docs/spec.md#tiling-seams Measures how hard a non-repeating span jumps where it wraps.
- * @evidenceReview docs/spec.md#tiling-seams Read the section against this function and ran checksTilingSeams green with pnpm test.
+ * @evidenceReview docs/spec.md#tiling-seams #ef3dc38 Checked this code against the section line by line and ran checksTilingSeams green with pnpm test.
  */
 export function lineDistance(
   raster: Raster,
@@ -101,12 +102,57 @@ export function lineDistance(
   return max;
 }
 
+/** Quantile of a line pair's interior pixel differences used as its noise score. */
+const noiseQuantile = 0.98;
+
+/**
+ * Noise floor along one axis, in the units line matching uses: for each
+ * adjacent line pair inside the central half of the content, the 98th
+ * percentile of their pixel differences over the central half of the line;
+ * the floor is the median over those pairs. Edges and corners stay out of the
+ * sample, so a patterned border is not taken for noise.
+ *
+ * @evidence docs/spec.md#stretch-detection Estimates each axis's interior noise floor that raises its tolerance for generated art.
+ * @evidenceReview docs/spec.md#stretch-detection #ff483ae Checked this code against the section line by line and ran detectsPanelInsets and toleratesGeneratedNoise green with pnpm test.
+ */
+export function estimateNoise(raster: Raster, bounds: Rect, axis: Axis): number {
+  const quarter = (start: number, length: number): [number, number] => [
+    start + Math.floor(length / 4),
+    start + Math.ceil((length * 3) / 4),
+  ];
+  const [lineStart, lineEnd] =
+    axis === 'x' ? quarter(bounds.x, bounds.width) : quarter(bounds.y, bounds.height);
+  const [crossStart, crossEnd] =
+    axis === 'x' ? quarter(bounds.y, bounds.height) : quarter(bounds.x, bounds.width);
+  const crossLength = crossEnd - crossStart;
+  if (lineEnd - lineStart < 2 || crossLength < 1) {
+    return 0;
+  }
+  const scores: number[] = [];
+  const differences = new Float64Array(crossLength);
+  for (let index = lineStart; index < lineEnd - 1; index += 1) {
+    for (let cross = 0; cross < crossLength; cross += 1) {
+      const at = crossStart + cross;
+      const a = axis === 'x' ? pixelOffset(raster, index, at) : pixelOffset(raster, at, index);
+      const b =
+        axis === 'x' ? pixelOffset(raster, index + 1, at) : pixelOffset(raster, at, index + 1);
+      differences[cross] = pixelDifference(raster, a, b);
+    }
+    differences.sort();
+    scores.push(
+      differences[Math.min(crossLength - 1, Math.floor(crossLength * noiseQuantile))] ?? 0,
+    );
+  }
+  scores.sort((a, b) => a - b);
+  return scores[Math.floor(scores.length / 2)] ?? 0;
+}
+
 /**
  * First adjacent pair inside `span` that does not match, as the index of the
  * first line of the pair, or undefined when the whole span is uniform.
  *
  * @evidence docs/spec.md#stretch-uniformity Locates the first mismatching pair inside a caller's stretch span.
- * @evidenceReview docs/spec.md#stretch-uniformity Read the section against this function and ran rejectsGivenInsetsThatStretchDetail green with pnpm test.
+ * @evidenceReview docs/spec.md#stretch-uniformity #53ef9b3 Checked this code against the section line by line and ran rejectsGivenInsetsThatStretchDetail green with pnpm test.
  */
 export function firstMismatch(
   raster: Raster,
@@ -128,7 +174,7 @@ export function firstMismatch(
  * pair matches. Ties prefer the run covering the center, then the nearest one.
  *
  * @evidence docs/spec.md#stretch-detection Picks the longest uniform run with the center-first tie break.
- * @evidenceReview docs/spec.md#stretch-detection Read the section against this function and ran detectsPanelInsets green with pnpm test.
+ * @evidenceReview docs/spec.md#stretch-detection #ff483ae Checked this code against the section line by line and ran detectsPanelInsets green with pnpm test.
  */
 export function detectStretchSpan(
   raster: Raster,
@@ -158,6 +204,68 @@ export function detectStretchSpan(
   }
   if (runStart !== undefined) {
     consider({ start: runStart, end: start + length });
+  }
+  return best;
+}
+
+export interface RepeatSpan {
+  readonly span: AxisSpan;
+  readonly period: number;
+}
+
+/**
+ * Longest span inside `bounds` whose lines repeat with a fixed period, trimmed
+ * to whole periods and holding at least two. Ties prefer the shorter period,
+ * then the span nearest the center.
+ *
+ * @evidence docs/spec.md#repeating-edges Finds the longest whole-period span for periods from 2 to a quarter of the content, at most 64.
+ * @evidenceReview docs/spec.md#repeating-edges #2fe5a06 Checked this code against the section line by line and ran tilesRepeatingEdges green with pnpm test.
+ */
+export function detectRepeatSpan(
+  raster: Raster,
+  axis: Axis,
+  bounds: Rect,
+  options: MatchOptions,
+): RepeatSpan | undefined {
+  const start = axis === 'x' ? bounds.x : bounds.y;
+  const length = axis === 'x' ? bounds.width : bounds.height;
+  const center = start + (length - 1) / 2;
+  const limit = Math.min(64, Math.floor(length / 4));
+  let best: RepeatSpan | undefined;
+  for (let period = 2; period <= limit; period += 1) {
+    let runStart: number | undefined;
+    const close = (runEnd: number): void => {
+      if (runStart === undefined) {
+        return;
+      }
+      const covered = runEnd - runStart + period;
+      const whole = Math.floor(covered / period) * period;
+      const candidate = { span: { start: runStart, end: runStart + whole }, period };
+      runStart = undefined;
+      if (whole < period * 2) {
+        return;
+      }
+      const length = (item: RepeatSpan): number => item.span.end - item.span.start;
+      // Periods ascend, so an equal span from a longer period never replaces a
+      // shorter one; within one period the span nearer the center wins.
+      if (
+        best === undefined ||
+        length(candidate) > length(best) ||
+        (length(candidate) === length(best) &&
+          candidate.period === best.period &&
+          centerDistance(candidate.span, center) < centerDistance(best.span, center))
+      ) {
+        best = candidate;
+      }
+    };
+    for (let index = start; index + period < start + length; index += 1) {
+      if (linesMatch(raster, axis, index, index + period, bounds, options)) {
+        runStart ??= index;
+      } else {
+        close(index);
+      }
+    }
+    close(start + length - period);
   }
   return best;
 }

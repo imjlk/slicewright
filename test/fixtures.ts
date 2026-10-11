@@ -49,11 +49,17 @@ export function panel(width: number, height: number, margin = 0): Raster {
   return raster;
 }
 
-/** A bar whose rows shade from light to dark, with 5 px capped ends. */
+/**
+ * A bar whose rows are distinct bands, with 5 px capped ends. Adjacent rows
+ * differ far beyond any noise tolerance and no row pattern repeats, so the bar
+ * can neither stretch nor tile vertically.
+ */
 export function shadedBar(width: number, height: number): Raster {
   const raster = createRaster(width, height);
+  // Rows 1 to 3 apart always differ by more than 24, so nothing repeats.
+  const shades = [40, 220, 90, 180, 60, 250, 120, 30, 200, 150, 70, 240, 110, 10];
   for (let y = 0; y < height; y += 1) {
-    const shade = 220 - Math.round((y * 160) / Math.max(1, height - 1));
+    const shade = shades[y % shades.length] ?? 0;
     fillRect(raster, 0, y, width, 1, [shade, shade, 255, 255]);
   }
   fillRect(raster, 0, 0, 5, height, outline);

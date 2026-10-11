@@ -1,0 +1,38 @@
+{
+  "frames": {
+    "pixel": {
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 240,
+        "h": 154
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 240,
+        "h": 154
+      },
+      "sourceSize": {
+        "w": 240,
+        "h": 154
+      },
+      "scale9Borders": {
+        "x": 15,
+        "y": 15,
+        "w": 210,
+        "h": 124
+      }
+    }
+  },
+  "meta": {
+    "image": "pixel.png",
+    "size": {
+      "w": 240,
+      "h": 154
+    },
+    "scale": "1"
+  }
+}

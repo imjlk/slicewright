@@ -1,0 +1,9 @@
+A single game UI dialog window background without a title bar, hand-painted fantasy RPG, dark carved wood frame with brass corner ornaments around parchment.
+Shape: a thick decorated frame with corner ornaments; the content area is calm and flat so text stays readable.
+Flat front view, no perspective, centered and filling the canvas edge to edge with only a few pixels of margin.
+Put all decoration in the four corners. Edges are plain repeating borders.
+It will be stretched horizontally and vertically: the top and bottom edges must look identical at every horizontal position, the left and right edges identical at every vertical position.
+No text, letters, icons, symbols, or characters on it.
+Clean edges, no blur, no noise or grain.
+Transparent background; nothing outside the element.
+Avoid: text or icons on the element; drop shadows or glows outside the element; perspective, tilt, or 3D camera angles; gradients or patterns along a stretch direction; decoration in the middle of an edge; multiple elements or variants in one image; background scenery.

@@ -40,3 +40,5 @@ jobs:
       - run: pnpm check
       - run: pnpm test
       - run: pnpm build
+      # Renders examples/real as Phaser 4 NineSlices in the runner's Chrome.
+      - run: pnpm phaser:check

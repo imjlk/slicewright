@@ -7,6 +7,9 @@ const spec = {
   files: ['docs/spec.md'],
   symbol: 'h2',
   noEvidenceExclude: true,
+  // Each review carries a fingerprint of the section it checked and expires
+  // when that section changes.
+  requireReview: true,
 };
 const evidenceGraph = {
   claims: [

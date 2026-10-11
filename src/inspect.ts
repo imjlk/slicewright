@@ -1,7 +1,9 @@
 import {
   contentBounds,
   defaultMatchOptions,
+  detectRepeatSpan,
   detectStretchSpan,
+  estimateNoise,
   firstMismatch,
   lineDistance,
   linesMatch,
@@ -38,6 +40,14 @@ export interface InspectOptions extends MatchOptions {
   readonly insets?: SliceInsets;
   readonly mode: 'auto' | SliceMode;
   readonly tile: TileAxes;
+  /** `auto` raises the tolerance to the measured noise floor of generated art. */
+  readonly noise: 'auto' | 'off';
+}
+
+/** Matching settings per axis; noise is measured separately along each. */
+export interface AxisMatching {
+  readonly x: MatchOptions;
+  readonly y: MatchOptions;
 }
 
 export interface InspectReport {
@@ -50,6 +60,10 @@ export interface InspectReport {
   readonly scale9Borders: Scale9Borders;
   readonly minSize: { readonly width: number; readonly height: number };
   readonly contentBounds: Rect | null;
+  /** Axes that tile, as given or detected from repeating edges. */
+  readonly tile: TileAxes;
+  /** Tolerance and outlier ratio actually used per axis, after noise handling. */
+  readonly matching: AxisMatching;
   readonly findings: readonly Finding[];
 }
 
@@ -57,7 +71,17 @@ export const defaultInspectOptions: InspectOptions = {
   ...defaultMatchOptions,
   mode: 'auto',
   tile: { x: false, y: false },
+  noise: 'auto',
 };
+
+/** Effective tolerance is this many times the measured noise floor. */
+const noiseFactor = 3;
+/** Noise handling never raises the tolerance above this. */
+const maximumNoiseTolerance = 24;
+/** A noise floor above this is texture or a defect rather than noise. */
+const busyNoise = 8;
+/** Outlier ratio used once noise is measured, so isolated noisy pixels do not split runs. */
+const noisyOutlierRatio = 0.02;
 
 const spillDominance = 64;
 const spillRatio = 0.01;
@@ -83,18 +107,20 @@ export function inspectRaster(
   } else {
     findings.push(...marginFindings(raster, bounds));
     findings.push(...chromaSpillFindings(raster));
+    findings.push(...interiorAlphaFindings(raster, bounds));
   }
 
+  const matching = noiseAdjusted(raster, bounds, options, findings);
   const resolved =
     options.insets === undefined
-      ? detectLayout(raster, bounds ?? full, options, findings)
-      : verifyLayout(raster, options.insets, options, findings);
+      ? detectLayout(raster, bounds ?? full, options, matching, findings)
+      : verifyLayout(raster, options.insets, options, matching, findings);
 
-  const { insets, mode } = resolved;
+  const { insets, mode, tile } = resolved;
   findings.push(...symmetryFindings(insets));
   for (const axis of ['x', 'y'] as const) {
-    if (options.tile[axis] && !(axis === 'y' && mode === 'three')) {
-      findings.push(...seamFindings(raster, axis, spanOf(raster, insets, axis), options));
+    if (tile[axis] && !(axis === 'y' && mode === 'three')) {
+      findings.push(...seamFindings(raster, axis, spanOf(raster, insets, axis), matching[axis]));
     }
   }
 
@@ -111,80 +137,180 @@ export function inspectRaster(
       height: mode === 'three' ? raster.height : insets.top + insets.bottom,
     },
     contentBounds: bounds ?? null,
+    tile,
+    matching,
     findings,
   };
+}
+
+/**
+ * Raises each axis's tolerance and outlier ratio to that axis's noise floor
+ * when noise handling is automatic and the image is not clean.
+ *
+ * @evidence docs/spec.md#stretch-detection Applies three times each axis's noise floor up to 24 and a 2% outlier ratio, warns when both axes are busy, and records the change.
+ * @evidenceReview docs/spec.md#stretch-detection #ff483ae Checked this code against the section line by line and ran toleratesGeneratedNoise green with pnpm test.
+ */
+export function noiseAdjusted(
+  raster: Raster,
+  bounds: Rect | undefined,
+  options: InspectOptions,
+  findings: Finding[],
+): AxisMatching {
+  const exact: MatchOptions = { tolerance: options.tolerance, outlierRatio: options.outlierRatio };
+  if (options.noise === 'off' || bounds === undefined) {
+    return { x: exact, y: exact };
+  }
+  const noise = { x: estimateNoise(raster, bounds, 'x'), y: estimateNoise(raster, bounds, 'y') };
+  const adjust = (floor: number): MatchOptions =>
+    floor === 0
+      ? exact
+      : {
+          tolerance: Math.max(
+            options.tolerance,
+            Math.min(maximumNoiseTolerance, Math.ceil(floor * noiseFactor)),
+          ),
+          outlierRatio: Math.max(options.outlierRatio, noisyOutlierRatio),
+        };
+  const matching = { x: adjust(noise.x), y: adjust(noise.y) };
+  if (noise.x === 0 && noise.y === 0) {
+    return matching;
+  }
+  if (noise.x > busyNoise && noise.y > busyNoise) {
+    findings.push({
+      code: 'noise.high',
+      severity: 'warning',
+      message: `The interior is busy along both axes (noise floors ${noise.x.toFixed(1)} and ${noise.y.toFixed(1)}), so stretching smears it and tolerance stops at ${maximumNoiseTolerance}. Use a flatter fill, tile it, or check the alpha for holes.`,
+      details: { noise },
+    });
+  }
+  findings.push({
+    code: 'noise.tolerance',
+    severity: 'info',
+    message: `Measured noise floors x ${noise.x.toFixed(1)} and y ${noise.y.toFixed(1)}; lines match within x ${matching.x.tolerance} and y ${matching.y.tolerance}. Pass --noise off for exact matching.`,
+    details: { noise, x: matching.x, y: matching.y },
+  });
+  return matching;
 }
 
 export interface Layout {
   readonly insets: SliceInsets;
   readonly mode: SliceMode;
+  readonly tile: TileAxes;
+}
+
+/** A stretch span shorter than this fraction of the content is too short to trust. */
+const shortSpanRatio = 0.1;
+
+type AxisPick =
+  | { readonly span: AxisSpan; readonly tile: boolean }
+  | { readonly span: undefined; readonly reason: 'none' | 'short' };
+
+/**
+ * Picks one axis's stretch span: the longest uniform run when it is long
+ * enough, else the longest repeating span, which then tiles.
+ *
+ * @evidence docs/spec.md#repeating-edges Falls back from a short uniform run to a repeating span and marks the axis as tiled.
+ * @evidenceReview docs/spec.md#repeating-edges #2fe5a06 Checked this code against the section line by line and ran tilesRepeatingEdges green with pnpm test.
+ */
+export function pickAxisSpan(
+  raster: Raster,
+  axis: Axis,
+  bounds: Rect,
+  matching: MatchOptions,
+  findings: Finding[],
+): AxisPick {
+  const length = axis === 'x' ? bounds.width : bounds.height;
+  const minimum = Math.max(2, Math.ceil(length * shortSpanRatio));
+  const uniform = detectStretchSpan(raster, axis, bounds, matching);
+  if (uniform !== undefined && uniform.end - uniform.start >= minimum) {
+    return { span: uniform, tile: false };
+  }
+  const repeat = detectRepeatSpan(raster, axis, bounds, matching);
+  if (repeat !== undefined && repeat.span.end - repeat.span.start >= minimum) {
+    findings.push({
+      code: `tile.${axis}.auto`,
+      severity: 'info',
+      message: `The ${axis === 'x' ? 'horizontal' : 'vertical'} edges repeat every ${repeat.period} px, so this axis tiles a span of whole periods. Create the NineSlice with tile${axis.toUpperCase()} enabled.`,
+      details: { axis, period: repeat.period, span: repeat.span },
+    });
+    return { span: repeat.span, tile: true };
+  }
+  return { span: undefined, reason: uniform === undefined ? 'none' : 'short' };
 }
 
 /**
- * @evidence docs/spec.md#stretch-detection Detects each axis inside the content bounds and falls back to the center pixel with a warning.
- * @evidenceReview docs/spec.md#stretch-detection Read the section against this function and ran detectsPanelInsets green with pnpm test.
+ * @evidence docs/spec.md#stretch-detection Detects each axis inside the content bounds and falls back to the center pixel with a warning when no span is found or the span is too short.
+ * @evidenceReview docs/spec.md#stretch-detection #ff483ae Checked this code against the section line by line and ran detectsPanelInsets green with pnpm test.
  * @evidence docs/spec.md#three-slice Turns an image without a vertical stretch span into a three-slice in automatic mode.
- * @evidenceReview docs/spec.md#three-slice Read the section against this function and ran treatsShadedBarsAsThreeSlices green with pnpm test.
+ * @evidenceReview docs/spec.md#three-slice #08c1617 Checked this code against the section line by line and ran treatsShadedBarsAsThreeSlices green with pnpm test.
  */
 export function detectLayout(
   raster: Raster,
   bounds: Rect,
   options: InspectOptions,
+  matching: AxisMatching,
   findings: Finding[],
 ): Layout {
-  const spanX = detectStretchSpan(raster, 'x', bounds, options);
-  const spanY = options.mode === 'three'
-    ? undefined
-    : detectStretchSpan(raster, 'y', bounds, options);
-
-  if (spanX === undefined) {
+  const fallback = (axis: Axis, reason: 'none' | 'short'): AxisSpan => {
+    const lines = axis === 'x' ? 'columns' : 'rows';
     findings.push({
-      code: 'stretch.x.none',
+      code: `stretch.${axis}.${reason}`,
       severity: 'warning',
       message:
-        'No two adjacent columns match, so horizontal stretching will smear detail. ' +
-        'Using the center column; regenerate with flat edges or give insets with --tile x.',
+        reason === 'none'
+          ? `No two adjacent ${lines} match, so stretching along ${axis} will smear detail. Using the center line; regenerate with plain edges, or give insets.`
+          : `The longest run of matching ${lines} is under ${shortSpanRatio * 100}% of the content and nothing repeats, so the edges carry non-repeating detail. Using the center line; regenerate with plain edges, or give insets after checking the preview.`,
     });
-  }
-  const x = spanX ?? centerSpan(bounds.x, bounds.width);
+    return axis === 'x' ? centerSpan(bounds.x, bounds.width) : centerSpan(bounds.y, bounds.height);
+  };
+
+  const pickX = pickAxisSpan(raster, 'x', bounds, matching.x, findings);
+  const x = pickX.span ?? fallback('x', pickX.reason);
   const horizontal = { left: x.start, right: raster.width - x.end };
+  const tileX = options.tile.x || (pickX.span !== undefined && pickX.tile);
 
-  if (options.mode === 'three' || (spanY === undefined && options.mode === 'auto')) {
-    if (options.mode === 'auto') {
-      findings.push({
-        code: 'three-slice.auto',
-        severity: 'info',
-        message: 'No two adjacent rows match, so the layout is a three-slice with a fixed height.',
-      });
-    }
-    return { insets: { ...horizontal, top: 0, bottom: 0 }, mode: 'three' };
+  if (options.mode === 'three') {
+    return {
+      insets: { ...horizontal, top: 0, bottom: 0 },
+      mode: 'three',
+      tile: { x: tileX, y: false },
+    };
   }
-
-  if (spanY === undefined) {
+  const pickY = pickAxisSpan(raster, 'y', bounds, matching.y, findings);
+  if (pickY.span === undefined && pickY.reason === 'none' && options.mode === 'auto') {
     findings.push({
-      code: 'stretch.y.none',
-      severity: 'warning',
-      message:
-        'No two adjacent rows match, so vertical stretching will smear detail. Using the center row.',
+      code: 'three-slice.auto',
+      severity: 'info',
+      message: 'No two adjacent rows match, so the layout is a three-slice with a fixed height.',
     });
+    return {
+      insets: { ...horizontal, top: 0, bottom: 0 },
+      mode: 'three',
+      tile: { x: tileX, y: false },
+    };
   }
-  const y = spanY ?? centerSpan(bounds.y, bounds.height);
+  const y = pickY.span ?? fallback('y', pickY.reason);
   const insets = { ...horizontal, top: y.start, bottom: raster.height - y.end };
-  return { insets, mode: isThreeSlice(insets) ? 'three' : 'nine' };
+  return {
+    insets,
+    mode: isThreeSlice(insets) ? 'three' : 'nine',
+    tile: { x: tileX, y: options.tile.y || (pickY.span !== undefined && pickY.tile) },
+  };
 }
 
 /**
  * @evidence docs/spec.md#slice-insets Rejects caller insets that leave no stretch span.
- * @evidenceReview docs/spec.md#slice-insets Read the section against this function and ran rejectsInsetsWithoutAStretchSpan green with pnpm test.
+ * @evidenceReview docs/spec.md#slice-insets #31ab641 Checked this code against the section line by line and ran rejectsInsetsWithoutAStretchSpan green with pnpm test.
  * @evidence docs/spec.md#stretch-uniformity Reports the first mismatching pair in each caller-given stretch span unless the axis tiles.
- * @evidenceReview docs/spec.md#stretch-uniformity Read the section against this function and ran rejectsGivenInsetsThatStretchDetail green with pnpm test.
+ * @evidenceReview docs/spec.md#stretch-uniformity #53ef9b3 Checked this code against the section line by line and ran rejectsGivenInsetsThatStretchDetail green with pnpm test.
  * @evidence docs/spec.md#three-slice Forces zero top and bottom insets in three-slice mode.
- * @evidenceReview docs/spec.md#three-slice Read the section against this function and ran treatsShadedBarsAsThreeSlices green with pnpm test.
+ * @evidenceReview docs/spec.md#three-slice #08c1617 Checked this code against the section line by line and ran treatsShadedBarsAsThreeSlices green with pnpm test.
  */
 export function verifyLayout(
   raster: Raster,
   given: SliceInsets,
   options: InspectOptions,
+  matching: AxisMatching,
   findings: Finding[],
 ): Layout {
   const insets = options.mode === 'three' ? { ...given, top: 0, bottom: 0 } : given;
@@ -192,7 +318,7 @@ export function verifyLayout(
   const problem = insetsProblem(insets, raster.width, raster.height);
   if (problem !== undefined) {
     findings.push({ code: 'insets.invalid', severity: 'error', message: problem });
-    return { insets, mode };
+    return { insets, mode, tile: options.tile };
   }
 
   const full: Rect = { x: 0, y: 0, width: raster.width, height: raster.height };
@@ -200,7 +326,13 @@ export function verifyLayout(
     if (options.tile[axis] || (axis === 'y' && mode === 'three')) {
       continue;
     }
-    const mismatch = firstMismatch(raster, axis, spanOf(raster, insets, axis), full, options);
+    const mismatch = firstMismatch(
+      raster,
+      axis,
+      spanOf(raster, insets, axis),
+      full,
+      matching[axis],
+    );
     if (mismatch !== undefined) {
       const line = axis === 'x' ? 'columns' : 'rows';
       findings.push({
@@ -211,12 +343,12 @@ export function verifyLayout(
       });
     }
   }
-  return { insets, mode };
+  return { insets, mode, tile: options.tile };
 }
 
 /**
  * @evidence docs/spec.md#tiling-seams Requires a repeating span to hold whole periods and a non-repeating span to wrap no harder than its largest step.
- * @evidenceReview docs/spec.md#tiling-seams Read the section against this function and ran checksTilingSeams green with pnpm test.
+ * @evidenceReview docs/spec.md#tiling-seams #ef3dc38 Checked this code against the section line by line and ran checksTilingSeams green with pnpm test.
  */
 export function seamFindings(
   raster: Raster,
@@ -229,11 +361,12 @@ export function seamFindings(
     return [];
   }
   const full: Rect = { x: 0, y: 0, width: raster.width, height: raster.height };
-  const period = repeatPeriod(raster, axis, span, full, options);
-  if (period !== undefined) {
-    if (length % period === 0) {
+  const periods = repeatPeriods(raster, axis, span, full, options);
+  if (periods.length > 0) {
+    if (periods.some((period) => length % period === 0)) {
       return [];
     }
+    const period = periods[0] ?? 1;
     return [
       {
         code: `tile.${axis}.seam`,
@@ -266,30 +399,31 @@ export function seamFindings(
   ];
 }
 
-/** Smallest period, at most half the span, that every line in it repeats with. */
-function repeatPeriod(
+/** Periods, at most half the span, that every line in it repeats with, shortest first. */
+function repeatPeriods(
   raster: Raster,
   axis: Axis,
   span: AxisSpan,
   bounds: Rect,
   options: MatchOptions,
-): number | undefined {
+): number[] {
   const length = span.end - span.start;
+  const periods: number[] = [];
   for (let period = 1; period * 2 <= length; period += 1) {
     let repeats = true;
     for (let index = span.start; index + period < span.end && repeats; index += 1) {
       repeats = linesMatch(raster, axis, index, index + period, bounds, options);
     }
     if (repeats) {
-      return period;
+      periods.push(period);
     }
   }
-  return undefined;
+  return periods;
 }
 
 /**
  * @evidence docs/spec.md#transparent-margins Warns about border margins with the content bounds.
- * @evidenceReview docs/spec.md#transparent-margins Read the section against this function and ran warnsAboutTransparentMargins green with pnpm test.
+ * @evidenceReview docs/spec.md#transparent-margins #5bcc022 Checked this code against the section line by line and ran warnsAboutTransparentMargins green with pnpm test.
  */
 export function marginFindings(raster: Raster, bounds: Rect): Finding[] {
   const margins = {
@@ -314,7 +448,7 @@ export function marginFindings(raster: Raster, bounds: Rect): Finding[] {
 
 /**
  * @evidence docs/spec.md#chroma-spill Counts green or magenta dominated alpha-edge pixels against the 1% threshold.
- * @evidenceReview docs/spec.md#chroma-spill Read the section against this function and ran flagsChromaSpill green with pnpm test.
+ * @evidenceReview docs/spec.md#chroma-spill #420e523 Checked this code against the section line by line and ran flagsChromaSpill green with pnpm test.
  */
 export function chromaSpillFindings(raster: Raster): Finding[] {
   let edgePixels = 0;
@@ -348,6 +482,45 @@ export function chromaSpillFindings(raster: Raster): Finding[] {
       severity: 'warning',
       message: `${spill} of ${edgePixels} alpha-edge pixels are tinted by the ${green >= magenta ? 'green' : 'magenta'} key. Despill or re-key before slicing.`,
       details: { edgePixels, green, magenta },
+    },
+  ];
+}
+
+/** Share of partly transparent pixels in the interior above which alpha is suspect. */
+const interiorAlphaRatio = 0.05;
+
+/**
+ * Warns when the central half of the content is partly transparent, which a
+ * generator faking alpha leaves as blotchy holes.
+ *
+ * @evidence docs/spec.md#interior-alpha Counts partly transparent pixels in the central half of the content against the 5% threshold.
+ * @evidenceReview docs/spec.md#interior-alpha #d87616b Checked the 1-249 alpha band, the central half, and the 5% threshold against the section and ran flagsInteriorAlphaHoles green with pnpm test.
+ */
+export function interiorAlphaFindings(raster: Raster, bounds: Rect): Finding[] {
+  const x0 = bounds.x + Math.floor(bounds.width / 4);
+  const x1 = bounds.x + Math.ceil((bounds.width * 3) / 4);
+  const y0 = bounds.y + Math.floor(bounds.height / 4);
+  const y1 = bounds.y + Math.ceil((bounds.height * 3) / 4);
+  let partial = 0;
+  let total = 0;
+  for (let y = y0; y < y1; y += 1) {
+    for (let x = x0; x < x1; x += 1) {
+      const alpha = alphaAt(raster, x, y);
+      total += 1;
+      if (alpha > 0 && alpha < 250) {
+        partial += 1;
+      }
+    }
+  }
+  if (total === 0 || partial / total <= interiorAlphaRatio) {
+    return [];
+  }
+  return [
+    {
+      code: 'alpha.interior',
+      severity: 'warning',
+      message: `${Math.round((partial / total) * 100)}% of the interior is partly transparent. A deliberate glass fill is fine, but generators that fake alpha leave holes like this; check the preview, or regenerate on a chroma key and run slicewright key.`,
+      details: { partial, total },
     },
   ];
 }

@@ -1,0 +1,38 @@
+{
+  "frames": {
+    "dialog": {
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 480,
+        "h": 289
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 480,
+        "h": 289
+      },
+      "sourceSize": {
+        "w": 480,
+        "h": 289
+      },
+      "scale9Borders": {
+        "x": 63,
+        "y": 57,
+        "w": 354,
+        "h": 175
+      }
+    }
+  },
+  "meta": {
+    "image": "dialog-min.png",
+    "size": {
+      "w": 480,
+      "h": 289
+    },
+    "scale": "1"
+  }
+}

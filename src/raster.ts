@@ -67,3 +67,33 @@ export function pixelDifference(raster: Raster, a: number, b: number): number {
   }
   return max;
 }
+
+export interface RasterDifference {
+  readonly mean: number;
+  readonly p99: number;
+  readonly max: number;
+}
+
+/** Premultiplied per-pixel difference statistics between two same-sized rasters. */
+export function rasterDifference(a: Raster, b: Raster): RasterDifference {
+  if (a.width !== b.width || a.height !== b.height) {
+    throw new RangeError(`Cannot compare ${a.width}x${a.height} with ${b.width}x${b.height}.`);
+  }
+  const pixels = a.width * a.height;
+  const differences = new Float64Array(pixels);
+  const pair = createRaster(2, 1);
+  let sum = 0;
+  for (let index = 0; index < pixels; index += 1) {
+    pair.data.set(a.data.subarray(index * 4, index * 4 + 4), 0);
+    pair.data.set(b.data.subarray(index * 4, index * 4 + 4), 4);
+    const difference = pixelDifference(pair, 0, 4);
+    differences[index] = difference;
+    sum += difference;
+  }
+  differences.sort();
+  return {
+    mean: sum / pixels,
+    p99: differences[Math.min(pixels - 1, Math.floor(pixels * 0.99))] ?? 0,
+    max: differences[pixels - 1] ?? 0,
+  };
+}

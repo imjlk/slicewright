@@ -1,0 +1,48 @@
+{
+  "entries": [
+    {
+      "label": "button",
+      "atlas": "button.json"
+    },
+    {
+      "label": "button --keep 4",
+      "atlas": "button-min.json",
+      "like": "button.json"
+    },
+    {
+      "label": "dialog",
+      "atlas": "dialog.json"
+    },
+    {
+      "label": "dialog --keep 4",
+      "atlas": "dialog-min.json",
+      "like": "dialog.json"
+    },
+    {
+      "label": "pixel",
+      "atlas": "pixel.json"
+    },
+    {
+      "label": "pixel --keep 4",
+      "atlas": "pixel-min.json",
+      "like": "pixel.json"
+    },
+    {
+      "label": "bar (keyed)",
+      "atlas": "bar.json"
+    },
+    {
+      "label": "bar --keep 4",
+      "atlas": "bar-min.json",
+      "like": "bar.json"
+    },
+    {
+      "label": "baroque",
+      "atlas": "baroque.json"
+    },
+    {
+      "label": "scifi",
+      "atlas": "scifi.json"
+    }
+  ]
+}

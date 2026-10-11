@@ -1,0 +1,38 @@
+{
+  "frames": {
+    "button": {
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 240,
+        "h": 99
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 240,
+        "h": 99
+      },
+      "sourceSize": {
+        "w": 240,
+        "h": 99
+      },
+      "scale9Borders": {
+        "x": 25,
+        "y": 20,
+        "w": 190,
+        "h": 59
+      }
+    }
+  },
+  "meta": {
+    "image": "button-min.png",
+    "size": {
+      "w": 240,
+      "h": 99
+    },
+    "scale": "1"
+  }
+}
