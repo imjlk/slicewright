@@ -24,6 +24,10 @@ carry no pattern along them. A first baroque frame drawn with that older prompt
 got a rope edge that could neither stretch nor tile; `baroque` is the redraw
 with the current prompt.
 
+`../packed/ui.*` is `pack dialog.json button.json bar.json ../tiled/rope.json
+--css`; the manifest's `packs` list lets the engine check rebuild it and the
+`packed …` entries render its frames next to the unpacked originals.
+
 `../tiled/rope.png` is a synthetic panel whose rope edge repeats exactly every
 6 px, so the check also covers a tiled export (`tile.x.auto`).
 

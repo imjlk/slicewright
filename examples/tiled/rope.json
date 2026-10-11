@@ -31,6 +31,10 @@
           "right": 6,
           "top": 6,
           "bottom": 6
+        },
+        "tile": {
+          "x": true,
+          "y": false
         }
       }
     }

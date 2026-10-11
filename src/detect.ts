@@ -254,7 +254,7 @@ export interface RepeatSpan {
  * then the span nearest the center.
  *
  * @evidence docs/spec.md#repeating-edges Finds the longest whole-period span for periods from 2 to a quarter of the content, at most 64.
- * @evidenceReview docs/spec.md#repeating-edges #795d113 Checked this code against the section line by line and ran tilesRepeatingEdges green with pnpm test.
+ * @evidenceReview docs/spec.md#repeating-edges #04c566e Checked this code against the section line by line and ran tilesRepeatingEdges green with pnpm test.
  */
 export function detectRepeatSpan(
   raster: Raster,

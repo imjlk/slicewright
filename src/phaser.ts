@@ -1,7 +1,7 @@
 import typia from 'typia';
 
 import { inspectRaster, type Finding, type InspectOptions, type InspectReport } from './inspect.js';
-import { contentLimits, layoutFromInsets } from './layout.js';
+import { contentLimits, layoutFromInsets, type SliceLayout } from './layout.js';
 import { paddingProblem } from './padding.js';
 import { cropRaster, type Raster } from './raster.js';
 import {
@@ -34,8 +34,16 @@ export interface PhaserAtlasFrame {
     readonly shape?: 'three-vertical';
     /** Where content sits inside the frame, in frame pixels from each edge. */
     readonly contentPadding?: SliceInsets;
+    /**
+     * Axes that repeat instead of stretching. Phaser takes tiling only as
+     * NineSlice constructor arguments, so this records what to pass.
+     */
+    readonly tile?: { readonly x: boolean; readonly y: boolean };
   };
 }
+
+/** slicewright's frame data, as `createSingleFrameAtlas` and packing write it. */
+export type SlicewrightFrameData = NonNullable<PhaserAtlasFrame['slicewright']>;
 
 export interface PhaserAtlasMeta {
   readonly image?: string;
@@ -76,7 +84,7 @@ export interface AtlasReport {
  * `this.load.atlas(key, image, json)` and NineSlice reads its borders.
  *
  * @evidence docs/spec.md#phaser-scale9borders Emits an untrimmed, unrotated JSON Hash frame carrying scale9Borders.
- * @evidenceReview docs/spec.md#phaser-scale9borders #4c250ad Checked this code against the section line by line and ran convertsToPhaserBorders green with pnpm test.
+ * @evidenceReview docs/spec.md#phaser-scale9borders #4aec64c Checked this code against the section line by line and ran convertsToPhaserBorders green with pnpm test.
  */
 export function createSingleFrameAtlas(
   name: string,
@@ -84,12 +92,13 @@ export function createSingleFrameAtlas(
   width: number,
   height: number,
   insets: SliceInsets,
-  extra: { readonly shape?: 'three-vertical'; readonly contentPadding?: SliceInsets } = {},
+  extra: SlicewrightFrameData = {},
 ): PhaserJsonHashAtlas {
   const rect = { x: 0, y: 0, w: width, h: height };
   const data = {
     ...(extra.shape === undefined ? {} : { shape: extra.shape }),
     ...(extra.contentPadding === undefined ? {} : { contentPadding: extra.contentPadding }),
+    ...(extra.tile === undefined || (!extra.tile.x && !extra.tile.y) ? {} : { tile: extra.tile }),
   };
   return {
     frames: {
@@ -120,11 +129,7 @@ export function inspectAtlas(
   options: InspectOptions,
   frameName?: string,
 ): AtlasReport {
-  const atlas = typia.assert<PhaserAtlas>(json);
-  const format = Array.isArray(atlas.frames) ? 'array' : 'hash';
-  const entries: Array<[string, PhaserAtlasFrame]> = Array.isArray(atlas.frames)
-    ? (atlas as PhaserJsonArrayAtlas).frames.map((frame) => [frame.filename, frame])
-    : Object.entries((atlas as PhaserJsonHashAtlas).frames);
+  const { atlas, format, entries } = readAtlas(json);
   const findings: Finding[] = [];
 
   if (
@@ -165,6 +170,54 @@ export function inspectAtlas(
     frames,
     findings,
   };
+}
+
+/** Validates a Phaser JSON Hash or JSON Array atlas and lists its frames by name. */
+export function readAtlas(json: unknown): {
+  readonly atlas: PhaserAtlas;
+  readonly format: 'hash' | 'array';
+  readonly entries: ReadonlyArray<readonly [string, PhaserAtlasFrame]>;
+} {
+  const atlas = typia.assert<PhaserAtlas>(json);
+  return Array.isArray(atlas.frames)
+    ? {
+        atlas,
+        format: 'array',
+        entries: (atlas as PhaserJsonArrayAtlas).frames.map((frame) => [frame.filename, frame]),
+      }
+    : { atlas, format: 'hash', entries: Object.entries((atlas as PhaserJsonHashAtlas).frames) };
+}
+
+/**
+ * The slice shape a frame's borders and marker describe: borders spanning the
+ * full height are Phaser's three-slice; a fixed width needs the explicit
+ * marker, because full-width borders alone are an ordinary nine-slice.
+ */
+export function frameShape(frame: PhaserAtlasFrame): 'nine' | 'three' | 'three-vertical' {
+  const borders = frame.scale9Borders;
+  if (borders !== undefined && borders.y === 0 && borders.h === frame.frame.h) {
+    return 'three';
+  }
+  return frame.slicewright?.shape === 'three-vertical' ? 'three-vertical' : 'nine';
+}
+
+/**
+ * The layout a frame records: its borders as insets, its shape, and the
+ * tiling and content padding in its slicewright data. Undefined when the
+ * frame has no `scale9Borders`; call it only on borders that fit the frame.
+ */
+export function frameLayout(frame: PhaserAtlasFrame): SliceLayout | undefined {
+  const borders = frame.scale9Borders;
+  if (borders === undefined) {
+    return undefined;
+  }
+  const { w, h } = frame.frame;
+  const data = frame.slicewright;
+  return layoutFromInsets(scale9BordersToInsets(borders, w, h), w, h, {
+    shape: frameShape(frame),
+    tile: { x: data?.tile?.x === true, y: data?.tile?.y === true },
+    ...(data?.contentPadding === undefined ? {} : { content: data.contentPadding }),
+  });
 }
 
 function inspectFrame(
@@ -218,14 +271,7 @@ function inspectFrame(
   const padding = frame.slicewright?.contentPadding;
   // Padding must also stay within the fixed segments that scale9Borders leaves.
   const fixedEdges = contentLimits(
-    layoutFromInsets(scale9BordersToInsets(borders, w, h), w, h, {
-      shape:
-        borders.y === 0 && borders.h === h
-          ? 'three'
-          : frame.slicewright?.shape === 'three-vertical'
-            ? 'three-vertical'
-            : 'nine',
-    }),
+    layoutFromInsets(scale9BordersToInsets(borders, w, h), w, h, { shape: frameShape(frame) }),
   );
   const paddingIssue =
     padding === undefined
@@ -253,14 +299,12 @@ function inspectFrame(
   const inspection = inspectRaster(cropRaster(image, { x, y, width: w, height: h }), {
     ...options,
     insets: scale9BordersToInsets(borders, w, h),
-    // Phaser's own three-slice keeps the height. A fixed width needs the
-    // explicit marker: full-width borders alone are an ordinary nine-slice.
-    mode:
-      borders.y === 0 && borders.h === h
-        ? 'three'
-        : frame.slicewright?.shape === 'three-vertical'
-          ? 'three-vertical'
-          : 'nine',
+    // Recorded tiling is checked for seams like tiling asked for on the command line.
+    tile: {
+      x: options.tile.x || frame.slicewright?.tile?.x === true,
+      y: options.tile.y || frame.slicewright?.tile?.y === true,
+    },
+    mode: frameShape(frame),
   });
   return {
     name,

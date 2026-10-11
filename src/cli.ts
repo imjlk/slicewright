@@ -13,10 +13,12 @@ import {
   type InspectReport,
 } from './inspect.js';
 import { normalizeRaster } from './normalize.js';
+import type { SliceLayout } from './layout.js';
+import { buildPack } from './pack-files.js';
+import { defaultPackOptions } from './pack.js';
 import { inspectAtlas } from './phaser.js';
 import { decodePng, encodePng } from './png.js';
 import { buildPromptPlan, promptBackgrounds, uiKinds } from './prompt.js';
-import type { SliceLayout } from './layout.js';
 import type { Raster } from './raster.js';
 import { renderPreviewSheet } from './render.js';
 import { resizeRaster, targetSize } from './resize.js';
@@ -362,6 +364,82 @@ const normalize = define({
   },
 });
 
+const pack = define({
+  name: 'pack',
+  description: 'Pack the frames of several atlases into one image and JSON Hash atlas',
+  args: {
+    inputs: {
+      type: 'positional',
+      multiple: true,
+      required: true,
+      description: 'Atlas JSON files, such as the one-frame atlases normalize and export write',
+    },
+    out: {
+      type: 'string',
+      required: true,
+      description: 'Packed PNG to write; the atlas goes next to it',
+    },
+    name: {
+      type: 'string',
+      description: 'Texture key and file name for the atlas and stylesheet; defaults to the PNG name',
+    },
+    spacing: {
+      type: 'number',
+      default: defaultPackOptions.spacing,
+      description: 'Transparent pixels between frames',
+    },
+    extrude: {
+      type: 'number',
+      default: defaultPackOptions.extrude,
+      description: "Pixels of each frame's edge repeated outward",
+    },
+    css: {
+      type: 'boolean',
+      description: "Also write one stylesheet with a border-image class per frame, using each frame's own image",
+    },
+    ...matchArgs,
+  },
+  run: (ctx) => {
+    const { out } = ctx.values;
+    const outDir = dirname(out);
+    const name = ctx.values.name ?? basename(out).replace(/\.png$/i, '');
+    // Validate every option before any file is written.
+    insideDirectory(outDir, `${name}.json`);
+    insideDirectory(outDir, `${name}.css`);
+    const result = buildPack({
+      inputs: ctx.values.inputs,
+      out,
+      name,
+      css: ctx.values.css === true,
+      spacing: ctx.values.spacing,
+      extrude: ctx.values.extrude,
+      match: matchOptions(ctx.values),
+      // Loader calls resolve from where the game is served; assume the working directory.
+      servedFrom: process.cwd(),
+    });
+    mkdirSync(outDir, { recursive: true });
+    for (const file of result.files) {
+      writeFileSync(file.path, file.contents);
+    }
+    print({
+      inputs: ctx.values.inputs,
+      files: result.files.map((file) => file.path),
+      size: result.size,
+      frames: result.frames,
+      ok: result.ok,
+      findings: result.report.findings,
+      frameFindings: result.report.frames.map((frame) => ({
+        name: frame.name,
+        ok: frame.ok,
+        findings: [...frame.findings, ...(frame.inspection?.findings ?? [])],
+      })),
+      ...(ctx.values.css === true ? { cssFindings: result.cssFindings } : {}),
+      usage: result.usage,
+    });
+    failOnErrors(result.ok);
+  },
+});
+
 const targets = define({
   name: 'targets',
   description: 'List export targets and what each can represent',
@@ -675,6 +753,7 @@ try {
       key,
       resize,
       normalize,
+      pack,
       export: exportCommand,
       targets,
     },

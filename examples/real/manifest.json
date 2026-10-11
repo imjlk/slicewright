@@ -64,6 +64,47 @@
       "atlas": "../tiled/rope.json",
       "css": "../tiled/rope.css",
       "tile": "x"
+    },
+    {
+      "label": "packed dialog",
+      "atlas": "../packed/ui.json",
+      "frame": "dialog",
+      "like": "dialog.json",
+      "css": "../packed/ui.css"
+    },
+    {
+      "label": "packed button",
+      "atlas": "../packed/ui.json",
+      "frame": "button",
+      "like": "button.json",
+      "css": "../packed/ui.css"
+    },
+    {
+      "label": "packed bar",
+      "atlas": "../packed/ui.json",
+      "frame": "bar",
+      "like": "bar.json",
+      "css": "../packed/ui.css"
+    },
+    {
+      "label": "packed rope",
+      "atlas": "../packed/ui.json",
+      "frame": "rope",
+      "like": "../tiled/rope.json",
+      "css": "../packed/ui.css",
+      "tile": "x"
+    }
+  ],
+  "packs": [
+    {
+      "out": "../packed/ui.png",
+      "inputs": [
+        "dialog.json",
+        "button.json",
+        "bar.json",
+        "../tiled/rope.json"
+      ],
+      "css": true
     }
   ]
 }
