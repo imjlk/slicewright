@@ -83,9 +83,22 @@ export function describesSliceLayouts(): void {
     offset(39),
     Array.from(source.data.subarray(pixelOffset(source, 19, 15), pixelOffset(source, 19, 15) + 4)),
   );
-  ok(sameRaster(renderLayout(source, three, 20, 90), renderLayout(source, three, 20, 30)));
-  throws(() => renderLayout(source, nine, Number.POSITIVE_INFINITY, 30), RangeError);
-  throws(() => renderLayout(source, nine, 40, 2.5), RangeError);
+  const sourceThree = layoutFromInsets({ left: 4, right: 4, top: 0, bottom: 0 }, 20, 30, {
+    shape: 'three',
+  });
+  ok(
+    sameRaster(renderLayout(source, sourceThree, 20, 90), renderLayout(source, sourceThree, 20, 30)),
+  );
+  const nineSource = panel(40, 30);
+  throws(() => renderLayout(nineSource, nine, Number.POSITIVE_INFINITY, 30), /whole number/);
+  throws(() => renderLayout(nineSource, nine, 40, 2.5), /whole number/);
+  // A layout built for another image size is refused, not silently misread.
+  throws(() => renderLayout(panel(30, 30), nine, 40, 30), /layout is 40x30/);
+  throws(
+    () =>
+      exportForTarget('css', { name: 'p', imageRef: 'p.png', raster: panel(30, 30), layout: nine }),
+    RangeError,
+  );
 }
 
 /**
@@ -167,6 +180,20 @@ export function detectsVerticalThreeSlices(): void {
   for (const frame of Object.values(unmarked.frames)) {
     delete frame.slicewright;
   }
+  // The marker on borders that are not full-width contradicts what Phaser renders.
+  const mismatched = JSON.parse(text(exported.files[0]?.contents)) as {
+    frames: Record<string, { scale9Borders: { x: number; w: number } }>;
+  };
+  for (const frame of Object.values(mismatched.frames)) {
+    frame.scale9Borders.x = 2;
+    frame.scale9Borders.w -= 4;
+  }
+  const mismatchReport = inspectAtlas(mismatched, bar, defaultInspectOptions);
+  ok(
+    mismatchReport.frames[0]?.findings.some((finding) => finding.code === 'atlas.marker-mismatch'),
+  );
+  strictEqual(mismatchReport.ok, false);
+
   const unmarkedReport = inspectAtlas(unmarked, bar, defaultInspectOptions);
   strictEqual(unmarkedReport.frames[0]?.inspection?.mode, 'nine');
   strictEqual(unmarkedReport.ok, false);
@@ -181,7 +208,7 @@ export function detectsVerticalThreeSlices(): void {
 
 /**
  * @evidence docs/spec.md#multiple-stretch-regions Splits the top edge around a crest only when multiple regions are asked for.
- * @evidenceReview docs/spec.md#multiple-stretch-regions #919c83e Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#multiple-stretch-regions #f4dd501 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function detectsMultipleRegions(): void {
   const art = crestPanel(96, 40);
@@ -211,13 +238,23 @@ export function detectsMultipleRegions(): void {
     y: 0,
   });
 
+  throws(
+    () =>
+      inspectRaster(art, {
+        ...defaultInspectOptions,
+        regions: 'multi',
+        insets: { left: 6, right: 6, top: 9, bottom: 6 },
+      }),
+    RangeError,
+  );
+
   const plain = inspectRaster(panel(96, 40), { ...defaultInspectOptions, regions: 'multi' });
   strictEqual(plain.mode, 'nine');
 }
 
 /**
  * @evidence docs/spec.md#targets Rejects unsupported shapes without files, notes emulation, warns about tiling gaps and fixed layouts, and lists every target.
- * @evidenceReview docs/spec.md#targets #0358c64 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#targets #9a4f665 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function checksTargetCapabilities(): void {
   deepStrictEqual(Object.keys(sliceTargets).sort(), ['css', 'phaser']);
@@ -247,7 +284,7 @@ export function checksTargetCapabilities(): void {
   const fixed = exportForTarget('css', {
     name: 'still',
     imageRef: 'still.png',
-    raster,
+    raster: panel(40, 30),
     layout: still,
   });
   ok(codes(fixed.findings).includes('target.fixed'));

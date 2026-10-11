@@ -108,6 +108,11 @@ export function inspectRaster(
   raster: Raster,
   options: InspectOptions = defaultInspectOptions,
 ): InspectReport {
+  if (options.insets !== undefined && options.regions === 'multi') {
+    throw new RangeError(
+      'Multiple regions are detected, not given: drop the insets or use single regions.',
+    );
+  }
   const findings: Finding[] = [];
   const bounds = contentBounds(raster);
   const full: Rect = { x: 0, y: 0, width: raster.width, height: raster.height };
@@ -260,7 +265,7 @@ export function pickAxisSpan(
  * @evidence docs/spec.md#vertical-three-slice Keeps the width when columns never match but rows do, or when the mode asks for it.
  * @evidenceReview docs/spec.md#vertical-three-slice #072e9af Checked this code against the section line by line and ran detectsVerticalThreeSlices green with pnpm test.
  * @evidence docs/spec.md#multiple-stretch-regions Builds a multi-region layout when asked and an axis has more than one long run.
- * @evidenceReview docs/spec.md#multiple-stretch-regions #919c83e Checked this code against the section line by line and ran detectsMultipleRegions green with pnpm test.
+ * @evidenceReview docs/spec.md#multiple-stretch-regions #f4dd501 Checked this code against the section line by line and ran detectsMultipleRegions green with pnpm test.
  */
 export function detectLayout(
   raster: Raster,
@@ -354,7 +359,7 @@ export function detectLayout(
  * only when an axis has more than one such run and does not tile.
  *
  * @evidence docs/spec.md#multiple-stretch-regions Keeps every long uniform run as a stretch segment, leaves tiled axes single, and records the counts.
- * @evidenceReview docs/spec.md#multiple-stretch-regions #919c83e Checked this code against the section line by line and ran detectsMultipleRegions green with pnpm test.
+ * @evidenceReview docs/spec.md#multiple-stretch-regions #f4dd501 Checked this code against the section line by line and ran detectsMultipleRegions green with pnpm test.
  */
 export function multiRegionLayout(
   raster: Raster,

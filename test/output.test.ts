@@ -124,7 +124,7 @@ export function convertsToPhaserBorders(): void {
 
 /**
  * @evidence docs/spec.md#atlas-frames Checks hash and array atlases for trimming, rotation, out-of-frame borders, missing frames, and frame pixels.
- * @evidenceReview docs/spec.md#atlas-frames #62396a0 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#atlas-frames #62a16b1 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function checksAtlasFrames(): void {
   const image = createRaster(80, 30);

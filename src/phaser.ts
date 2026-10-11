@@ -102,7 +102,7 @@ export function createSingleFrameAtlas(
  * only `frameName`, against the atlas image.
  *
  * @evidence docs/spec.md#atlas-frames Rejects trimmed frames and out-of-frame borders, warns on rotation, and inspects each frame with its borders.
- * @evidenceReview docs/spec.md#atlas-frames #62396a0 Checked this code against the section line by line and ran checksAtlasFrames green with pnpm test.
+ * @evidenceReview docs/spec.md#atlas-frames #62a16b1 Checked this code against the section line by line and ran checksAtlasFrames green with pnpm test.
  */
 export function inspectAtlas(
   json: unknown,
@@ -205,6 +205,15 @@ function inspectFrame(
     return { name, ok: false, findings };
   }
 
+  if (frame.slicewright?.shape === 'three-vertical' && !(borders.x === 0 && borders.w === w)) {
+    findings.push({
+      code: 'atlas.marker-mismatch',
+      severity: 'error',
+      message:
+        'The frame is marked as a vertical three-slice but its scale9Borders do not span the full width, so Phaser renders it as a nine-slice.',
+    });
+    return { name, ok: false, findings };
+  }
   const inspection = inspectRaster(cropRaster(image, { x, y, width: w, height: h }), {
     ...options,
     insets: scale9BordersToInsets(borders, w, h),

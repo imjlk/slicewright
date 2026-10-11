@@ -99,7 +99,9 @@ single layout detection found, including a three-slice or vertical three-slice.
 An axis with only one such run keeps the single-region result, a tiled axis and
 an axis the layout keeps fixed are never split, and a
 `regions.multi` finding records the counts. The reported insets are the
-outermost flexible lines. No current target can export a multi-region layout;
+outermost flexible lines. Multiple regions are only detected, so asking for them
+together with given insets is refused. No current target can export a
+multi-region layout;
 it renders in previews and reports `target.unsupported` on export.
 
 ## Stretch uniformity
@@ -250,6 +252,9 @@ check, and an `experimental` target follows the documented format without being
 run, which a `target.experimental` finding states on every export. The targets
 are `phaser` and `css`, both verified; other engines are not supported.
 
+The layout and the image must have the same size; a target refuses a layout
+built for another size, as the renderer does.
+
 ## CSS border-image
 
 The CSS target writes a class with `border-image-slice` set to the insets plus
@@ -274,7 +279,9 @@ inspected with its borders as explicit insets: borders spanning the full height
 inspect as a three-slice. Borders spanning the full width are an ordinary
 nine-slice whose columns must match, unless the frame carries
 `"slicewright": { "shape": "three-vertical" }`, which the Phaser target writes
-for its emulated vertical three-slice.
+for its emulated vertical three-slice. A frame carrying that marker without
+full-width borders is an `atlas.marker-mismatch` error, because Phaser would
+still render it as a nine-slice.
 
 ## Generation prompts
 

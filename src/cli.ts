@@ -453,8 +453,16 @@ function urlPath(path: string): string {
   return path.split(sep).join('/').replace(/\\/g, '/');
 }
 
-/** `file` joined to `directory`, refusing any path that would leave it. */
+/**
+ * `file` joined to `directory`. Only a plain file name is accepted: a path
+ * component, even one inside the directory, could pass through a symlink.
+ */
 function insideDirectory(directory: string, file: string): string {
+  if (file.includes('/') || file.includes('\\') || file === '.' || file === '..') {
+    throw new UsageError(
+      `"${file}" must be a plain file name; pick a --name without path separators.`,
+    );
+  }
   const path = join(directory, file);
   const inside = relative(resolve(directory), resolve(path));
   // A leading ".." component escapes; a name such as "..panel" does not.

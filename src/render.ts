@@ -77,6 +77,11 @@ export function renderLayout(
       throw new RangeError(`The ${name} to render must be a whole number of pixels, got ${value}.`);
     }
   }
+  if (layout.x.length !== source.width || layout.y.length !== source.height) {
+    throw new RangeError(
+      `The layout is ${layout.x.length}x${layout.y.length} but the image is ${source.width}x${source.height}.`,
+    );
+  }
   const columns = axisMap(layout.x, width, tileCount);
   const rows = axisMap(layout.y, height, tileCount);
   const out = createRaster(columns.length, rows.length);

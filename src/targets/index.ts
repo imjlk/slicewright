@@ -28,13 +28,18 @@ export function findTarget(id: string): SliceTarget | undefined {
  * produces its findings and no files.
  *
  * @evidence docs/spec.md#targets Looks the target up, checks capabilities, and writes files only when no error remains.
- * @evidenceReview docs/spec.md#targets #0358c64 Checked this code against the section line by line and ran checksTargetCapabilities green with pnpm test.
+ * @evidenceReview docs/spec.md#targets #9a4f665 Checked this code against the section line by line and ran checksTargetCapabilities green with pnpm test.
  */
 export function exportForTarget(id: string, input: ExportInput): ExportResult {
   const target = findTarget(id);
   if (target === undefined) {
     throw new Error(
       `Unknown target "${id}". Known targets: ${Object.keys(sliceTargets).join(', ')}.`,
+    );
+  }
+  if (input.layout.x.length !== input.raster.width || input.layout.y.length !== input.raster.height) {
+    throw new RangeError(
+      `The layout is ${input.layout.x.length}x${input.layout.y.length} but the image is ${input.raster.width}x${input.raster.height}.`,
     );
   }
   const findings: Finding[] = capabilityFindings(target, input.layout);
