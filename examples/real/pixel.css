@@ -1,0 +1,11 @@
+/* slicewright: pixel, nine */
+.pixel {
+  box-sizing: border-box;
+  border-style: solid;
+  border-width: 15px 15px 15px 15px;
+  border-image-source: url("pixel.png");
+  border-image-slice: 15 15 15 15 fill;
+  border-image-repeat: stretch stretch;
+  min-width: 30px;
+  min-height: 30px;
+}

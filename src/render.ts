@@ -1,5 +1,13 @@
 import { createRaster, pixelOffset, type Raster, type Rect } from './raster.js';
-import type { SliceInsets, SliceMode } from './slices.js';
+import {
+  flexibleSegments,
+  layoutFromInsets,
+  minimumLayoutSize,
+  type AxisLayout,
+  type Segment,
+  type SliceLayout,
+} from './layout.js';
+import type { SliceInsets } from './slices.js';
 
 export interface RenderOptions {
   readonly tileX: boolean;
@@ -21,11 +29,7 @@ const maximumCellSize = 4096;
 const tint = [255, 0, 200, 72] as const;
 
 /**
- * Renders the slice layout at a new size, sampling the nearest source pixel.
- * Sizes below the fixed borders are raised to them, as Phaser does.
- *
- * @evidence docs/spec.md#preview-sheet Keeps corners unscaled and stretches or tiles spans with nearest sampling.
- * @evidenceReview docs/spec.md#preview-sheet #40dc75a Checked this code against the section line by line and ran rendersSlicesAndPreviewSheets green with pnpm test.
+ * Renders insets at a new size; a thin wrapper over `renderLayout`.
  */
 export function renderSlices(
   source: Raster,
@@ -34,61 +38,95 @@ export function renderSlices(
   height: number,
   options: RenderOptions = { tileX: false, tileY: false },
 ): Raster {
-  const outWidth = Math.max(width, insets.left + insets.right, 1);
-  const outHeight = Math.max(height, insets.top + insets.bottom, 1);
-  const out = createRaster(outWidth, outHeight);
-  const columns = Array.from({ length: outWidth }, (_, x) =>
-    mapAxis(x, outWidth, source.width, insets.left, insets.right, options.tileX),
+  return renderLayout(
+    source,
+    layoutFromInsets(insets, source.width, source.height, {
+      tile: { x: options.tileX, y: options.tileY },
+    }),
+    width,
+    height,
   );
-  for (let y = 0; y < outHeight; y += 1) {
-    const sy = mapAxis(y, outHeight, source.height, insets.top, insets.bottom, options.tileY);
-    for (let x = 0; x < outWidth; x += 1) {
-      const from = pixelOffset(source, columns[x] ?? 0, sy);
-      out.data.set(source.data.subarray(from, from + 4), pixelOffset(out, x, y));
+}
+
+/**
+ * Renders a layout at a new size, sampling the nearest source pixel. Fixed
+ * segments keep their size; flexible segments share the remaining length in
+ * proportion to their source size. Tiled segments repeat a whole number of
+ * tiles, at least one, each scaled to fill the segment: the count rounds down
+ * as Phaser does, or to the nearest whole number to match CSS `round`. A size
+ * below the fixed segments is raised to them, and an axis with nothing
+ * flexible keeps its source length.
+ *
+ * @evidence docs/spec.md#preview-sheet Keeps fixed segments unscaled, shares the rest among flexible segments, and tiles whole tiles with nearest sampling.
+ * @evidenceReview docs/spec.md#preview-sheet #49443a9 Checked this code against the section line by line and ran rendersSlicesAndPreviewSheets green with pnpm test.
+ * @evidence docs/spec.md#slice-layouts Renders any number of fixed, stretched, and tiled segments per axis.
+ * @evidenceReview docs/spec.md#slice-layouts #fc52f65 Checked this code against the section line by line and ran describesSliceLayouts green with pnpm test.
+ */
+export function renderLayout(
+  source: Raster,
+  layout: SliceLayout,
+  width: number,
+  height: number,
+  tileCount: 'floor' | 'round' = 'floor',
+): Raster {
+  for (const [name, value] of [
+    ['width', width],
+    ['height', height],
+  ] as const) {
+    if (!Number.isInteger(value) || value < 0) {
+      throw new RangeError(`The ${name} to render must be a whole number of pixels, got ${value}.`);
     }
   }
+  if (layout.x.length !== source.width || layout.y.length !== source.height) {
+    throw new RangeError(
+      `The layout is ${layout.x.length}x${layout.y.length} but the image is ${source.width}x${source.height}.`,
+    );
+  }
+  const columns = axisMap(layout.x, width, tileCount);
+  const rows = axisMap(layout.y, height, tileCount);
+  const out = createRaster(columns.length, rows.length);
+  rows.forEach((sourceY, y) => {
+    columns.forEach((sourceX, x) => {
+      const from = pixelOffset(source, sourceX, sourceY);
+      out.data.set(source.data.subarray(from, from + 4), pixelOffset(out, x, y));
+    });
+  });
   return out;
 }
 
 /**
- * Lays the source, its tinted stretch spans, and several stretched sizes side
- * by side over a checkerboard.
+ * Lays the source, its tinted flexible segments, and several resized versions
+ * side by side over a checkerboard. Axes that cannot resize are not resized.
  *
  * @evidence docs/spec.md#preview-sheet Builds the guides, source, minimum, wide, tall, and doubled cells.
- * @evidenceReview docs/spec.md#preview-sheet #40dc75a Checked this code against the section line by line and ran rendersSlicesAndPreviewSheets green with pnpm test.
+ * @evidenceReview docs/spec.md#preview-sheet #49443a9 Checked this code against the section line by line and ran rendersSlicesAndPreviewSheets green with pnpm test.
  */
-export function renderPreviewSheet(
-  source: Raster,
-  insets: SliceInsets,
-  mode: SliceMode,
-  options: RenderOptions = { tileX: false, tileY: false },
-): PreviewSheet {
+export function renderPreviewSheet(source: Raster, layout: SliceLayout): PreviewSheet {
   const cap = (value: number): number => Math.min(Math.round(value), maximumCellSize);
+  const minimum = minimumLayoutSize(layout);
+  const resizesX = flexibleSegments(layout.x).length > 0;
+  const resizesY = flexibleSegments(layout.y).length > 0;
   const sizes: Array<[PreviewCell['label'], number, number]> = [
     ['guides', source.width, source.height],
     ['source', source.width, source.height],
-    [
-      'min',
-      Math.max(insets.left + insets.right, 1),
-      mode === 'three' ? source.height : Math.max(insets.top + insets.bottom, 1),
-    ],
-    ['wide', cap(source.width * 2.5), source.height],
+    ['min', Math.max(minimum.width, 1), Math.max(minimum.height, 1)],
   ];
-  if (mode === 'nine') {
+  if (resizesX) {
+    sizes.push(['wide', cap(source.width * 2.5), source.height]);
+  }
+  if (resizesY) {
     sizes.push(['tall', source.width, cap(source.height * 2.5)]);
   }
   sizes.push([
     'double',
-    cap(source.width * 2),
-    mode === 'three' ? source.height : cap(source.height * 2),
+    resizesX ? cap(source.width * 2) : source.width,
+    resizesY ? cap(source.height * 2) : source.height,
   ]);
 
   const rendered = sizes.map(([label, width, height]) => ({
     label,
     raster:
-      label === 'guides'
-        ? tintSpans(source, insets, mode)
-        : renderSlices(source, insets, width, height, options),
+      label === 'guides' ? tintSegments(source, layout) : renderLayout(source, layout, width, height),
   }));
 
   const sheetWidth =
@@ -111,39 +149,59 @@ export function renderPreviewSheet(
   return { raster: sheet, cells };
 }
 
-function mapAxis(
-  position: number,
-  outLength: number,
-  sourceLength: number,
-  startInset: number,
-  endInset: number,
-  tile: boolean,
-): number {
-  if (position < startInset) {
-    return position;
+/** For each output line of one axis, the source line it samples. */
+function axisMap(axis: AxisLayout, requested: number, tileCount: 'floor' | 'round'): number[] {
+  const flexible = flexibleSegments(axis);
+  const fixedLength = axis.segments
+    .filter((segment) => segment.kind === 'fixed')
+    .reduce((sum, segment) => sum + segment.end - segment.start, 0);
+  if (flexible.length === 0) {
+    return Array.from({ length: axis.length }, (_, index) => index);
   }
-  if (position >= outLength - endInset) {
-    return sourceLength - (outLength - position);
+  const outLength = Math.max(requested, fixedLength, 1);
+  const extra = outLength - fixedLength;
+  const flexibleSource = flexible.reduce((sum, segment) => sum + segment.end - segment.start, 0);
+  const map: number[] = [];
+  let shared = 0;
+  let given = 0;
+  for (const segment of axis.segments) {
+    const sourceLength = segment.end - segment.start;
+    if (segment.kind === 'fixed') {
+      for (let index = 0; index < sourceLength; index += 1) {
+        map.push(segment.start + index);
+      }
+      continue;
+    }
+    shared += sourceLength;
+    const boundary = Math.round((extra * shared) / flexibleSource);
+    const length = boundary - given;
+    given = boundary;
+    const count = tileCount === 'round'
+      ? Math.round(length / sourceLength)
+      : Math.floor(length / sourceLength);
+    const tiles = segment.kind === 'tile' ? Math.max(1, count) : 1;
+    const tileLength = length / tiles;
+    for (let index = 0; index < length; index += 1) {
+      const local = (index + 0.5) % tileLength;
+      map.push(
+        segment.start + Math.min(sourceLength - 1, Math.floor((local * sourceLength) / tileLength)),
+      );
+    }
   }
-  const span = sourceLength - startInset - endInset;
-  const outSpan = outLength - startInset - endInset;
-  const offset = position - startInset;
-  if (!tile) {
-    return startInset + Math.min(span - 1, Math.floor(((offset + 0.5) * span) / outSpan));
-  }
-  const tiles = Math.max(1, Math.round(outSpan / span));
-  const tileLength = outSpan / tiles;
-  const local = (offset + 0.5) % tileLength;
-  return startInset + Math.min(span - 1, Math.floor((local * span) / tileLength));
+  return map;
 }
 
-function tintSpans(source: Raster, insets: SliceInsets, mode: SliceMode): Raster {
+function tintSegments(source: Raster, layout: SliceLayout): Raster {
   const out = createRaster(source.width, source.height);
   out.data.set(source.data);
+  const flexibleX = flexibleSegments(layout.x);
+  const flexibleY = flexibleSegments(layout.y);
+  const inside = (segments: readonly Segment[], position: number): boolean =>
+    segments.some((segment) => position >= segment.start && position < segment.end);
   for (let y = 0; y < source.height; y += 1) {
-    const inY = mode === 'nine' && y >= insets.top && y < source.height - insets.bottom;
+    const inY = inside(flexibleY, y);
     for (let x = 0; x < source.width; x += 1) {
-      const inX = x >= insets.left && x < source.width - insets.right;
+      const inX = inside(flexibleX, x);
       for (let pass = Number(inX) + Number(inY); pass > 0; pass -= 1) {
         blendPixel(out, x, y, tint);
       }

@@ -1,7 +1,12 @@
 import { deepStrictEqual, notDeepStrictEqual, ok, strictEqual } from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { contentBounds, defaultMatchOptions, detectStretchSpan } from '../src/detect.js';
+import {
+  contentBounds,
+  defaultMatchOptions,
+  detectRepeatSpan,
+  detectStretchSpan,
+} from '../src/detect.js';
 import { defaultInspectOptions, inspectRaster, type InspectReport } from '../src/inspect.js';
 import { createRaster } from '../src/raster.js';
 import { insetsProblem } from '../src/slices.js';
@@ -11,6 +16,7 @@ import {
   fillRect,
   horizontalGradient,
   panel,
+  ropePanel,
   setPixel,
   shadedBar,
   type Color,
@@ -22,7 +28,7 @@ function codes(report: InspectReport): string[] {
 
 /**
  * @evidence docs/spec.md#slice-insets Checks negative, fractional, and span-consuming insets.
- * @evidenceReview docs/spec.md#slice-insets #31ab641 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#slice-insets #705f0b4 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function rejectsInsetsWithoutAStretchSpan(): void {
   strictEqual(insetsProblem({ left: 4, right: 4, top: 4, bottom: 4 }, 9, 9), undefined);
@@ -57,6 +63,7 @@ export function detectsPanelInsets(): void {
   // Exact matching: every column of the gradient differs from its neighbor.
   const gradient = inspectRaster(horizontalGradient(30, 10), {
     ...defaultInspectOptions,
+    mode: 'nine',
     noise: 'off',
   });
   ok(codes(gradient).includes('stretch.x.none'));
@@ -97,7 +104,7 @@ export function treatsShadedBarsAsThreeSlices(): void {
 
 /**
  * @evidence docs/spec.md#stretch-uniformity Reports the first mismatching pair for caller insets that cut into the border.
- * @evidenceReview docs/spec.md#stretch-uniformity #53ef9b3 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#stretch-uniformity #695468c Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function rejectsGivenInsetsThatStretchDetail(): void {
   const report = inspectRaster(panel(40, 30), {
@@ -107,6 +114,14 @@ export function rejectsGivenInsetsThatStretchDetail(): void {
   strictEqual(report.ok, false);
   const finding = report.findings.find((item) => item.code === 'stretch.x.nonuniform');
   deepStrictEqual(finding?.details, { axis: 'x', pair: [2, 3] });
+
+  // Insets that leave no span are a finding, not an exception.
+  const invalid = inspectRaster(panel(40, 30), {
+    ...defaultInspectOptions,
+    insets: { left: 30, right: 30, top: 6, bottom: 6 },
+  });
+  strictEqual(invalid.ok, false);
+  ok(codes(invalid).includes('insets.invalid'));
 
   const fine = inspectRaster(panel(40, 30), {
     ...defaultInspectOptions,
@@ -154,7 +169,7 @@ export function flagsChromaSpill(): void {
 
 /**
  * @evidence docs/spec.md#tiling-seams Accepts a whole-period tile span and warns when the span breaks the period.
- * @evidenceReview docs/spec.md#tiling-seams #ef3dc38 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#tiling-seams #e6197a2 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function checksTilingSeams(): void {
   const striped = createRaster(24, 8);
@@ -238,17 +253,10 @@ export function toleratesGeneratedNoise(): void {
 
 /**
  * @evidence docs/spec.md#repeating-edges Tiles a rope-patterned edge with its period, and warns about a non-repeating edge.
- * @evidenceReview docs/spec.md#repeating-edges #2fe5a06 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#repeating-edges #795d113 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function tilesRepeatingEdges(): void {
-  // A panel whose top and bottom borders carry a 6 px rope pattern.
-  const rope = panel(96, 40);
-  for (let x = 6; x < 90; x += 1) {
-    const color: Color = x % 6 < 3 ? [230, 190, 60, 255] : [120, 80, 20, 255];
-    fillRect(rope, x, 2, 1, 3, color);
-    fillRect(rope, x, 35, 1, 3, color);
-  }
-  const report = inspectRaster(rope);
+  const report = inspectRaster(ropePanel(96, 40));
   const finding = report.findings.find((item) => item.code === 'tile.x.auto');
   strictEqual(finding?.details?.['period'], 6);
   strictEqual(report.tile.x, true);
@@ -261,6 +269,34 @@ export function tilesRepeatingEdges(): void {
   for (let x = 6; x < 90; x += 1) {
     fillRect(organic, x, 2, 1, 3, [(x * 37) % 256, (x * 91) % 256, 60, 255]);
   }
+  // A 4 px pattern on columns 6..19 leaves 2 lines over; the span shifts toward the center.
+  const offCenter = createRaster(40, 4);
+  for (let x = 0; x < 40; x += 1) {
+    const color: Color =
+      x >= 6 && x < 20
+        ? [x % 4 < 2 ? 220 : 40, 80, 80, 255]
+        : [(x * 53) % 256, (x * 29) % 256, 200, 255];
+    fillRect(offCenter, x, 0, 1, 4, color);
+  }
+  deepStrictEqual(
+    detectRepeatSpan(offCenter, 'x', { x: 0, y: 0, width: 40, height: 4 }, defaultMatchOptions),
+    { span: { start: 8, end: 20 }, period: 4 },
+  );
+
+  // A run straddling the center: every window touches it, so the midpoint decides.
+  const straddling = createRaster(40, 4);
+  for (let x = 0; x < 40; x += 1) {
+    const color: Color =
+      x >= 14 && x < 24
+        ? [x % 4 < 2 ? 220 : 40, 80, 80, 255]
+        : [(x * 53) % 256, (x * 29) % 256, 200, 255];
+    fillRect(straddling, x, 0, 1, 4, color);
+  }
+  deepStrictEqual(
+    detectRepeatSpan(straddling, 'x', { x: 0, y: 0, width: 40, height: 4 }, defaultMatchOptions),
+    { span: { start: 16, end: 24 }, period: 4 },
+  );
+
   const organicReport = inspectRaster(organic, { ...defaultInspectOptions, noise: 'off' });
   ok(
     codes(organicReport).includes('stretch.x.none') || codes(organicReport).includes('stretch.x.short'),

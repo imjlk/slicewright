@@ -2,6 +2,7 @@ import {
   contentBounds,
   defaultMatchOptions,
   detectRepeatSpan,
+  detectStretchRuns,
   detectStretchSpan,
   estimateNoise,
   firstMismatch,
@@ -11,6 +12,14 @@ import {
   type AxisSpan,
   type MatchOptions,
 } from './detect.js';
+import {
+  axisFromSpans,
+  flexibleSegments,
+  layoutFromInsets,
+  minimumLayoutSize,
+  type AxisLayout,
+  type SliceLayout,
+} from './layout.js';
 import { alphaAt, pixelOffset, type Raster, type Rect } from './raster.js';
 import {
   insetsProblem,
@@ -38,8 +47,10 @@ export interface TileAxes {
 export interface InspectOptions extends MatchOptions {
   /** Caller-supplied insets; omitted means detect them. */
   readonly insets?: SliceInsets;
-  readonly mode: 'auto' | SliceMode;
+  readonly mode: 'auto' | 'nine' | 'three' | 'three-vertical';
   readonly tile: TileAxes;
+  /** `multi` keeps every long stretchable run on an axis instead of only the longest. */
+  readonly regions?: 'single' | 'multi';
   /** `auto` raises the tolerance to the measured noise floor of generated art. */
   readonly noise: 'auto' | 'off';
 }
@@ -56,8 +67,11 @@ export interface InspectReport {
   readonly height: number;
   readonly mode: SliceMode;
   readonly insetsSource: 'detected' | 'given';
+  /** Insets of the layout; for a multi-region layout, its outermost flexible lines. */
   readonly insets: SliceInsets;
   readonly scale9Borders: Scale9Borders;
+  /** The engine-neutral layout every renderer and target consumes. */
+  readonly layout: SliceLayout;
   readonly minSize: { readonly width: number; readonly height: number };
   readonly contentBounds: Rect | null;
   /** Axes that tile, as given or detected from repeating edges. */
@@ -94,6 +108,11 @@ export function inspectRaster(
   raster: Raster,
   options: InspectOptions = defaultInspectOptions,
 ): InspectReport {
+  if (options.insets !== undefined && options.regions === 'multi') {
+    throw new RangeError(
+      'Multiple regions are detected, not given: drop the insets or use single regions.',
+    );
+  }
   const findings: Finding[] = [];
   const bounds = contentBounds(raster);
   const full: Rect = { x: 0, y: 0, width: raster.width, height: raster.height };
@@ -116,10 +135,11 @@ export function inspectRaster(
       ? detectLayout(raster, bounds ?? full, options, matching, findings)
       : verifyLayout(raster, options.insets, options, matching, findings);
 
-  const { insets, mode, tile } = resolved;
+  const { insets, mode, tile, layout } = resolved;
   findings.push(...symmetryFindings(insets));
   for (const axis of ['x', 'y'] as const) {
-    if (tile[axis] && !(axis === 'y' && mode === 'three')) {
+    // Only an axis with exactly one tiled span has a seam to check.
+    if (tile[axis] && flexibleSegments(layout[axis]).length === 1) {
       findings.push(...seamFindings(raster, axis, spanOf(raster, insets, axis), matching[axis]));
     }
   }
@@ -132,10 +152,8 @@ export function inspectRaster(
     insetsSource: options.insets === undefined ? 'detected' : 'given',
     insets,
     scale9Borders: insetsToScale9Borders(insets, raster.width, raster.height),
-    minSize: {
-      width: insets.left + insets.right,
-      height: mode === 'three' ? raster.height : insets.top + insets.bottom,
-    },
+    layout,
+    minSize: minimumLayoutSize(layout),
     contentBounds: bounds ?? null,
     tile,
     matching,
@@ -196,6 +214,7 @@ export interface Layout {
   readonly insets: SliceInsets;
   readonly mode: SliceMode;
   readonly tile: TileAxes;
+  readonly layout: SliceLayout;
 }
 
 /** A stretch span shorter than this fraction of the content is too short to trust. */
@@ -210,7 +229,7 @@ type AxisPick =
  * enough, else the longest repeating span, which then tiles.
  *
  * @evidence docs/spec.md#repeating-edges Falls back from a short uniform run to a repeating span and marks the axis as tiled.
- * @evidenceReview docs/spec.md#repeating-edges #2fe5a06 Checked this code against the section line by line and ran tilesRepeatingEdges green with pnpm test.
+ * @evidenceReview docs/spec.md#repeating-edges #795d113 Checked this code against the section line by line and ran tilesRepeatingEdges green with pnpm test.
  */
 export function pickAxisSpan(
   raster: Raster,
@@ -243,6 +262,10 @@ export function pickAxisSpan(
  * @evidenceReview docs/spec.md#stretch-detection #ff483ae Checked this code against the section line by line and ran detectsPanelInsets green with pnpm test.
  * @evidence docs/spec.md#three-slice Turns an image without a vertical stretch span into a three-slice in automatic mode.
  * @evidenceReview docs/spec.md#three-slice #08c1617 Checked this code against the section line by line and ran treatsShadedBarsAsThreeSlices green with pnpm test.
+ * @evidence docs/spec.md#vertical-three-slice Keeps the width when columns never match but rows do, or when the mode asks for it.
+ * @evidenceReview docs/spec.md#vertical-three-slice #072e9af Checked this code against the section line by line and ran detectsVerticalThreeSlices green with pnpm test.
+ * @evidence docs/spec.md#multiple-stretch-regions Builds a multi-region layout when asked and an axis has more than one long run.
+ * @evidenceReview docs/spec.md#multiple-stretch-regions #f4dd501 Checked this code against the section line by line and ran detectsMultipleRegions green with pnpm test.
  */
 export function detectLayout(
   raster: Raster,
@@ -263,48 +286,140 @@ export function detectLayout(
     });
     return axis === 'x' ? centerSpan(bounds.x, bounds.width) : centerSpan(bounds.y, bounds.height);
   };
-
-  const pickX = pickAxisSpan(raster, 'x', bounds, matching.x, findings);
-  const x = pickX.span ?? fallback('x', pickX.reason);
-  const horizontal = { left: x.start, right: raster.width - x.end };
-  const tileX = options.tile.x || (pickX.span !== undefined && pickX.tile);
-
-  if (options.mode === 'three') {
-    return {
-      insets: { ...horizontal, top: 0, bottom: 0 },
-      mode: 'three',
-      tile: { x: tileX, y: false },
+  const tiles = (pick: AxisPick | undefined): boolean => pick?.span !== undefined && pick.tile;
+  const finish = (insets: SliceInsets, mode: SliceMode, tile: TileAxes): Layout => {
+    const shape = mode === 'three' || mode === 'three-vertical' ? mode : 'nine';
+    const single: Layout = {
+      insets,
+      mode,
+      tile,
+      layout: layoutFromInsets(insets, raster.width, raster.height, { shape, tile }),
     };
-  }
-  const pickY = pickAxisSpan(raster, 'y', bounds, matching.y, findings);
-  if (pickY.span === undefined && pickY.reason === 'none' && options.mode === 'auto') {
-    findings.push({
-      code: 'three-slice.auto',
-      severity: 'info',
-      message: 'No two adjacent rows match, so the layout is a three-slice with a fixed height.',
-    });
-    return {
-      insets: { ...horizontal, top: 0, bottom: 0 },
-      mode: 'three',
-      tile: { x: tileX, y: false },
-    };
-  }
-  const y = pickY.span ?? fallback('y', pickY.reason);
-  const insets = { ...horizontal, top: y.start, bottom: raster.height - y.end };
-  return {
-    insets,
-    mode: isThreeSlice(insets) ? 'three' : 'nine',
-    tile: { x: tileX, y: options.tile.y || (pickY.span !== undefined && pickY.tile) },
+    // Multiple regions refine whatever single layout was found, fixed axes included.
+    return options.regions === 'multi'
+      ? (multiRegionLayout(raster, bounds, matching, single, findings) ?? single)
+      : single;
   };
+
+  const pickX =
+    options.mode === 'three-vertical'
+      ? undefined
+      : pickAxisSpan(raster, 'x', bounds, matching.x, findings);
+  const pickY =
+    options.mode === 'three' ? undefined : pickAxisSpan(raster, 'y', bounds, matching.y, findings);
+
+  const verticalThree =
+    options.mode === 'three-vertical' ||
+    (options.mode === 'auto' &&
+      pickX?.span === undefined &&
+      pickX?.reason === 'none' &&
+      pickY?.span !== undefined);
+  if (verticalThree) {
+    if (options.mode === 'auto') {
+      findings.push({
+        code: 'three-slice.vertical.auto',
+        severity: 'info',
+        message: 'No two adjacent columns match but rows do, so the layout keeps its width and stretches vertically.',
+      });
+    }
+    const y = pickY?.span ?? fallback('y', pickY?.span === undefined ? (pickY?.reason ?? 'none') : 'none');
+    return finish(
+      { left: 0, right: 0, top: y.start, bottom: raster.height - y.end },
+      'three-vertical',
+      { x: false, y: options.tile.y || tiles(pickY) },
+    );
+  }
+
+  const x = pickX?.span ?? fallback('x', pickX?.span === undefined ? (pickX?.reason ?? 'none') : 'none');
+  const horizontal = { left: x.start, right: raster.width - x.end };
+  const tileX = options.tile.x || tiles(pickX);
+
+  const horizontalThree =
+    options.mode === 'three' ||
+    (options.mode === 'auto' && pickY?.span === undefined && pickY?.reason === 'none');
+  if (horizontalThree) {
+    if (options.mode === 'auto') {
+      findings.push({
+        code: 'three-slice.auto',
+        severity: 'info',
+        message: 'No two adjacent rows match, so the layout is a three-slice with a fixed height.',
+      });
+    }
+    return finish({ ...horizontal, top: 0, bottom: 0 }, 'three', { x: tileX, y: false });
+  }
+
+  const y = pickY?.span ?? fallback('y', pickY?.span === undefined ? (pickY?.reason ?? 'none') : 'none');
+  const insets = { ...horizontal, top: y.start, bottom: raster.height - y.end };
+  const tile = { x: tileX, y: options.tile.y || tiles(pickY) };
+  return finish(insets, isThreeSlice(insets) ? 'three' : 'nine', tile);
+}
+
+/**
+ * Keeps every long uniform run on an axis as its own stretch segment. Used
+ * only when an axis has more than one such run and does not tile.
+ *
+ * @evidence docs/spec.md#multiple-stretch-regions Keeps every long uniform run as a stretch segment, leaves tiled axes single, and records the counts.
+ * @evidenceReview docs/spec.md#multiple-stretch-regions #f4dd501 Checked this code against the section line by line and ran detectsMultipleRegions green with pnpm test.
+ */
+export function multiRegionLayout(
+  raster: Raster,
+  bounds: Rect,
+  matching: AxisMatching,
+  base: Layout,
+  findings: Finding[],
+): Layout | undefined {
+  const runsFor = (axis: Axis): AxisSpan[] => {
+    // A tiled axis and an axis the base layout keeps fixed are never split.
+    if (base.tile[axis] || flexibleSegments(base.layout[axis]).length === 0) {
+      return [];
+    }
+    const length = axis === 'x' ? bounds.width : bounds.height;
+    const minimum = Math.max(2, Math.ceil(length * shortSpanRatio));
+    return detectStretchRuns(raster, axis, bounds, matching[axis], minimum);
+  };
+  const runsX = runsFor('x');
+  const runsY = runsFor('y');
+  if (runsX.length < 2 && runsY.length < 2) {
+    return undefined;
+  }
+  const axisFor = (axis: Axis, runs: AxisSpan[]): AxisLayout =>
+    runs.length < 2
+      ? base.layout[axis]
+      : axisFromSpans(
+          axis === 'x' ? raster.width : raster.height,
+          runs.map((run) => ({ ...run, kind: 'stretch' as const })),
+        );
+  const layout: SliceLayout = { x: axisFor('x', runsX), y: axisFor('y', runsY) };
+  const envelope = (axis: AxisLayout): [number, number] => {
+    const flexible = flexibleSegments(axis);
+    return flexible.length === 0
+      ? [0, 0]
+      : [flexible[0]?.start ?? 0, axis.length - (flexible.at(-1)?.end ?? axis.length)];
+  };
+  const [left, right] = envelope(layout.x);
+  const [top, bottom] = envelope(layout.y);
+  const regions = {
+    x: flexibleSegments(layout.x).length,
+    y: flexibleSegments(layout.y).length,
+  };
+  findings.push({
+    code: 'regions.multi',
+    severity: 'info',
+    message: `The layout keeps ${regions.x} horizontal and ${regions.y} vertical stretch regions; no current target can export more than one region per axis.`,
+    details: regions,
+  });
+  return { insets: { left, right, top, bottom }, mode: 'multi', tile: base.tile, layout };
 }
 
 /**
  * @evidence docs/spec.md#slice-insets Rejects caller insets that leave no stretch span.
- * @evidenceReview docs/spec.md#slice-insets #31ab641 Checked this code against the section line by line and ran rejectsInsetsWithoutAStretchSpan green with pnpm test.
+ * @evidenceReview docs/spec.md#slice-insets #705f0b4 Checked this code against the section line by line and ran rejectsInsetsWithoutAStretchSpan green with pnpm test.
  * @evidence docs/spec.md#stretch-uniformity Reports the first mismatching pair in each caller-given stretch span unless the axis tiles.
- * @evidenceReview docs/spec.md#stretch-uniformity #53ef9b3 Checked this code against the section line by line and ran rejectsGivenInsetsThatStretchDetail green with pnpm test.
+ * @evidenceReview docs/spec.md#stretch-uniformity #695468c Checked this code against the section line by line and ran rejectsGivenInsetsThatStretchDetail green with pnpm test.
  * @evidence docs/spec.md#three-slice Forces zero top and bottom insets in three-slice mode.
  * @evidenceReview docs/spec.md#three-slice #08c1617 Checked this code against the section line by line and ran treatsShadedBarsAsThreeSlices green with pnpm test.
+ * @evidence docs/spec.md#vertical-three-slice Forces zero left and right insets and skips the column check in vertical three-slice mode.
+ * @evidenceReview docs/spec.md#vertical-three-slice #072e9af Checked this code against the section line by line and ran detectsVerticalThreeSlices green with pnpm test.
  */
 export function verifyLayout(
   raster: Raster,
@@ -313,17 +428,37 @@ export function verifyLayout(
   matching: AxisMatching,
   findings: Finding[],
 ): Layout {
-  const insets = options.mode === 'three' ? { ...given, top: 0, bottom: 0 } : given;
-  const mode: SliceMode = options.mode === 'three' || isThreeSlice(insets) ? 'three' : 'nine';
+  const insets =
+    options.mode === 'three'
+      ? { ...given, top: 0, bottom: 0 }
+      : options.mode === 'three-vertical'
+        ? { ...given, left: 0, right: 0 }
+        : given;
+  const mode: 'nine' | 'three' | 'three-vertical' =
+    options.mode === 'three-vertical'
+      ? 'three-vertical'
+      : options.mode === 'three' || isThreeSlice(insets)
+        ? 'three'
+        : 'nine';
+  const tile = {
+    x: options.tile.x && mode !== 'three-vertical',
+    y: options.tile.y && mode !== 'three',
+  };
   const problem = insetsProblem(insets, raster.width, raster.height);
   if (problem !== undefined) {
     findings.push({ code: 'insets.invalid', severity: 'error', message: problem });
-    return { insets, mode, tile: options.tile };
+    // Invalid insets cannot form spans; report on a layout that resizes nothing.
+    const fixed = { x: axisFromSpans(raster.width, []), y: axisFromSpans(raster.height, []) };
+    return { insets, mode, tile, layout: fixed };
   }
+  const layout = layoutFromInsets(insets, raster.width, raster.height, {
+    shape: mode,
+    tile,
+  });
 
   const full: Rect = { x: 0, y: 0, width: raster.width, height: raster.height };
   for (const axis of ['x', 'y'] as const) {
-    if (options.tile[axis] || (axis === 'y' && mode === 'three')) {
+    if (tile[axis] || (axis === 'y' && mode === 'three') || (axis === 'x' && mode === 'three-vertical')) {
       continue;
     }
     const mismatch = firstMismatch(
@@ -343,12 +478,12 @@ export function verifyLayout(
       });
     }
   }
-  return { insets, mode, tile: options.tile };
+  return { insets, mode, tile, layout };
 }
 
 /**
  * @evidence docs/spec.md#tiling-seams Requires a repeating span to hold whole periods and a non-repeating span to wrap no harder than its largest step.
- * @evidenceReview docs/spec.md#tiling-seams #ef3dc38 Checked this code against the section line by line and ran checksTilingSeams green with pnpm test.
+ * @evidenceReview docs/spec.md#tiling-seams #e6197a2 Checked this code against the section line by line and ran checksTilingSeams green with pnpm test.
  */
 export function seamFindings(
   raster: Raster,

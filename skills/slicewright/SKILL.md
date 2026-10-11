@@ -17,8 +17,9 @@ reaches the game.
 Use `npx slicewright` when the package is installed. From a clone, run
 `pnpm install && pnpm build` once in `$SLICEWRIGHT_ROOT`, then
 `node $SLICEWRIGHT_ROOT/dist/cli.js`. Every command prints JSON on stdout;
-`inspect`, `frame`, `normalize`, and `atlas` exit 1 when a finding is an
-error, and every command exits 2 on bad input. `--help` works on each command.
+`inspect`, `frame`, `normalize`, `export`, and `atlas` exit 1 when a finding is
+an error (for `export`, a layout the target cannot represent), and every
+command exits 2 on bad input. `--help` works on each command.
 
 ## Workflow
 
@@ -38,22 +39,26 @@ error, and every command exits 2 on bad input. `--help` works on each command.
 4. **Normalize.** `slicewright normalize art.png --width 480 --out ui/panel.png
    --atlas ui/panel.json --name panel` crops margins, resizes to the in-game
    size with area averaging (`--filter nearest` for pixel art), picks insets
-   at that size, and writes a one-frame atlas. Add `--keep 8` to shrink the
+   at that size, and writes a one-frame atlas. Add `--target` to write engine
+   files at the same time (see step 7). Add `--keep 8` to shrink the
    texture when the art is flat; it refuses axes where that would lose
    texture or shading.
 5. **Read the findings** with the table below. Fix every `error`. Pass
    `--insets l,r,t,b` to `inspect` to check insets chosen by hand, `--mode
    three` for horizontal-only art, `--tile x` when an edge should repeat.
 6. **Look at the preview.** `slicewright preview ui/panel.png --out
-   sheet.png`, then open `sheet.png`. Cells, left to right: stretch spans
-   tinted magenta, source, minimum size, wide, tall (nine-slice only),
-   doubled. Corners must look identical in every cell and edges must not
+   sheet.png`, then open `sheet.png`. Cells, left to right: flexible segments
+   tinted magenta, source, minimum size, wide (when the width resizes), tall
+   (when the height resizes), doubled. Corners must look identical in every cell and edges must not
    smear.
-7. **Hand it to the engine.**
-   - Single image: the atlas from step 4, or `slicewright frame`.
-   - Packed atlas: disable trimming (and rotation) for nine-slice sprites,
-     add `scale9Borders` per frame (TexturePacker 7.1+ can export them), then
-     run `slicewright atlas ui.json` to check every frame against the pixels.
+7. **Hand it to the engine.** `slicewright export ui/panel.png --target
+   phaser,css --out-dir ui` writes each engine's files
+   and prints how to use them; `slicewright targets` lists what each target
+   can represent. Only Phaser and CSS are supported; both are verified in the
+   real engine. For a packed atlas, disable trimming (and rotation) for
+   nine-slice sprites, add `scale9Borders` per frame (TexturePacker 7.1+ can
+   export them), then run `slicewright atlas ui.json` to check every frame
+   against the pixels.
 
 ## Findings
 
@@ -65,6 +70,13 @@ error, and every command exits 2 on bad input. `--help` works on each command.
 | `tile.x.auto`, `tile.y.auto` | The edges repeat with the named period, so that axis tiles. | Create the NineSlice with `tileX` / `tileY`; atlas data cannot carry it. |
 | `tile.x.seam`, `tile.y.seam` | A tiled span cuts its pattern or jumps where it wraps. | Use one of the `nearestLengths`, or make the texture seamless. |
 | `three-slice.auto` | Rows never repeat, so the layout keeps a fixed height. | Fine for bars. For panels, regenerate with a flat center. |
+| `three-slice.vertical.auto` | Columns never repeat but rows do, so the layout keeps its width. | Fine for vertical tracks. For panels, regenerate with plain edges. |
+| `regions.multi` | The layout has several stretch regions per axis. | Preview only: no current target exports it; re-slice as a nine-slice to export. |
+| `target.unsupported` | The target cannot represent this layout; no files were written. | Pick a target that can, or re-slice as a nine-slice. |
+| `target.emulated` | The target has no native form of this layout; the fixed axis has zero insets. | Keep that axis at its source size in the engine. |
+| `target.experimental` | The target's output is not yet rendered in its engine. | Check it in the engine before shipping. |
+| `target.tile` | The target cannot tile as asked, or counts tiles differently (CSS `round` takes the nearest count; Phaser rounds down). | Check the tiled edge at the sizes you use. |
+| `target.fixed` | Nothing in the layout resizes; no files were written. | Use the image as a plain sprite. |
 | `noise.tolerance` | Generated art is noisy, so matching tolerance was raised per axis. | Informational. `--noise off` restores exact matching. |
 | `noise.high` | The interior is busy along both axes. | Stretching smears it; use a flatter fill or tile it. |
 | `alpha.interior` | The middle of the element is partly transparent. | Usually a generator faking alpha: regenerate on a chroma key and run `key`. |
@@ -91,5 +103,5 @@ panel.setSize(360, 220); // never below left+right by top+bottom; scale instead.
 `scale9Borders` is the stretchable center rectangle `{ x, y, w, h }`. A frame
 whose `y` is 0 and `h` equals the frame height is a three-slice and its height
 cannot change. For a `tile.<axis>.auto` finding, pass `tileX` / `tileY` as the
-last NineSlice constructor arguments. Extrude or pad atlas frames by 1 to 2 px
+last NineSlice constructor arguments; `export --target phaser` prints the call. Extrude or pad atlas frames by 1 to 2 px
 so linear filtering does not bleed neighbors into the seams.

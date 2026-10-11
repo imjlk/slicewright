@@ -2,47 +2,68 @@
   "entries": [
     {
       "label": "button",
-      "atlas": "button.json"
+      "atlas": "button.json",
+      "css": "button.css"
     },
     {
       "label": "button --keep 4",
       "atlas": "button-min.json",
-      "like": "button.json"
+      "like": "button.json",
+      "css": "button-min.css"
     },
     {
       "label": "dialog",
-      "atlas": "dialog.json"
+      "atlas": "dialog.json",
+      "css": "dialog.css"
     },
     {
       "label": "dialog --keep 4",
       "atlas": "dialog-min.json",
-      "like": "dialog.json"
+      "like": "dialog.json",
+      "css": "dialog-min.css"
     },
     {
       "label": "pixel",
-      "atlas": "pixel.json"
+      "atlas": "pixel.json",
+      "css": "pixel.css"
     },
     {
       "label": "pixel --keep 4",
       "atlas": "pixel-min.json",
-      "like": "pixel.json"
+      "like": "pixel.json",
+      "css": "pixel-min.css"
     },
     {
       "label": "bar (keyed)",
-      "atlas": "bar.json"
+      "atlas": "bar.json",
+      "css": "bar.css"
     },
     {
       "label": "bar --keep 4",
       "atlas": "bar-min.json",
-      "like": "bar.json"
+      "like": "bar.json",
+      "css": "bar-min.css"
+    },
+    {
+      "label": "bar (vertical)",
+      "atlas": "bar-vertical.json",
+      "css": "bar-vertical.css"
     },
     {
       "label": "baroque",
-      "atlas": "baroque.json"
+      "atlas": "baroque.json",
+      "css": "baroque.css"
     },
     {
       "label": "scifi",
-      "atlas": "scifi.json"
+      "atlas": "scifi.json",
+      "css": "scifi.css"
+    },
+    {
+      "label": "rope (tiled x)",
+      "atlas": "../tiled/rope.json",
+      "css": "../tiled/rope.css",
+      "tile": "x"
     }
   ]
 }

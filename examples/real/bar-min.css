@@ -1,0 +1,11 @@
+/* slicewright: bar-min, three */
+.bar-min {
+  box-sizing: border-box;
+  border-style: solid;
+  border-width: 0px 39px 0px 39px;
+  border-image-source: url("bar-min.png");
+  border-image-slice: 0 39 0 39 fill;
+  border-image-repeat: stretch stretch;
+  height: 33px;
+  min-width: 78px;
+}

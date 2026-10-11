@@ -9,3 +9,5 @@ export * from './raster.js';
 export * from './render.js';
 export * from './resize.js';
 export * from './slices.js';
+export * from './layout.js';
+export * from './targets/index.js';

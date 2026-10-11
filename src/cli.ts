@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { readFileSync, writeFileSync } from 'node:fs';
-import { basename, dirname, relative, resolve } from 'node:path';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import { cli, define } from 'gunshi';
 
@@ -8,17 +8,20 @@ import { defaultChromaOptions, removeChroma } from './chroma.js';
 import {
   defaultInspectOptions,
   inspectRaster,
+  type Finding,
   type InspectOptions,
   type InspectReport,
 } from './inspect.js';
 import { normalizeRaster } from './normalize.js';
-import { createSingleFrameAtlas, inspectAtlas } from './phaser.js';
+import { inspectAtlas } from './phaser.js';
 import { decodePng, encodePng } from './png.js';
 import { buildPromptPlan, promptBackgrounds, uiKinds } from './prompt.js';
+import type { SliceLayout } from './layout.js';
 import type { Raster } from './raster.js';
 import { renderPreviewSheet } from './render.js';
 import { resizeRaster, targetSize } from './resize.js';
 import { parseBorders, parseInsets, scale9BordersToInsets } from './slices.js';
+import { exportForTarget, findTarget, sliceTargets } from './targets/index.js';
 
 /** Exit codes: 0 ok, 1 error findings, 2 usage or input failure. */
 const findingsFailed = 1;
@@ -54,9 +57,15 @@ const sliceArgs = {
   },
   mode: {
     type: 'enum',
-    choices: ['auto', 'nine', 'three'],
+    choices: ['auto', 'nine', 'three', 'three-vertical'],
     default: 'auto',
-    description: 'Slice mode',
+    description: 'Slice mode: three keeps the height, three-vertical keeps the width',
+  },
+  regions: {
+    type: 'enum',
+    choices: ['single', 'multi'],
+    default: 'single',
+    description: 'multi keeps every long stretch run on an axis, around fixed detail',
   },
   tile: {
     type: 'enum',
@@ -83,6 +92,7 @@ const chromaKeyChoices = ['auto', 'green', 'magenta'] as const;
 const image = { type: 'positional', description: 'PNG image' } as const;
 
 interface SliceValues {
+  readonly regions: string;
   readonly insets?: string | undefined;
   readonly borders?: string | undefined;
   readonly mode: string;
@@ -136,10 +146,7 @@ const preview = define({
     const raster = readPng(ctx.values.input);
     const settings = inspectOptions(ctx.values, raster);
     const report = inspectRaster(raster, settings);
-    const sheet = renderPreviewSheet(raster, report.insets, report.mode, {
-      tileX: report.tile.x,
-      tileY: report.tile.y,
-    });
+    const sheet = renderPreviewSheet(raster, report.layout);
     writeFileSync(ctx.values.out, encodePng(sheet.raster));
     print({
       image: ctx.values.input,
@@ -157,21 +164,31 @@ const frame = define({
     input: image,
     name: { type: 'string', required: true, description: 'Frame name' },
     out: { type: 'string', description: 'Atlas JSON to write; printed when omitted' },
+    'image-ref': {
+      type: 'string',
+      description: 'How the atlas refers to the image; defaults to its path from the atlas',
+    },
     ...sliceArgs,
   },
   run: (ctx) => {
     const { input, name, out } = ctx.values;
     const raster = readPng(input);
     const report = inspectRaster(raster, inspectOptions(ctx.values, raster));
-    const imageRef = out === undefined
-      ? basename(input)
-      : relative(dirname(resolve(out)), resolve(input));
-    const atlas = createSingleFrameAtlas(name, imageRef, raster.width, raster.height, report.insets);
-    if (out !== undefined) {
-      writeFileSync(out, `${JSON.stringify(atlas, null, 2)}\n`);
-    }
-    print({ image: input, atlas: out ?? atlas, ...summary(report) });
-    failOnErrors(report.ok);
+    const phaser = phaserAtlas({
+      name,
+      imagePath: input,
+      imageRef: ctx.values['image-ref'],
+      atlasPath: out,
+      raster,
+      layout: report.layout,
+    });
+    print({
+      image: input,
+      atlas: phaser.atlas,
+      atlasFindings: phaser.findings,
+      ...summary(report),
+    });
+    failOnErrors(report.ok && phaser.ok);
   },
 });
 
@@ -269,12 +286,29 @@ const normalize = define({
     },
     'no-crop': { type: 'boolean', description: 'Keep transparent margins' },
     atlas: { type: 'string', description: 'Also write a one-frame atlas JSON here' },
-    name: { type: 'string', description: 'Frame name for --atlas; defaults to the file name' },
+    name: {
+      type: 'string',
+      description: 'Asset name for --atlas and --target; defaults to the file name',
+    },
+    target: {
+      type: 'string',
+      description: `Also export for these targets, comma separated: ${Object.keys(sliceTargets).join(', ')}`,
+    },
+    'image-ref': {
+      type: 'string',
+      description: 'How --target files refer to the image; defaults to its path from the output',
+    },
     ...sizeArgs,
     ...sliceArgs,
   },
   run: (ctx) => {
     const { input, out } = ctx.values;
+    // Validate every option before any file is written.
+    const targetIds = targetList(ctx.values.target);
+    const assetName = ctx.values.name ?? basename(out).replace(/\.png$/i, '');
+    if (targetIds.length > 0) {
+      insideDirectory(dirname(out), assetName);
+    }
     const source = readPng(input);
     const result = normalizeRaster(source, {
       inspect: inspectOptions(ctx.values, undefined),
@@ -285,23 +319,222 @@ const normalize = define({
     });
     writeFileSync(out, encodePng(result.raster));
     let atlasOut: string | undefined;
+    let atlasFindings: readonly Finding[] = [];
+    let atlasOk = true;
     if (ctx.values.atlas !== undefined) {
-      atlasOut = ctx.values.atlas;
-      const frameName = ctx.values.name ?? basename(out).replace(/\.png$/i, '');
-      const imageRef = relative(dirname(resolve(atlasOut)), resolve(out));
-      const json = createSingleFrameAtlas(
-        frameName,
-        imageRef,
-        result.raster.width,
-        result.raster.height,
-        result.report.insets,
-      );
-      writeFileSync(atlasOut, `${JSON.stringify(json, null, 2)}\n`);
+      const phaser = phaserAtlas({
+        name: ctx.values.name ?? basename(out).replace(/\.png$/i, ''),
+        imagePath: out,
+        imageRef: ctx.values['image-ref'],
+        atlasPath: ctx.values.atlas,
+        raster: result.raster,
+        layout: result.report.layout,
+      });
+      atlasOk = phaser.ok;
+      atlasOut = phaser.ok ? ctx.values.atlas : undefined;
+      atlasFindings = phaser.findings;
     }
-    print({ image: input, out, atlas: atlasOut, steps: result.steps, ...summary(result.report) });
-    failOnErrors(result.report.ok);
+    const exports = targetIds.map((id) =>
+      writeExport(id, {
+        name: assetName,
+        outDir: dirname(out),
+        imagePath: out,
+        imageRef: ctx.values['image-ref'],
+        raster: result.raster,
+        layout: result.report.layout,
+      }),
+    );
+    print({
+      image: input,
+      out,
+      atlas: atlasOut,
+      ...(atlasFindings.length === 0 ? {} : { atlasFindings }),
+      steps: result.steps,
+      ...summary(result.report),
+      ...(exports.length === 0 ? {} : { exports }),
+    });
+    failOnErrors(result.report.ok && atlasOk && exports.every((item) => item.ok));
   },
 });
+
+const targets = define({
+  name: 'targets',
+  description: 'List export targets and what each can represent',
+  run: () => {
+    print(
+      Object.values(sliceTargets).map(({ id, label, status, capabilities }) => ({
+        id,
+        label,
+        status,
+        capabilities,
+      })),
+    );
+  },
+});
+
+const exportCommand = define({
+  name: 'export',
+  description: 'Export the slice layout for one or more engine targets',
+  args: {
+    input: image,
+    target: {
+      type: 'string',
+      required: true,
+      description: `Targets, comma separated: ${Object.keys(sliceTargets).join(', ')}`,
+    },
+    'out-dir': { type: 'string', default: '.', description: 'Directory for the exported files' },
+    'image-ref': {
+      type: 'string',
+      description: 'How the exported files refer to the image; defaults to its path from --out-dir',
+    },
+    name: { type: 'string', description: 'Asset name; defaults to the file name' },
+    ...sliceArgs,
+  },
+  run: (ctx) => {
+    const { input } = ctx.values;
+    const raster = readPng(input);
+    const report = inspectRaster(raster, inspectOptions(ctx.values, raster));
+    const exports = targetList(ctx.values.target).map((id) =>
+      writeExport(id, {
+        name: ctx.values.name ?? basename(input).replace(/\.png$/i, ''),
+        outDir: ctx.values['out-dir'],
+        imagePath: input,
+        imageRef: ctx.values['image-ref'],
+        raster,
+        layout: report.layout,
+      }),
+    );
+    print({ image: input, ...summary(report), exports });
+    failOnErrors(report.ok && exports.every((item) => item.ok));
+  },
+});
+
+/**
+ * Writes a Phaser atlas through the Phaser target, so `frame` and
+ * `normalize --atlas` get the same capability checks and image reference as
+ * `export --target phaser`. Without a path the atlas is returned instead.
+ */
+function phaserAtlas(options: {
+  readonly name: string;
+  readonly imagePath: string;
+  readonly imageRef: string | undefined;
+  readonly atlasPath: string | undefined;
+  readonly raster: Raster;
+  readonly layout: SliceLayout;
+}): { ok: boolean; atlas: unknown; findings: readonly Finding[] } {
+  const imageRef =
+    options.imageRef ??
+    (options.atlasPath === undefined
+      ? basename(options.imagePath)
+      : urlPath(relative(dirname(resolve(options.atlasPath)), resolve(options.imagePath))));
+  const result = exportForTarget('phaser', {
+    name: options.name,
+    imageRef,
+    raster: options.raster,
+    layout: options.layout,
+  });
+  const ok = !result.findings.some((finding) => finding.severity === 'error');
+  const contents = result.files[0]?.contents;
+  if (!ok || typeof contents !== 'string') {
+    return { ok: false, atlas: undefined, findings: result.findings };
+  }
+  if (options.atlasPath !== undefined) {
+    writeFileSync(options.atlasPath, contents);
+  }
+  return {
+    ok,
+    atlas: options.atlasPath ?? (JSON.parse(contents) as unknown),
+    findings: result.findings,
+  };
+}
+
+/** A path as a URL-style reference: forward slashes on every platform. */
+function urlPath(path: string): string {
+  return path.split(sep).join('/').replace(/\\/g, '/');
+}
+
+/**
+ * `file` joined to `directory`. Only a plain file name is accepted: a path
+ * component, even one inside the directory, could pass through a symlink.
+ */
+function insideDirectory(directory: string, file: string): string {
+  if (file.includes('/') || file.includes('\\') || file === '.' || file === '..') {
+    throw new UsageError(
+      `"${file}" must be a plain file name; pick a --name without path separators.`,
+    );
+  }
+  const path = join(directory, file);
+  const inside = relative(resolve(directory), resolve(path));
+  // A leading ".." component escapes; a name such as "..panel" does not.
+  if (inside === '' || inside === '..' || inside.startsWith(`..${sep}`) || isAbsolute(inside)) {
+    throw new UsageError(`"${file}" would be written outside ${directory}; pick a plain --name.`);
+  }
+  return path;
+}
+
+function targetList(value: string | undefined): string[] {
+  if (value === undefined) {
+    return [];
+  }
+  const ids = value
+    .split(',')
+    .map((id) => id.trim())
+    .filter((id) => id.length > 0);
+  if (ids.length === 0) {
+    throw new UsageError(
+      `--target names no target. Known targets: ${Object.keys(sliceTargets).join(', ')}.`,
+    );
+  }
+  for (const id of ids) {
+    if (findTarget(id) === undefined) {
+      throw new UsageError(
+        `Unknown target "${id}". Known targets: ${Object.keys(sliceTargets).join(', ')}.`,
+      );
+    }
+  }
+  return ids;
+}
+
+function writeExport(
+  id: string,
+  options: {
+    readonly name: string;
+    readonly outDir: string;
+    readonly imagePath: string;
+    readonly imageRef?: string | undefined;
+    readonly raster: Raster;
+    readonly layout: SliceLayout;
+  },
+): { target: string; ok: boolean; files: string[]; usage: string; findings: readonly Finding[] } {
+  mkdirSync(options.outDir, { recursive: true });
+  const imageRef =
+    options.imageRef ??
+    (urlPath(relative(resolve(options.outDir), resolve(options.imagePath))) ||
+      basename(options.imagePath));
+  const result = exportForTarget(id, {
+    name: options.name,
+    imageRef,
+    raster: options.raster,
+    layout: options.layout,
+    // Loader calls resolve from where the game is served; assume the working directory.
+    loaderPaths: {
+      image: urlPath(relative(process.cwd(), resolve(options.imagePath))),
+      directory: urlPath(relative(process.cwd(), resolve(options.outDir))),
+    },
+  });
+  const files = result.files.map((file) => {
+    const path = insideDirectory(options.outDir, file.path);
+    writeFileSync(path, file.contents);
+    return path;
+  });
+  return {
+    target: id,
+    ok: !result.findings.some((finding) => finding.severity === 'error'),
+    files,
+    usage: result.usage,
+    findings: result.findings,
+  };
+}
 
 /** Insets given as borders need the final image size, so they are resolved against `raster`. */
 function inspectOptions(values: SliceValues, raster: Raster | undefined): InspectOptions {
@@ -320,7 +553,11 @@ function inspectOptions(values: SliceValues, raster: Raster | undefined): Inspec
   const tile = values.tile ?? '';
   return {
     ...matchOptions(values),
-    mode: values.mode === 'nine' || values.mode === 'three' ? values.mode : 'auto',
+    mode:
+      values.mode === 'nine' || values.mode === 'three' || values.mode === 'three-vertical'
+        ? values.mode
+        : 'auto',
+    regions: values.regions === 'multi' ? 'multi' : 'single',
     tile: { x: tile.includes('x'), y: tile.includes('y') },
     ...(insets === undefined ? {} : { insets }),
   };
@@ -423,11 +660,29 @@ try {
   await cli(process.argv.slice(2), main, {
     name: 'slicewright',
     version,
-    subCommands: { prompt, inspect, preview, frame, atlas, key, resize, normalize },
-    // stdout carries JSON only; gunshi's banner would break parsing.
+    subCommands: {
+      prompt,
+      inspect,
+      preview,
+      frame,
+      atlas,
+      key,
+      resize,
+      normalize,
+      export: exportCommand,
+      targets,
+    },
+    // stdout carries JSON only: no banner, no validation text; errors go to stderr.
     renderHeader: null,
+    renderValidationErrors: null,
+    // Unknown or misspelled flags are errors, not silently ignored.
+    strict: true,
   });
 } catch (error) {
-  process.stderr.write(`slicewright: ${error instanceof Error ? error.message : String(error)}\n`);
+  const messages =
+    error instanceof AggregateError
+      ? error.errors.map((item: unknown) => (item instanceof Error ? item.message : String(item)))
+      : [error instanceof Error ? error.message : String(error)];
+  process.stderr.write(messages.map((message) => `slicewright: ${message}\n`).join(''));
   process.exitCode = usageFailed;
 }

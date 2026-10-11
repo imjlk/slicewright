@@ -15,6 +15,8 @@ inspection finds or checks the exact slice insets afterwards.
 - `inspect` detects the stretch spans, or checks insets you give, and reports
   smearing, repeating edges, seams, noise, alpha holes, margins, and spill.
 - `preview` renders the art at several stretched sizes on one PNG.
+- `export` writes engine files for Phaser and CSS `border-image`; `targets`
+  lists what each can represent.
 - `frame` writes a one-frame Phaser JSON Hash atlas with `scale9Borders`.
 - `atlas` checks every nine-slice frame of a Phaser JSON Hash or JSON Array
   atlas against its pixels.
@@ -30,7 +32,7 @@ pnpm install
 pnpm build
 node dist/cli.js prompt --kind panel --style "hand-painted fantasy wood"
 node dist/cli.js key generated.png --out keyed.png
-node dist/cli.js normalize keyed.png --width 480 --out ui/panel.png --atlas ui/panel.json --name panel
+node dist/cli.js normalize keyed.png --width 480 --out ui/panel.png --name panel --target phaser,css
 node dist/cli.js preview ui/panel.png --out panel-sheet.png
 node dist/cli.js atlas ui/panel.json
 ```
@@ -59,6 +61,39 @@ this.add.nineslice(400, 300, 'ui', 'panel', 320, 200);
 Phaser reads the frame's `scale9Borders`, so scenes never hard-code insets.
 Keep nine-slice frames untrimmed.
 
+## Layouts and targets
+
+Every result is an engine-neutral layout: each axis is a list of fixed,
+stretched, and tiled segments.
+
+| Layout | Meaning | How to get it |
+| --- | --- | --- |
+| Nine-slice | Corners fixed; edges and center stretch | default |
+| Three-slice | Ends fixed; stretches horizontally; height fixed | `--mode three`, or rows that never repeat |
+| Vertical three-slice | Ends fixed; stretches vertically; width fixed | `--mode three-vertical`, or columns that never repeat |
+| Tiled axis | A span repeats instead of stretching | `--tile x/y/xy`, or edges that repeat a pattern |
+| Multiple regions | Several stretch spans per axis around fixed detail | `--regions multi` (preview only; no target exports it yet) |
+
+| Target | Nine | Three | Vertical three | Multi | Tiling |
+| --- | --- | --- | --- | --- | --- |
+| `phaser` | ✓ | ✓ | emulated | ✗ | per axis |
+| `css` | ✓ | ✓ | ✓ | ✗ | per axis, nearest tile count |
+
+Emulated means zero insets on the fixed axis; keep that axis at its size.
+Anything a target cannot represent is reported instead of exported.
+
+### Engine support
+
+slicewright targets **Phaser 4**, with CSS `border-image` alongside it for DOM
+UI; both are rendered in the real engine by `pnpm engine:check`. Other engines
+(Godot, Unity, Android nine-patch, Defold, GameMaker, Cocos, Pixi.js, Bevy, and
+so on) are **not supported**, and none is planned for now.
+
+**Pull requests are welcome** for new targets, ideally with a way to render the
+output in that engine. [`docs/extending.md`](docs/extending.md) explains how
+to add a target or a layout feature; a target starts as `experimental` until
+the engine check renders it.
+
 ## How it decides
 
 The behavior contract is [`docs/spec.md`](docs/spec.md). In short: two
@@ -67,19 +102,20 @@ tolerance; the longest run of matching columns is the horizontal stretch span,
 and rows work the same way. Generated art is noisy, so each axis measures its
 interior noise floor and raises its tolerance to match. Edges that repeat a
 pattern tile instead of stretching; edges with non-repeating detail are
-reported rather than guessed. Art whose rows never repeat (a banded bar)
-becomes a three-slice.
+reported rather than guessed.
 
 The samples in [`examples/real`](examples/real) are real model output and are
-checked in Phaser 4 itself:
+checked in real renderers:
 
 ```bash
-pnpm phaser:check
+pnpm engine:check
 ```
 
-renders every sample as a NineSlice in headless Chrome (WebGL through
-SwiftShader), checks the rendered sizes and the insets Phaser read, and compares
-rebuilt textures with their sources pixel for pixel.
+renders every sample as a Phaser 4 NineSlice and as its exported CSS
+`border-image` in headless Chrome. It checks the sizes and insets Phaser read,
+compares every Phaser and CSS render with slicewright's own renderer, compares
+rebuilt textures with their sources, and checks that the tiling the Phaser
+usage passes matches what detection finds (a tiled rope sample covers it).
 
 ## Development
 
@@ -90,8 +126,8 @@ The toolchain is [ttsc](https://ttsc.dev) on TypeScript 7:
 - `pnpm test`: `node:test` suites run through `ttsx`.
 - `pnpm fix` / `pnpm format`: apply lint and format fixes.
 - `pnpm build`: emit `dist` with the typia transform.
-- `pnpm phaser:check`: render `examples/real` in Phaser 4 (needs Chrome;
-  `SLICEWRIGHT_CHROME_CHANNEL` picks another Playwright channel).
+- `pnpm engine:check`: render `examples/real` in Phaser 4 and CSS (needs
+  Chrome; `SLICEWRIGHT_CHROME_CHANNEL` picks another Playwright channel).
 - `.mcp.json` registers the `@ttsc/graph` MCP server for agents.
 
 Every H2 in `docs/spec.md` is a requirement. The build fails until a source
@@ -107,7 +143,7 @@ The core is pure TypeScript over RGBA buffers. PNG input and output use
 ## Roadmap
 
 - Approximate-period tiling for hand-drawn patterned edges.
-- Exports for engines other than Phaser.
+- Content padding: where text sits inside an ornate frame (Phaser frame `customData`, CSS `border-width` separate from `border-image-width`).
 - A first npm release once the detection settles.
 
 ## License

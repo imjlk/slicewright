@@ -14,11 +14,27 @@ an error that names the reason.
 
 ## Slice insets
 
-A slice layout is four insets in pixels: `left`, `right`, `top`, and `bottom`.
-Corners keep their size, the top and bottom edges stretch horizontally, the left
-and right edges stretch vertically, and the center stretches both ways. The
-stretchable span on each axis must be at least one pixel wide, so `left + right`
-must be smaller than the width and `top + bottom` smaller than the height.
+Insets are four sizes in pixels, `left`, `right`, `top`, and `bottom`, that
+describe the layouts with at most one flexible span per axis (see Slice
+layouts): they are how callers give a nine-slice and how engines such as Phaser
+store one. Corners keep their size, the top and bottom edges stretch
+horizontally, the left and right edges stretch vertically, and the center
+stretches both ways. The stretchable span on each axis must be at least one
+pixel wide, so `left + right` must be smaller than the width and `top + bottom`
+smaller than the height.
+
+## Slice layouts
+
+Every slicing scheme is one engine-neutral layout: each axis is a list of
+segments that cover it in order, and each segment is `fixed` (keeps its size),
+`stretch`, or `tile`. A nine-slice has one flexible segment per axis between
+fixed ones; a three-slice has a fully fixed vertical axis; a vertical
+three-slice has a fully fixed horizontal axis; a multi-region layout has more
+than one flexible segment on an axis; a layout with nothing flexible is
+`fixed`. Segment bounds are whole pixels. Insets convert to a layout and back
+whenever each axis has at most one
+flexible segment, and a fixed axis converts to zero insets on both sides. The
+minimum size of a layout is the sum of its fixed segments on each axis.
 
 ## Stretch detection
 
@@ -53,7 +69,8 @@ Ornate edges often carry a pattern, such as a rope or a chain, that cannot
 stretch but can tile. When an axis has no trustworthy uniform run, detection
 looks for a span whose every line matches the line one period later, for
 periods from 2 to a quarter of the content length and at most 64. The longest
-such span, trimmed to whole periods and holding at least two, becomes the
+such span, trimmed to whole periods (with the leftover lines placed so the span's
+midpoint sits nearest the center) and holding at least two, becomes the
 stretch span when it reaches 10% of the content; ties prefer the shorter period,
 then the span nearest the center. That axis is then tiled, and a
 `tile.<axis>.auto` finding names the period and tells the caller to enable
@@ -67,9 +84,34 @@ with no vertical stretch span becomes a three-slice and an informational
 `three-slice.auto` finding records the choice. Forcing three-slice mode sets
 `top` and `bottom` to zero.
 
+## Vertical three-slice
+
+A vertical three-slice keeps its width and stretches only vertically, like a
+scroll bar track. In automatic mode, when no two adjacent columns match but rows
+do, the layout becomes a vertical three-slice and a `three-slice.vertical.auto`
+finding records it. Forcing the mode sets `left` and `right` to zero and skips
+the column checks.
+
+## Multiple stretch regions
+
+Some art has fixed detail in the middle of an edge, such as a crest on a title
+plate, with stretchable lengths on both sides. With multiple regions requested,
+every uniform run on an axis that reaches 10% of the content becomes its own
+stretch segment, with fixed segments between them. This refines whichever
+single layout detection found, including a three-slice or vertical three-slice.
+An axis with only one such run keeps the single-region result, a tiled axis and
+an axis the layout keeps fixed are never split, and a
+`regions.multi` finding records the counts. The reported insets are the
+outermost flexible lines. Multiple regions are only detected, so asking for them
+together with given insets is refused. No current target can export a
+multi-region layout;
+it renders in previews and reports `target.unsupported` on export.
+
 ## Stretch uniformity
 
-When the caller supplies insets, every column inside the horizontal stretch span
+Insets that leave no stretch span are an `insets.invalid` error reported on a
+layout that resizes nothing. When the caller supplies valid insets, every column
+inside the horizontal stretch span
 must match its neighbor, and every row inside the vertical span must match its
 neighbor. A mismatch is an error that names the first offending pair, because
 stretching that span changes the art. An axis in tiling mode is exempt and is
@@ -100,7 +142,8 @@ is not counted.
 
 ## Tiling seams
 
-An axis may tile instead of stretch. Tiling repeats the stretch span, so the
+An axis may tile instead of stretch; only an axis with a single tiled span is
+checked. Tiling repeats the stretch span, so the
 span must end where its pattern starts again. When every line of the span
 matches the line one period later, for one or more periods of at most half the
 span, the span must be a whole number of one of those periods; otherwise a
@@ -121,7 +164,8 @@ keying fails rather than guessing. Pixels at or above the drop threshold
 (default 40) and the drop threshold fade linearly, and the rest stay as they
 are. Pixels within the despill radius (default 2) of a pixel that is not fully
 opaque and that still lean toward the key are despilled: green drops to
-`max(r, b)`; red and blue drop by their lead over green.
+`max(r, b)`; red and blue drop by their lead over green. The radius must be a
+whole number from 0 to 64.
 
 ## Resizing
 
@@ -130,7 +174,9 @@ averages every source pixel an output pixel covers, weighted by overlap, in
 premultiplied alpha so transparent pixels do not darken edges; when enlarging
 it samples the covering source pixel. The nearest filter samples the source
 pixel under each output pixel center, for pixel art. A target is a width and
-height, one side with the aspect ratio kept, or a scale.
+height in whole pixels, one side with the aspect ratio kept, or a positive scale,
+never a scale together with a size; anything else is refused rather than
+clamped.
 
 ## Normalization
 
@@ -141,8 +187,9 @@ hold it open; after resizing, rows and columns that averaged to full
 transparency are cropped as well. With a keep length, it rebuilds a smaller
 texture that keeps the fixed borders and the first `keep` lines of each stretch
 span. It rebuilds only an axis whose span was really found (not tiled, no
-`stretch.<axis>.none` or `stretch.<axis>.short` fallback), and never the
-vertical axis of a three-slice. Noise tolerance accepts spans that
+`stretch.<axis>.none` or `stretch.<axis>.short` fallback), never an axis that
+keeps its size (the height of a three-slice, the width of a vertical
+three-slice), and never a multi-region layout. Noise tolerance accepts spans that
 carry texture or shading, which stretching keeps but cutting would lose, so each
 axis is verified: rebuilt alone and rendered back at the original size, its
 99th-percentile pixel difference must stay within the exact tolerance, not the
@@ -156,11 +203,16 @@ without rebuilding.
 
 ## Preview sheet
 
-A preview sheet renders the slice layout at several sizes on one PNG over a
-checkerboard: the source with stretch spans tinted, the source size, the minimum
-size, wide, tall (skipped for a three-slice), and doubled. Rendering samples the
-nearest source pixel, keeps corners unscaled, and repeats spans in tiling mode the
-way Phaser does: a whole number of tiles, each scaled to fill the span.
+A preview sheet renders the layout at several sizes on one PNG over a
+checkerboard: the source with flexible segments tinted, the source size, the
+minimum size, wide and tall (each only when that axis can resize), and doubled
+on the axes that can resize. Rendering samples the nearest source pixel. Fixed
+segments keep their size and the flexible segments share the rest in proportion
+to their source size. A tiled segment repeats a whole number of tiles, the
+segment length divided by the source length rounded down and at least one, each
+scaled to fill the segment, as Phaser does; the renderer can round to the
+nearest count instead, to compare with CSS `round`. A size below the fixed segments is
+raised to them; a requested size must be a whole, non-negative number of pixels.
 
 ## Phaser scale9Borders
 
@@ -168,7 +220,57 @@ Phaser 4 reads a frame's `scale9Borders` as the stretchable center rectangle:
 `x = left`, `y = top`, `w = width - left - right`, `h = height - top - bottom`.
 Phaser treats a frame as a three-slice when `y` is zero and `h` equals the frame
 height. slicewright converts both ways and writes a single-frame JSON Hash atlas,
-untrimmed and unrotated, that `this.load.atlas` accepts.
+untrimmed and unrotated, that `this.load.atlas` accepts. The Phaser target adds
+the `this.load.atlas` and `nineslice` calls, passing `tileX` and `tileY` for
+tiled axes, because atlas data cannot carry them. Phaser resolves the image and
+atlas URLs in `this.load.atlas` against its loader path rather than the atlas
+file, so the call uses paths from where the game is served (the working
+directory, from the CLI) while the atlas keeps the image path relative to
+itself. Phaser has no vertical three-slice, so it is emulated.
+
+The emulated vertical three-slice records its shape in the frame as
+`"slicewright": { "shape": "three-vertical" }`, which Phaser keeps in
+`frame.customData`.
+
+Because Phaser reads borders spanning the full height as its own three-slice, a
+layout whose height stretches as one full-height span (zero top and bottom
+insets on a resizable axis) cannot be encoded and is a `target.unsupported`
+error for the Phaser target. The usage keeps guidance such as a fixed size in a
+JavaScript comment.
+
+## Targets
+
+A target turns a layout into an engine's files. Each target declares the shapes
+it represents natively, the shapes it can only emulate, and whether it tiles
+per axis, both axes together, or not at all. Emulation exports the fixed axis
+with zero insets, so the engine would stretch it, and a `target.emulated`
+finding tells the caller to keep that axis at its source size. A shape the
+target can neither represent nor emulate is a `target.unsupported` error and
+writes no files, and so is a layout that never resizes (`target.fixed`), since
+every target would stretch zero-inset art. Tiling the target cannot express is
+a `target.tile` warning, and so is a target whose tile count differs from the
+layout's rule of rounding down (CSS `round` takes the nearest whole number). Each target also
+has a status: `verified` targets are rendered in the real engine by the engine
+check, and an `experimental` target follows the documented format without being
+run, which a `target.experimental` finding states on every export. The targets
+are `phaser` and `css`, both verified; other engines are not supported.
+
+The layout and the image must have the same size; a target refuses a layout
+built for another size, as the renderer does.
+
+## CSS border-image
+
+The CSS target writes a class with `border-image-slice` set to the insets plus
+`fill`, matching `border-width` in pixels, and `border-image-repeat` of
+`stretch` or, for a tiled axis, `round` (whole tiles scaled to fit). The usage
+links the stylesheet from the same served path the Phaser usage loads from.
+URLs the targets emit percent-encode each path component, so a name such as
+`button#blue.png` stays one file; the atlas keeps the plain file path. `round`
+takes the nearest whole number of tiles rather than rounding down, so a tiled
+CSS export carries a `target.tile` warning. A
+three-slice fixes the height and a vertical three-slice fixes the width; any
+other layout sets the minimum width and height. CSS cannot express more than
+one region per axis.
 
 ## Atlas frames
 
@@ -176,7 +278,13 @@ An atlas check reads a Phaser JSON Hash or JSON Array atlas and validates every
 frame that has `scale9Borders`, or only the named frame. A trimmed frame is an
 error because Phaser's NineSlice does not support trimming. A rotated frame is a
 warning. Borders outside the frame are an error. Each frame's pixels are then
-inspected with its borders as explicit insets.
+inspected with its borders as explicit insets: borders spanning the full height
+inspect as a three-slice. Borders spanning the full width are an ordinary
+nine-slice whose columns must match, unless the frame carries
+`"slicewright": { "shape": "three-vertical" }`, which the Phaser target writes
+for its emulated vertical three-slice. A frame carrying that marker without
+full-width borders is an `atlas.marker-mismatch` error, because Phaser would
+still render it as a nine-slice.
 
 ## Generation prompts
 

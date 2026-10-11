@@ -48,7 +48,7 @@
     "test": "ttsx test/index.ts",
     "build": "ttsc -p tsconfig.build.json",
     "examples": "ttsx tools/make-examples.ts",
-    "phaser:check": "ttsx tools/phaser-check.ts"
+    "engine:check": "ttsx tools/engine-check.ts"
   },
   "dependencies": {
     "fast-png": "8.0.0",

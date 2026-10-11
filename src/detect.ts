@@ -82,7 +82,7 @@ export function linesMatch(
  * Largest premultiplied pixel difference between two lines inside `bounds`.
  *
  * @evidence docs/spec.md#tiling-seams Measures how hard a non-repeating span jumps where it wraps.
- * @evidenceReview docs/spec.md#tiling-seams #ef3dc38 Checked this code against the section line by line and ran checksTilingSeams green with pnpm test.
+ * @evidenceReview docs/spec.md#tiling-seams #e6197a2 Checked this code against the section line by line and ran checksTilingSeams green with pnpm test.
  */
 export function lineDistance(
   raster: Raster,
@@ -152,7 +152,7 @@ export function estimateNoise(raster: Raster, bounds: Rect, axis: Axis): number 
  * first line of the pair, or undefined when the whole span is uniform.
  *
  * @evidence docs/spec.md#stretch-uniformity Locates the first mismatching pair inside a caller's stretch span.
- * @evidenceReview docs/spec.md#stretch-uniformity #53ef9b3 Checked this code against the section line by line and ran rejectsGivenInsetsThatStretchDetail green with pnpm test.
+ * @evidenceReview docs/spec.md#stretch-uniformity #695468c Checked this code against the section line by line and ran rejectsGivenInsetsThatStretchDetail green with pnpm test.
  */
 export function firstMismatch(
   raster: Raster,
@@ -208,6 +208,41 @@ export function detectStretchSpan(
   return best;
 }
 
+/**
+ * Every run of matching lines inside `bounds` that is at least `minimum` lines
+ * long, in order.
+ *
+ * @evidence docs/spec.md#multiple-stretch-regions Collects every matching run that reaches the minimum length.
+ * @evidenceReview docs/spec.md#multiple-stretch-regions #f4dd501 Checked this code against the section line by line and ran detectsMultipleRegions green with pnpm test.
+ */
+export function detectStretchRuns(
+  raster: Raster,
+  axis: Axis,
+  bounds: Rect,
+  options: MatchOptions,
+  minimum: number,
+): AxisSpan[] {
+  const start = axis === 'x' ? bounds.x : bounds.y;
+  const length = axis === 'x' ? bounds.width : bounds.height;
+  const runs: AxisSpan[] = [];
+  let runStart: number | undefined;
+  const close = (end: number): void => {
+    if (runStart !== undefined && end - runStart >= minimum) {
+      runs.push({ start: runStart, end });
+    }
+    runStart = undefined;
+  };
+  for (let index = start; index < start + length - 1; index += 1) {
+    if (linesMatch(raster, axis, index, index + 1, bounds, options)) {
+      runStart ??= index;
+    } else {
+      close(index + 1);
+    }
+  }
+  close(start + length);
+  return runs;
+}
+
 export interface RepeatSpan {
   readonly span: AxisSpan;
   readonly period: number;
@@ -219,7 +254,7 @@ export interface RepeatSpan {
  * then the span nearest the center.
  *
  * @evidence docs/spec.md#repeating-edges Finds the longest whole-period span for periods from 2 to a quarter of the content, at most 64.
- * @evidenceReview docs/spec.md#repeating-edges #2fe5a06 Checked this code against the section line by line and ran tilesRepeatingEdges green with pnpm test.
+ * @evidenceReview docs/spec.md#repeating-edges #795d113 Checked this code against the section line by line and ran tilesRepeatingEdges green with pnpm test.
  */
 export function detectRepeatSpan(
   raster: Raster,
@@ -240,7 +275,21 @@ export function detectRepeatSpan(
       }
       const covered = runEnd - runStart + period;
       const whole = Math.floor(covered / period) * period;
-      const candidate = { span: { start: runStart, end: runStart + whole }, period };
+      // The leftover lines can sit on either side; keep the window whose
+      // midpoint is nearest the center.
+      const from = runStart;
+      const midpointDistance = (offset: number): number =>
+        Math.abs(from + offset + (whole - 1) / 2 - center);
+      let offset = 0;
+      for (let shift = 1; shift <= covered - whole; shift += 1) {
+        if (midpointDistance(shift) < midpointDistance(offset)) {
+          offset = shift;
+        }
+      }
+      const candidate = {
+        span: { start: from + offset, end: from + offset + whole },
+        period,
+      };
       runStart = undefined;
       if (whole < period * 2) {
         return;

@@ -48,7 +48,7 @@ export function convertsPngLayoutsToRgba(): void {
 
 /**
  * @evidence docs/spec.md#preview-sheet Renders the source size losslessly, keeps corners at larger sizes, tiles whole periods, and lays out the sheet cells.
- * @evidenceReview docs/spec.md#preview-sheet #40dc75a Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#preview-sheet #49443a9 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function rendersSlicesAndPreviewSheets(): void {
   const source = panel(40, 30);
@@ -78,7 +78,7 @@ export function rendersSlicesAndPreviewSheets(): void {
     Array.from({ length: 20 }, (_, x) => (x % 2 === 0 ? 255 : 0)),
   );
 
-  const sheet = renderPreviewSheet(source, insets, mode);
+  const sheet = renderPreviewSheet(source, inspectRaster(source).layout);
   deepStrictEqual(
     sheet.cells.map((cell) => cell.label),
     ['guides', 'source', 'min', 'wide', 'tall', 'double'],
@@ -89,7 +89,7 @@ export function rendersSlicesAndPreviewSheets(): void {
 
   const bar = shadedBar(48, 12);
   const barReport = inspectRaster(bar);
-  const barSheet = renderPreviewSheet(bar, barReport.insets, barReport.mode);
+  const barSheet = renderPreviewSheet(bar, barReport.layout);
   strictEqual(
     barSheet.cells.some((cell) => cell.label === 'tall'),
     false,
@@ -99,7 +99,7 @@ export function rendersSlicesAndPreviewSheets(): void {
 
 /**
  * @evidence docs/spec.md#phaser-scale9borders Converts both ways, applies Phaser's three-slice rule, and writes a loadable one-frame atlas.
- * @evidenceReview docs/spec.md#phaser-scale9borders #649e388 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#phaser-scale9borders #4c250ad Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function convertsToPhaserBorders(): void {
   const insets = { left: 6, right: 8, top: 5, bottom: 7 };
@@ -124,7 +124,7 @@ export function convertsToPhaserBorders(): void {
 
 /**
  * @evidence docs/spec.md#atlas-frames Checks hash and array atlases for trimming, rotation, out-of-frame borders, missing frames, and frame pixels.
- * @evidenceReview docs/spec.md#atlas-frames #879cca2 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#atlas-frames #62a16b1 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function checksAtlasFrames(): void {
   const image = createRaster(80, 30);

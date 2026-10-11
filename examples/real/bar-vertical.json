@@ -1,0 +1,41 @@
+{
+  "frames": {
+    "bar-vertical": {
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 33,
+        "h": 320
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 33,
+        "h": 320
+      },
+      "sourceSize": {
+        "w": 33,
+        "h": 320
+      },
+      "scale9Borders": {
+        "x": 0,
+        "y": 39,
+        "w": 33,
+        "h": 242
+      },
+      "slicewright": {
+        "shape": "three-vertical"
+      }
+    }
+  },
+  "meta": {
+    "image": "bar-vertical.png",
+    "size": {
+      "w": 33,
+      "h": 320
+    },
+    "scale": "1"
+  }
+}

@@ -32,16 +32,22 @@ const entries = await Promise.all(
 function sizesFor(entry) {
   const { w, h } = entry.likeFrame.frame;
   const b = entry.likeFrame.scale9Borders;
+  // Phaser's three-slice keeps the height.
   const three = b.y === 0 && b.h === h;
+  // Only the explicit marker means a fixed width; full-width borders alone do not.
+  const vertical = entry.likeFrame.slicewright?.shape === 'three-vertical';
   const sizes = [
     ['frame', w, h],
-    ['min', w - b.w, three ? h : h - b.h],
-    ['wide', Math.round(w * 2.5), h],
+    // A resizable axis renders at least 1 px, as renderLayout does.
+    ['min', vertical ? w : Math.max(1, w - b.w), three ? h : Math.max(1, h - b.h)],
   ];
+  if (!vertical) {
+    sizes.push(['wide', Math.round(w * 2.5), h]);
+  }
   if (!three) {
     sizes.push(['tall', w, Math.round(h * 2.5)]);
   }
-  sizes.push(['double', w * 2, three ? h : h * 2]);
+  sizes.push(['double', vertical ? w : w * 2, three ? h : h * 2]);
   return sizes;
 }
 
@@ -65,24 +71,40 @@ class Check extends Phaser.Scene {
   }
 
   create() {
-    const checker = this.add.graphics();
-    for (let y = 0; y < height; y += 12) {
-      for (let x = 0; x < width; x += 12) {
-        checker.fillStyle((x / 12 + y / 12) % 2 === 0 ? 0x34343e : 0x2a2a32);
-        checker.fillRect(x, y, 12, 12);
-      }
-    }
+    // A solid background, so scripts can composite the expected render over it.
     let y = gap;
     const report = [];
     for (const row of rows) {
       this.add.text(gap, y, row.entry.label, { fontSize: '13px', color: '#e8e8e8' });
       let x = labelWidth;
       for (const [label, w, h] of row.sizes) {
-        const slice = this.add.nineslice(x, y, row.entry.key, row.entry.frameName, w, h).setOrigin(0);
+        // Tile flags are constructor arguments; atlas data cannot carry them.
+        const tile = row.entry.tile ?? '';
+        const slice = this.add
+          .nineslice(
+            x,
+            y,
+            row.entry.key,
+            row.entry.frameName,
+            w,
+            h,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            tile.includes('x'),
+            tile.includes('y'),
+          )
+          .setOrigin(0);
         report.push({
           entry: row.entry.label,
           label,
           at: [x, y],
+          image: new URL(row.entry.imageUrl).pathname,
+          frame: row.entry.frame.frame,
+          borders: row.entry.frame.scale9Borders,
+          shape: row.entry.frame.slicewright?.shape,
+          tile,
           requested: [w, h],
           rendered: [slice.width, slice.height],
           insets: [slice.leftWidth, slice.rightWidth, slice.topHeight, slice.bottomHeight],
@@ -123,11 +145,13 @@ function compareLikePairs(canvas, report) {
   for (const entry of entries.filter((item) => item.like !== undefined)) {
     const base = entries.find((item) => item.atlas === entry.like);
     if (base === undefined) {
+      results.push({ entry: entry.label, against: entry.like, skipped: 'the like atlas is not in the manifest' });
       continue;
     }
     for (const rendered of report.filter((item) => item.entry === entry.label)) {
       const other = report.find((item) => item.entry === base.label && item.label === rendered.label);
       if (other === undefined || other.rendered.join() !== rendered.rendered.join()) {
+        results.push({ entry: entry.label, against: base.label, size: rendered.label, skipped: 'no same-size render to compare' });
         continue;
       }
       const [w, h] = rendered.rendered;

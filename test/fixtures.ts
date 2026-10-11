@@ -87,3 +87,39 @@ export function sameRaster(a: Raster, b: Raster): boolean {
     a.data.every((value, index) => value === b.data[index])
   );
 }
+
+/** The raster turned a quarter turn: columns become rows. */
+export function transpose(raster: Raster): Raster {
+  const out = createRaster(raster.height, raster.width);
+  for (let y = 0; y < raster.height; y += 1) {
+    for (let x = 0; x < raster.width; x += 1) {
+      out.data.set(
+        raster.data.subarray(pixelOffset(raster, x, y), pixelOffset(raster, x, y) + 4),
+        pixelOffset(out, y, x),
+      );
+    }
+  }
+  return out;
+}
+
+/** A panel with a crest in the middle of its top edge, which must not stretch. */
+export function crestPanel(width: number, height: number): Raster {
+  const raster = panel(width, height);
+  const center = Math.floor(width / 2);
+  // Every crest column differs, as drawn detail does, so none of it stretches.
+  for (let x = 0; x < 10; x += 1) {
+    fillRect(raster, center - 5 + x, 0, 1, 9, [240, 120 + x * 12, 60, 255]);
+  }
+  return raster;
+}
+
+/** A panel whose top and bottom borders carry a rope pattern repeating every 6 px. */
+export function ropePanel(width: number, height: number): Raster {
+  const raster = panel(width, height);
+  for (let x = 6; x < width - 6; x += 1) {
+    const color: Color = x % 6 < 3 ? [230, 190, 60, 255] : [120, 80, 20, 255];
+    fillRect(raster, x, 2, 1, 3, color);
+    fillRect(raster, x, height - 5, 1, 3, color);
+  }
+  return raster;
+}
