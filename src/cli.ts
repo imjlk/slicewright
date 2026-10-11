@@ -18,7 +18,13 @@ import { decodePng, encodePng } from './png.js';
 import { buildPromptPlan, promptBackgrounds, uiKinds } from './prompt.js';
 import type { SliceLayout } from './layout.js';
 import type { Raster } from './raster.js';
-import { renderPreviewSheet } from './render.js';
+import {
+  defaultPreviewMaxWidth,
+  previewCellLabels,
+  renderPreviewSheet,
+  type PreviewCellLabel,
+  type PreviewOptions,
+} from './render.js';
 import { resizeRaster, targetSize } from './resize.js';
 import { parseBorders, parseInsets, scale9BordersToInsets, type SliceInsets } from './slices.js';
 import { exportForTarget, findTarget, sliceTargets } from './targets/index.js';
@@ -145,13 +151,28 @@ const preview = define({
   args: {
     input: image,
     out: { type: 'string', required: true, description: 'Preview sheet PNG to write' },
+    cells: {
+      type: 'string',
+      description: `Cells to show, comma-separated: ${previewCellLabels.join(',')}`,
+    },
+    zoom: {
+      type: 'number',
+      default: 1,
+      description: 'Scale every cell by this whole number (1-8), nearest-neighbor',
+    },
+    'max-width': {
+      type: 'number',
+      default: defaultPreviewMaxWidth,
+      description: 'Wrap cells to a new row past this sheet width',
+    },
     ...sliceArgs,
   },
   run: (ctx) => {
     const raster = readPng(ctx.values.input);
     const settings = inspectOptions(ctx.values, raster);
+    const options = previewOptions(ctx.values);
     const report = inspectRaster(raster, settings);
-    const sheet = renderPreviewSheet(raster, report.layout);
+    const sheet = renderPreviewSheet(raster, report.layout, options);
     writeFileSync(ctx.values.out, encodePng(sheet.raster));
     print({
       image: ctx.values.input,
@@ -604,6 +625,33 @@ function sizeRequest(values: {
     ...(height === undefined ? {} : { height }),
     ...(scale === undefined ? {} : { scale }),
   };
+}
+
+function previewOptions(values: {
+  readonly cells?: string | undefined;
+  readonly zoom: number;
+  readonly 'max-width': number;
+}): PreviewOptions {
+  const zoom = values.zoom;
+  const maxWidth = values['max-width'];
+  if (!Number.isInteger(zoom) || zoom < 1 || zoom > 8) {
+    throw new UsageError('--zoom must be a whole number from 1 to 8.');
+  }
+  if (!Number.isInteger(maxWidth) || maxWidth < 1) {
+    throw new UsageError('--max-width must be a positive whole number.');
+  }
+  if (values.cells === undefined) {
+    return { zoom, maxWidth };
+  }
+  const names = values.cells.split(',').map((name) => name.trim());
+  const cells = names.filter((name): name is PreviewCellLabel =>
+    (previewCellLabels as readonly string[]).includes(name),
+  );
+  const unknown = names.filter((name) => !cells.includes(name as PreviewCellLabel));
+  if (unknown.length > 0 || cells.length === 0) {
+    throw new UsageError(`--cells takes ${previewCellLabels.join(', ')}; got ${values.cells}.`);
+  }
+  return { cells, zoom, maxWidth };
 }
 
 function atlasImage(json: unknown, path: string): string {
