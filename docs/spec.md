@@ -65,7 +65,8 @@ Ornate edges often carry a pattern, such as a rope or a chain, that cannot
 stretch but can tile. When an axis has no trustworthy uniform run, detection
 looks for a span whose every line matches the line one period later, for
 periods from 2 to a quarter of the content length and at most 64. The longest
-such span, trimmed to whole periods and holding at least two, becomes the
+such span, trimmed to whole periods (with the leftover lines placed so the span
+sits nearest the center) and holding at least two, becomes the
 stretch span when it reaches 10% of the content; ties prefer the shorter period,
 then the span nearest the center. That axis is then tiled, and a
 `tile.<axis>.auto` finding names the period and tells the caller to enable
@@ -151,7 +152,8 @@ keying fails rather than guessing. Pixels at or above the drop threshold
 (default 40) and the drop threshold fade linearly, and the rest stay as they
 are. Pixels within the despill radius (default 2) of a pixel that is not fully
 opaque and that still lean toward the key are despilled: green drops to
-`max(r, b)`; red and blue drop by their lead over green.
+`max(r, b)`; red and blue drop by their lead over green. The radius must be a
+whole number from 0 to 64.
 
 ## Resizing
 
@@ -160,7 +162,8 @@ averages every source pixel an output pixel covers, weighted by overlap, in
 premultiplied alpha so transparent pixels do not darken edges; when enlarging
 it samples the covering source pixel. The nearest filter samples the source
 pixel under each output pixel center, for pixel art. A target is a width and
-height, one side with the aspect ratio kept, or a scale.
+height in whole pixels, one side with the aspect ratio kept, or a positive scale;
+anything else is refused rather than clamped.
 
 ## Normalization
 

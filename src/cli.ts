@@ -578,10 +578,17 @@ try {
       export: exportCommand,
       targets,
     },
-    // stdout carries JSON only; gunshi's banner would break parsing.
+    // stdout carries JSON only: no banner, no validation text; errors go to stderr.
     renderHeader: null,
+    renderValidationErrors: null,
+    // Unknown or misspelled flags are errors, not silently ignored.
+    strict: true,
   });
 } catch (error) {
-  process.stderr.write(`slicewright: ${error instanceof Error ? error.message : String(error)}\n`);
+  const messages =
+    error instanceof AggregateError
+      ? error.errors.map((item: unknown) => (item instanceof Error ? item.message : String(item)))
+      : [error instanceof Error ? error.message : String(error)];
+  process.stderr.write(messages.map((message) => `slicewright: ${message}\n`).join(''));
   process.exitCode = usageFailed;
 }

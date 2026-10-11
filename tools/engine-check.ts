@@ -1,6 +1,6 @@
 import { createReadStream, existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { extname, join, normalize, resolve } from 'node:path';
+import { extname, join, normalize, resolve, sep } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { chromium, type Page } from 'playwright-core';
@@ -39,7 +39,7 @@ const server = createServer((request, response) => {
   const path = normalize(
     join(root, decodeURIComponent(new URL(request.url ?? '/', 'http://x').pathname)),
   );
-  if (!path.startsWith(root) || !existsSync(path) || !statSync(path).isFile()) {
+  if (!path.startsWith(root + sep) || !existsSync(path) || !statSync(path).isFile()) {
     response.writeHead(404).end();
     return;
   }
@@ -113,7 +113,10 @@ async function checkPhaser(page: Page): Promise<{
   return {
     ...result,
     sizeMismatches: result.report.filter((item) => item.requested.join() !== item.rendered.join()),
-    failing: result.comparisons.filter((item) => item.mean > maxMean),
+    // A skipped comparison means the manifest no longer pairs what it claims to.
+    failing: result.comparisons.filter(
+      (item) => 'skipped' in item || item.mean > maxMean,
+    ),
   };
 }
 

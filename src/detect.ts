@@ -254,7 +254,7 @@ export interface RepeatSpan {
  * then the span nearest the center.
  *
  * @evidence docs/spec.md#repeating-edges Finds the longest whole-period span for periods from 2 to a quarter of the content, at most 64.
- * @evidenceReview docs/spec.md#repeating-edges #2fe5a06 Checked this code against the section line by line and ran tilesRepeatingEdges green with pnpm test.
+ * @evidenceReview docs/spec.md#repeating-edges #4d54ace Checked this code against the section line by line and ran tilesRepeatingEdges green with pnpm test.
  */
 export function detectRepeatSpan(
   raster: Raster,
@@ -275,7 +275,19 @@ export function detectRepeatSpan(
       }
       const covered = runEnd - runStart + period;
       const whole = Math.floor(covered / period) * period;
-      const candidate = { span: { start: runStart, end: runStart + whole }, period };
+      // The remainder can sit on either side; keep the alignment nearest the center.
+      let offset = 0;
+      for (let shift = 1; shift <= covered - whole; shift += 1) {
+        const shifted = { start: runStart + shift, end: runStart + shift + whole };
+        const current = { start: runStart + offset, end: runStart + offset + whole };
+        if (centerDistance(shifted, center) < centerDistance(current, center)) {
+          offset = shift;
+        }
+      }
+      const candidate = {
+        span: { start: runStart + offset, end: runStart + offset + whole },
+        period,
+      };
       runStart = undefined;
       if (whole < period * 2) {
         return;

@@ -127,11 +127,13 @@ function compareLikePairs(canvas, report) {
   for (const entry of entries.filter((item) => item.like !== undefined)) {
     const base = entries.find((item) => item.atlas === entry.like);
     if (base === undefined) {
+      results.push({ entry: entry.label, against: entry.like, skipped: 'the like atlas is not in the manifest' });
       continue;
     }
     for (const rendered of report.filter((item) => item.entry === entry.label)) {
       const other = report.find((item) => item.entry === base.label && item.label === rendered.label);
       if (other === undefined || other.rendered.join() !== rendered.rendered.join()) {
+        results.push({ entry: entry.label, against: base.label, size: rendered.label, skipped: 'no same-size render to compare' });
         continue;
       }
       const [w, h] = rendered.rendered;

@@ -16,7 +16,7 @@ function pixel(raster: Raster, x: number, y: number): number[] {
 
 /**
  * @evidence docs/spec.md#chroma-removal Keys green and magenta backgrounds, fades the blend band, despills the edge, and refuses an image with no key.
- * @evidenceReview docs/spec.md#chroma-removal #df13fe5 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#chroma-removal #594a7cd Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function removesChromaBackgrounds(): void {
   const keyed = createRaster(12, 8);
@@ -49,11 +49,16 @@ export function removesChromaBackgrounds(): void {
 
   throws(() => removeChroma(panel(20, 16)), /No chroma key/);
   throws(() => removeChroma(keyed, { ...defaultChromaOptions, keep: 90, drop: 80 }), RangeError);
+  throws(() => removeChroma(keyed, { ...defaultChromaOptions, despillRadius: 1.5 }), RangeError);
+  throws(
+    () => removeChroma(keyed, { ...defaultChromaOptions, despillRadius: Infinity }),
+    RangeError,
+  );
 }
 
 /**
  * @evidence docs/spec.md#resizing Averages in premultiplied alpha without colour halos, keeps uniform areas exact, samples nearest pixels, and fits target sizes.
- * @evidenceReview docs/spec.md#resizing #77df809 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#resizing #50e7c67 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function resizesWithoutHalos(): void {
   const edge = createRaster(2, 1);
@@ -81,6 +86,15 @@ export function resizesWithoutHalos(): void {
   deepStrictEqual(targetSize(400, 200, { scale: 0.25 }), { width: 100, height: 50 });
   deepStrictEqual(targetSize(400, 200, { width: 90, height: 30 }), { width: 90, height: 30 });
   throws(() => resizeRaster(checker, 0, 4), RangeError);
+  for (const request of [
+    { scale: 0 },
+    { scale: -1 },
+    { scale: Number.NaN },
+    { width: 1.5 },
+    { height: 0 },
+  ]) {
+    throws(() => targetSize(400, 200, request), RangeError);
+  }
 }
 
 /**
@@ -156,6 +170,17 @@ export function normalizesGeneratedArt(): void {
   });
   strictEqual(broken.report.ok, false);
   strictEqual(broken.raster.width, 40);
+  // An invalid keep is refused even when inspection would stop early.
+  throws(
+    () =>
+      normalizeRaster(panel(40, 30), {
+        inspect: { ...defaultInspectOptions, insets: { left: 2, right: 2, top: 6, bottom: 6 } },
+        crop: true,
+        filter: 'area',
+        keep: 0,
+      }),
+    RangeError,
+  );
 }
 
 void test('chroma removal', removesChromaBackgrounds);

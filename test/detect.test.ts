@@ -1,7 +1,12 @@
 import { deepStrictEqual, notDeepStrictEqual, ok, strictEqual } from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { contentBounds, defaultMatchOptions, detectStretchSpan } from '../src/detect.js';
+import {
+  contentBounds,
+  defaultMatchOptions,
+  detectRepeatSpan,
+  detectStretchSpan,
+} from '../src/detect.js';
 import { defaultInspectOptions, inspectRaster, type InspectReport } from '../src/inspect.js';
 import { createRaster } from '../src/raster.js';
 import { insetsProblem } from '../src/slices.js';
@@ -239,7 +244,7 @@ export function toleratesGeneratedNoise(): void {
 
 /**
  * @evidence docs/spec.md#repeating-edges Tiles a rope-patterned edge with its period, and warns about a non-repeating edge.
- * @evidenceReview docs/spec.md#repeating-edges #2fe5a06 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#repeating-edges #4d54ace Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function tilesRepeatingEdges(): void {
   // A panel whose top and bottom borders carry a 6 px rope pattern.
@@ -262,6 +267,20 @@ export function tilesRepeatingEdges(): void {
   for (let x = 6; x < 90; x += 1) {
     fillRect(organic, x, 2, 1, 3, [(x * 37) % 256, (x * 91) % 256, 60, 255]);
   }
+  // A 4 px pattern on columns 6..19 leaves 2 lines over; the span shifts toward the center.
+  const offCenter = createRaster(40, 4);
+  for (let x = 0; x < 40; x += 1) {
+    const color: Color =
+      x >= 6 && x < 20
+        ? [x % 4 < 2 ? 220 : 40, 80, 80, 255]
+        : [(x * 53) % 256, (x * 29) % 256, 200, 255];
+    fillRect(offCenter, x, 0, 1, 4, color);
+  }
+  deepStrictEqual(
+    detectRepeatSpan(offCenter, 'x', { x: 0, y: 0, width: 40, height: 4 }, defaultMatchOptions),
+    { span: { start: 8, end: 20 }, period: 4 },
+  );
+
   const organicReport = inspectRaster(organic, { ...defaultInspectOptions, noise: 'off' });
   ok(
     codes(organicReport).includes('stretch.x.none') || codes(organicReport).includes('stretch.x.short'),

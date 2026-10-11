@@ -40,7 +40,7 @@ export function keyDominance(red: number, green: number, blue: number, key: Chro
  * covers at least half of the border pixels.
  *
  * @evidence docs/spec.md#chroma-removal Detects the key from the border pixels before keying.
- * @evidenceReview docs/spec.md#chroma-removal #df13fe5 Checked this code against the section line by line and ran removesChromaBackgrounds green with pnpm test.
+ * @evidenceReview docs/spec.md#chroma-removal #594a7cd Checked this code against the section line by line and ran removesChromaBackgrounds green with pnpm test.
  */
 export function detectChromaKey(raster: Raster, minimum = 120): ChromaKey | undefined {
   let border = 0;
@@ -74,7 +74,7 @@ export function detectChromaKey(raster: Raster, minimum = 120): ChromaKey | unde
  * Keys out a green or magenta background and despills the new alpha edge.
  *
  * @evidence docs/spec.md#chroma-removal Clears, softens, and despills by key dominance.
- * @evidenceReview docs/spec.md#chroma-removal #df13fe5 Checked this code against the section line by line and ran removesChromaBackgrounds green with pnpm test.
+ * @evidenceReview docs/spec.md#chroma-removal #594a7cd Checked this code against the section line by line and ran removesChromaBackgrounds green with pnpm test.
  */
 export function removeChroma(
   raster: Raster,
@@ -82,6 +82,11 @@ export function removeChroma(
 ): ChromaResult {
   if (!(options.keep >= 0 && options.drop > options.keep && options.drop <= 255)) {
     throw new RangeError('Chroma thresholds need 0 <= keep < drop <= 255.');
+  }
+  if (!Number.isInteger(options.despillRadius) || options.despillRadius < 0 || options.despillRadius > 64) {
+    throw new RangeError(
+      `The despill radius must be a whole number from 0 to 64, got ${options.despillRadius}.`,
+    );
   }
   const key = options.key === 'auto' ? detectChromaKey(raster) : options.key;
   if (key === undefined) {

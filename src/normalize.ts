@@ -67,6 +67,9 @@ export function normalizeRaster(
   source: Raster,
   options: NormalizeOptions = defaultNormalizeOptions,
 ): NormalizeResult {
+  if (options.keep !== undefined && (!Number.isInteger(options.keep) || options.keep < 1)) {
+    throw new RangeError(`--keep must be a positive integer, got ${options.keep}.`);
+  }
   const steps: NormalizeStep[] = [];
   let raster = source;
 
@@ -88,9 +91,6 @@ export function normalizeRaster(
   const report = inspectRaster(raster, options.inspect);
   if (options.keep === undefined || !report.ok) {
     return { raster, steps, report };
-  }
-  if (!Number.isInteger(options.keep) || options.keep < 1) {
-    throw new RangeError(`--keep must be a positive integer, got ${options.keep}.`);
   }
 
   const findings: Finding[] = [];
