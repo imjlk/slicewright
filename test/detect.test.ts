@@ -28,7 +28,7 @@ function codes(report: InspectReport): string[] {
 
 /**
  * @evidence docs/spec.md#slice-insets Checks negative, fractional, and span-consuming insets.
- * @evidenceReview docs/spec.md#slice-insets #31ab641 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#slice-insets #705f0b4 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function rejectsInsetsWithoutAStretchSpan(): void {
   strictEqual(insetsProblem({ left: 4, right: 4, top: 4, bottom: 4 }, 9, 9), undefined);

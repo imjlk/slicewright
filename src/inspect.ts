@@ -413,7 +413,7 @@ export function multiRegionLayout(
 
 /**
  * @evidence docs/spec.md#slice-insets Rejects caller insets that leave no stretch span.
- * @evidenceReview docs/spec.md#slice-insets #31ab641 Checked this code against the section line by line and ran rejectsInsetsWithoutAStretchSpan green with pnpm test.
+ * @evidenceReview docs/spec.md#slice-insets #705f0b4 Checked this code against the section line by line and ran rejectsInsetsWithoutAStretchSpan green with pnpm test.
  * @evidence docs/spec.md#stretch-uniformity Reports the first mismatching pair in each caller-given stretch span unless the axis tiles.
  * @evidenceReview docs/spec.md#stretch-uniformity #695468c Checked this code against the section line by line and ran rejectsGivenInsetsThatStretchDetail green with pnpm test.
  * @evidence docs/spec.md#three-slice Forces zero top and bottom insets in three-slice mode.

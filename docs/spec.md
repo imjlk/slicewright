@@ -14,11 +14,14 @@ an error that names the reason.
 
 ## Slice insets
 
-A slice layout is four insets in pixels: `left`, `right`, `top`, and `bottom`.
-Corners keep their size, the top and bottom edges stretch horizontally, the left
-and right edges stretch vertically, and the center stretches both ways. The
-stretchable span on each axis must be at least one pixel wide, so `left + right`
-must be smaller than the width and `top + bottom` smaller than the height.
+Insets are four sizes in pixels, `left`, `right`, `top`, and `bottom`, that
+describe the layouts with at most one flexible span per axis (see Slice
+layouts): they are how callers give a nine-slice and how engines such as Phaser
+store one. Corners keep their size, the top and bottom edges stretch
+horizontally, the left and right edges stretch vertically, and the center
+stretches both ways. The stretchable span on each axis must be at least one
+pixel wide, so `left + right` must be smaller than the width and `top + bottom`
+smaller than the height.
 
 ## Slice layouts
 

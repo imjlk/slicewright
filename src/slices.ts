@@ -21,7 +21,7 @@ export interface Scale9Borders {
  * Returns why the insets cannot slice an image of this size, or undefined.
  *
  * @evidence docs/spec.md#slice-insets Enforces non-negative integer insets that leave at least one stretch pixel per axis.
- * @evidenceReview docs/spec.md#slice-insets #31ab641 Checked this code against the section line by line and ran rejectsInsetsWithoutAStretchSpan green with pnpm test.
+ * @evidenceReview docs/spec.md#slice-insets #705f0b4 Checked this code against the section line by line and ran rejectsInsetsWithoutAStretchSpan green with pnpm test.
  */
 export function insetsProblem(
   insets: SliceInsets,
