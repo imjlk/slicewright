@@ -5,7 +5,7 @@
 First release.
 
 - Prompt plans for buttons, panels, dialogs, bars and bar fills, tooltips,
-  speech-bubble bodies and tails, and frames.
+  and frames.
 - Chroma-key removal with despill, premultiplied area and nearest resizing,
   and `normalize` (crop, resize, inset detection, optional minimal rebuild).
 - Inset detection for nine-slice, three-slice, vertical three-slice,

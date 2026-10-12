@@ -61,7 +61,9 @@ enforces in `pnpm check`:
   entry to `CHANGELOG.md`; after it merges, push a `v<version>` tag on `main`.
 - `.github/workflows/release.yml` publishes on the tag through npm Trusted
   Publishing (OIDC, with provenance). It refuses a tag that does not match
-  `package.json`. `prepublishOnly` runs check, test, and build.
+  `package.json` or does not point at a commit on `main`, and publishes a
+  prerelease (a version with a hyphen) to the `next` dist-tag.
+  `prepublishOnly` runs check, test, and build.
 - The first version is published once by hand by the maintainer
   (`npm publish` with their own npm login); then configure this workflow as
   the package's Trusted Publisher on npmjs.com before relying on tags.

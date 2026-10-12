@@ -21,6 +21,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      # Only a commit already on main is released.
+      - name: Tag is on main
+        run: |
+          git fetch origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "Tag ${GITHUB_REF_NAME} points at a commit that is not on main." >&2
+            exit 1
+          fi
 
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
@@ -54,4 +65,10 @@ jobs:
 
       - run: pnpm engine:check
       # prepublishOnly runs check, test, and build again before publishing.
-      - run: npm publish --provenance
+      # A prerelease (a version with a hyphen) goes to the next dist-tag.
+      - run: |
+          version="$(node -p "require('./package.json').version")"
+          case "$version" in
+            *-*) npm publish --provenance --tag next ;;
+            *) npm publish --provenance ;;
+          esac
