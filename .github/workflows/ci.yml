@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  # The release workflow runs CI on the release PR, which GITHUB_TOKEN cannot trigger.
+  workflow_dispatch: {}
 
 permissions:
   contents: read
