@@ -218,6 +218,24 @@ lines into their neighbors over about the stretched span divided by twice the
 keep length. When inspection reports an error, it returns the resized image
 without rebuilding.
 
+Before resizing down, normalization looks for drawn lines the resize will
+lose. Area averaging leaves a line about its width divided by the factor of
+its contrast, so a line narrower than half the factor fades; nearest sampling
+can drop a line narrower than the factor. That width is the limit for each
+axis. Along up to five distinct sample lines at 40% to 60% of the cropped image
+it walks in from each edge, past the transparent margin and the anti-aliased
+ramp (alpha below 224), and no further than a quarter of the length, splitting
+the line into segments whose neighbors differ by at most 40 (premultiplied,
+alpha included). A segment that reaches the end of the search is the fill,
+whether opaque, translucent, or empty. A segment at least as wide as the limit
+is a rim, which keeps marking the border, so nothing is reported. Narrower
+segments are passed over, so a double stroke still reaches the fill; the first
+of them that differs from both neighbors by more than 48 (from the
+transparency outside by its alpha) is the line. When at least three of a
+side's sample lines reach the fill past such a line, a `resize.thin-lines`
+warning names the sides, widths, and factors and asks for lines at least as
+thick as the limit or a larger size.
+
 ## Content padding
 
 Content padding is where content such as text sits inside the frame: four sizes
