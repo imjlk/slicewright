@@ -1,7 +1,7 @@
 [git]
 default_branch = "main"
 # One package: tag releases v<version> rather than slicewright-v<version>.
-short_tags = "npm/slicewright"
+short_tags = "slicewright"
 
 [github]
 repository = "imjlk/slicewright"

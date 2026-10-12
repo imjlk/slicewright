@@ -70,7 +70,7 @@ Releases go through Sampo (`.sampo/config.toml`), as in mpgd-kit:
   which bumps `package.json` and `CHANGELOG.md`; never edit those two by hand
   for a release.
 - Merging the release PR publishes to npm through Trusted Publishing (OIDC,
-  with provenance; `prepublishOnly` runs check, test, and build) and creates
+  with provenance) the `dist` a separate build job checked and built, and creates
   the `v<version>` tag and GitHub release. Merge the release PR after the
   other PRs meant for that release.
 - 0.1.0 was published by hand; npm already lists this repository's
