@@ -121,7 +121,7 @@ export function createSingleFrameAtlas(
  * only `frameName`, against the atlas image.
  *
  * @evidence docs/spec.md#atlas-frames Rejects trimmed frames and out-of-frame borders, warns on rotation, and inspects each frame with its borders.
- * @evidenceReview docs/spec.md#atlas-frames #62a16b1 Checked this code against the section line by line and ran checksAtlasFrames green with pnpm test.
+ * @evidenceReview docs/spec.md#atlas-frames #0dc6d1b Checked this code against the section line by line and ran checksAtlasFrames green with pnpm test.
  */
 export function inspectAtlas(
   json: unknown,
@@ -243,11 +243,14 @@ function inspectFrame(
     });
   }
   // A fractional rectangle would crop at shifted byte offsets.
-  if (![x, y, w, h].every(Number.isInteger) || x < 0 || y < 0 || x + w > image.width || y + h > image.height) {
+  const fractional = ![x, y, w, h].every(Number.isInteger);
+  if (fractional || x < 0 || y < 0 || x + w > image.width || y + h > image.height) {
     findings.push({
       code: 'atlas.frame-outside-image',
       severity: 'error',
-      message: `Frame ${w}x${h}+${x}+${y} is not a whole-pixel rectangle inside the ${image.width}x${image.height} image.`,
+      message: fractional
+        ? `Frame ${w}x${h}+${x}+${y} is not a whole-pixel rectangle.`
+        : `Frame ${w}x${h}+${x}+${y} lies outside the ${image.width}x${image.height} image.`,
     });
     return { name, ok: false, findings };
   }
