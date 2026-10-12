@@ -52,7 +52,9 @@
     "examples": "ttsx tools/make-examples.ts",
     "engine:check": "ttsx tools/engine-check.ts",
     "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
-    "prepublishOnly": "pnpm check && pnpm test && pnpm build"
+    "prepublishOnly": "pnpm check && pnpm test && pnpm build",
+    "sampo:add": "sampo add",
+    "sampo:release:dry-run": "sampo release --dry-run"
   },
   "dependencies": {
     "fast-png": "8.0.0",

@@ -57,13 +57,21 @@ enforces in `pnpm check`:
 
 ## Releasing
 
-- The version lives in `package.json`. A release PR bumps it and adds a short
-  entry to `CHANGELOG.md`; after it merges, push a `v<version>` tag on `main`.
-- `.github/workflows/release.yml` publishes on the tag through npm Trusted
-  Publishing (OIDC, with provenance). It refuses a tag that does not match
-  `package.json` or does not point at a commit on `main`, and publishes a
-  prerelease (a version with a hyphen) to the `next` dist-tag.
-  `prepublishOnly` runs check, test, and build.
-- The first version is published once by hand by the maintainer
-  (`npm publish` with their own npm login); then configure this workflow as
-  the package's Trusted Publisher on npmjs.com before relying on tags.
+Releases go through Sampo (`.sampo/config.toml`), as in mpgd-kit:
+
+- A PR that changes the published package's behavior, public API, CLI, skill,
+  or package metadata adds a changeset in `.sampo/changesets/` (`pnpm
+  sampo:add`, or a file with `npm/slicewright: patch|minor|major` front matter
+  and a user-facing description; `patch (Fixed)` style tags pick the changelog
+  section). Docs-only, CI-only, and example-only PRs need none; say so in the
+  PR summary.
+- After CI passes on `main`, `.github/workflows/release.yml` runs Sampo: with
+  pending changesets it opens or updates the release PR (`release/main`),
+  which bumps `package.json` and `CHANGELOG.md`; never edit those two by hand
+  for a release.
+- Merging the release PR publishes to npm through Trusted Publishing (OIDC,
+  with provenance; `prepublishOnly` runs check, test, and build) and creates
+  the `v<version>` tag and GitHub release. Merge the release PR after the
+  other PRs meant for that release.
+- 0.1.0 was published by hand; npm already lists this repository's
+  `release.yml` as the package's Trusted Publisher.

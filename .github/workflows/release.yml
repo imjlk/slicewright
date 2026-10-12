@@ -1,74 +1,134 @@
 name: Release
 
-# Publishes to npm when a version tag is pushed. The package must have been
-# published once by hand and have this workflow configured as its Trusted
-# Publisher on npmjs.com; npm then authenticates the run through OIDC, with no
-# token, and attaches provenance.
+# Sampo release automation, after CI passes on main:
+# - with pending changesets in .sampo/changesets, it opens or updates the
+#   release PR (release/main) that bumps package.json and CHANGELOG.md;
+# - when that PR has merged, it publishes to npm through Trusted Publishing
+#   (OIDC, no token; prepublishOnly runs check, test, and build) and creates the
+#   v<version> tag and GitHub release.
 on:
-  push:
-    tags: ['v*']
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
 
 permissions:
   contents: read
-  id-token: write
-
-concurrency:
-  group: release
-  cancel-in-progress: false
 
 jobs:
-  publish:
+  release:
+    if: ${{ (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.conclusion == 'success') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') }}
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: write
+      pull-requests: write
+      id-token: write
+    env:
+      RELEASE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-
-      # Only a commit already on main is released.
-      - name: Tag is on main
+      # Several merges in a row each finish CI; only the run for the current
+      # main tip releases, so a stale run ends here instead of racing.
+      - name: Release commit is current main
+        id: current
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git fetch origin main
-          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
-            echo "Tag ${GITHUB_REF_NAME} points at a commit that is not on main." >&2
+          set -euo pipefail
+          main_sha="$(gh api "repos/${GITHUB_REPOSITORY}/branches/main" --jq '.commit.sha')"
+          if [ "${main_sha}" = "${RELEASE_SHA}" ]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "current=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping ${RELEASE_SHA}: main is at ${main_sha}, whose run releases instead."
+          fi
+
+      - name: Manual runs need CI to have passed on this commit
+        if: ${{ steps.current.outputs.current == 'true' && github.event_name == 'workflow_dispatch' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          conclusion="$(gh run list --repo "${GITHUB_REPOSITORY}" --workflow ci.yml --commit "${RELEASE_SHA}" --event push --limit 5 --json status,conclusion --jq '[.[] | select(.status == "completed")][0].conclusion // empty')"
+          if [ "${conclusion}" != "success" ]; then
+            echo "Manual release needs a successful CI push run for ${RELEASE_SHA}; got ${conclusion:-none}." >&2
             exit 1
           fi
 
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: ${{ steps.current.outputs.current == 'true' }}
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      # pnpm publish checks the branch and a clean tree; attach the verified
+      # commit to main and track origin/main.
+      - name: Attach the release commit to main
+        if: ${{ steps.current.outputs.current == 'true' }}
+        run: |
+          git switch -C main
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          git branch --set-upstream-to=origin/main main
+
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        if: ${{ steps.current.outputs.current == 'true' }}
         with:
           version: 11.7.0
 
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        if: ${{ steps.current.outputs.current == 'true' }}
         with:
           node-version: 24
           cache: pnpm
-          registry-url: https://registry.npmjs.org
 
       # Trusted Publishing needs npm 11.5.1 or newer.
       - run: npm install -g npm@11.20.0
-
-      - name: Tag matches package.json
-        run: |
-          version="$(node -p "require('./package.json').version")"
-          if [ "v${version}" != "${GITHUB_REF_NAME}" ]; then
-            echo "Tag ${GITHUB_REF_NAME} does not match package.json version ${version}." >&2
-            exit 1
-          fi
+        if: ${{ steps.current.outputs.current == 'true' }}
 
       - run: pnpm install --frozen-lockfile
+        if: ${{ steps.current.outputs.current == 'true' }}
 
       - name: Cache compiled ttsc plugins
+        if: ${{ steps.current.outputs.current == 'true' }}
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: node_modules/.cache/ttsc/plugins
           key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
 
-      - run: pnpm engine:check
-      # prepublishOnly runs check, test, and build again before publishing.
-      # A prerelease (a version with a hyphen) goes to the next dist-tag.
-      - run: |
-          version="$(node -p "require('./package.json').version")"
-          case "$version" in
-            *-*) npm publish --provenance --tag next ;;
-            *) npm publish --provenance ;;
-          esac
+      # Credentials stay out of checkout and install; Sampo's git push reads
+      # the step-scoped token through the helper.
+      - name: Configure git authentication for Sampo
+        if: ${{ steps.current.outputs.current == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh auth setup-git --hostname github.com
+
+      - name: Run Sampo release automation
+        if: ${{ steps.current.outputs.current == 'true' }}
+        uses: bruits/sampo/crates/sampo-github-action@f7241754458e1be4073902b2860596340c7d089c # sampo-v0.17.4
+        with:
+          command: auto
+          create-github-release: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # A PR opened with GITHUB_TOKEN does not start CI on its own.
+      - name: Run CI on the release PR
+        if: ${{ steps.current.outputs.current == 'true' }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          release_pr="$(gh pr list --repo "${GITHUB_REPOSITORY}" --head release/main --state open --json number --jq '.[0].number // empty')"
+          if [ -n "${release_pr}" ]; then
+            gh workflow run ci.yml --ref release/main
+          else
+            echo "No open release PR."
+          fi
