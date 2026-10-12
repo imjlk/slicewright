@@ -61,7 +61,7 @@ interface AtlasSource {
  * stylesheet sit next to the PNG.
  *
  * @evidence docs/spec.md#atlas-packing Refuses trimmed, rotated, and out-of-image input frames, checks the packed atlas, writes one load call with a NineSlice per frame, and gives CSS classes only to frames that are a whole image.
- * @evidenceReview docs/spec.md#atlas-packing #cd28666 Checked this code against the section line by line and ran packsAtlasFiles green with pnpm test.
+ * @evidenceReview docs/spec.md#atlas-packing #8eec33b Checked this code against the section line by line and ran packsAtlasFiles green with pnpm test.
  */
 export function buildPack(options: PackFilesOptions): PackFilesResult {
   const outDir = dirname(options.out);
@@ -71,8 +71,12 @@ export function buildPack(options: PackFilesOptions): PackFilesResult {
   // Packing next to its inputs must never overwrite them or their stylesheets.
   // Existing files compare by their real path, so a symlink or another letter
   // case on a case-insensitive disk still names the same file.
-  const outputs = [options.out, atlasPath, cssPath].map((path) => filePath(path));
-  if (new Set(outputs).size !== outputs.length) {
+  const outputs = [options.out, atlasPath, ...(options.css ? [cssPath] : [])].map((path) =>
+    filePath(path),
+  );
+  // Outputs that differ only in letter case are one file on a case-insensitive
+  // disk, even before any of them exists.
+  if (new Set(outputs.map((path) => path.toLowerCase())).size !== outputs.length) {
     throw new PackInputError(
       `--out ${options.out} is also the atlas or stylesheet path for --name ${options.name}; give the image a .png name.`,
     );

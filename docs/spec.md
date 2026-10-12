@@ -333,7 +333,8 @@ one region per axis.
 An atlas check reads a Phaser JSON Hash or JSON Array atlas and validates every
 frame that has `scale9Borders`, or only the named frame. A trimmed frame is an
 error because Phaser's NineSlice does not support trimming. A rotated frame is a
-warning. Borders outside the frame are an error. Each frame's pixels are then
+warning. A frame rectangle that is not whole pixels or lies outside the image
+is an `atlas.frame-outside-image` error. Borders outside the frame are an error. Each frame's pixels are then
 inspected with its borders as explicit insets: borders spanning the full height
 inspect as a three-slice. Borders spanning the full width are an ordinary
 nine-slice whose columns must match, unless the frame carries
@@ -364,7 +365,8 @@ CSS is one stylesheet with a class per frame that still points at each frame's
 own image, and a frame that is only part of its image has no CSS class; with no
 class at all, no stylesheet is written. Packing refuses to write over an input
 atlas, its image, or the stylesheet beside it, comparing existing files by their
-real path, and refuses an image path that is also its own atlas or stylesheet.
+real path, and refuses an image path that is also its own atlas or, with a
+stylesheet, its stylesheet, even when they differ only in letter case.
 
 ## Command-line arguments
 

@@ -38,7 +38,7 @@ function pixel(raster: Raster, x: number, y: number): number[] {
 
 /**
  * @evidence docs/spec.md#atlas-packing Packs a panel, a bar, and a tiled rope panel: exact pixels, extrusion, spacing, kept borders and slicewright data, a passing atlas check, one usage, and refused inputs.
- * @evidenceReview docs/spec.md#atlas-packing #cd28666 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#atlas-packing #8eec33b Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function packsAtlases(): void {
   const pieces = [
@@ -144,7 +144,7 @@ export function packsAtlases(): void {
 
 /**
  * @evidence docs/spec.md#atlas-packing Packs committed atlases from files: one load call, tiling flags, a stylesheet whose classes point at each frame's own image, no classes for frames that are part of an image, and refused trimmed frames.
- * @evidenceReview docs/spec.md#atlas-packing #cd28666 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#atlas-packing #8eec33b Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function packsAtlasFiles(): void {
   const dir = mkdtempSync(join(tmpdir(), 'slicewright-pack-'));
@@ -267,9 +267,49 @@ export function packsAtlasFiles(): void {
     firstFrame.frame.x = 10_000;
     writeFileSync(join(dir, 'outside.json'), JSON.stringify(changed));
     throws(() => packOne('outside.json'), /outside its/);
-    firstFrame.frame.x = 0.25;
-    writeFileSync(join(dir, 'fractional.json'), JSON.stringify(changed));
-    throws(() => packOne('fractional.json'), /fractional/);
+    firstFrame.frame.x = 0;
+    for (const key of ['x', 'y', 'w', 'h'] as const) {
+      const fractionalAtlas = JSON.parse(readFileSync(join(dir, 'ui.json'), 'utf8')) as {
+        frames: Record<string, { frame: Record<'x' | 'y' | 'w' | 'h', number> }>;
+      };
+      const [frame] = Object.values(fractionalAtlas.frames);
+      ok(frame !== undefined);
+      frame.frame[key] += 0.25;
+      writeFileSync(join(dir, 'fractional.json'), JSON.stringify(fractionalAtlas));
+      throws(() => packOne('fractional.json'), /fractional/);
+      // The atlas check refuses the same rectangle instead of cropping shifted bytes.
+      const checked = inspectAtlas(
+        fractionalAtlas,
+        decodePng(readFileSync(join(dir, 'ui.png'))),
+        defaultInspectOptions,
+      );
+      ok(
+        checked.frames.some((item) =>
+          item.findings.some(
+            (finding) => finding.code === 'atlas.frame-outside-image' && finding.message.includes('whole-pixel'),
+          ),
+        ),
+      );
+    }
+
+    // A frame without borders is listed as a plain image in the usage.
+    const plainAtlas = JSON.parse(readFileSync(join(dir, 'ui.json'), 'utf8')) as {
+      frames: Record<string, { scale9Borders?: unknown }>;
+    };
+    const [plainName, plainFrame] = Object.entries(plainAtlas.frames)[0] ?? [];
+    ok(plainName !== undefined && plainFrame !== undefined);
+    delete plainFrame.scale9Borders;
+    writeFileSync(join(dir, 'plain.json'), JSON.stringify(plainAtlas));
+    const plainPack = buildPack({
+      ...options,
+      css: false,
+      inputs: [join(dir, 'plain.json')],
+      out: join(dir, 'plain-pack.png'),
+      name: 'plain-pack',
+    });
+    ok(
+      plainPack.usage.includes(`this.add.image(x, y, "plain-pack", ${JSON.stringify(plainName)});`),
+    );
 
     // The image cannot share a path with its own atlas.
     throws(
@@ -281,6 +321,22 @@ export function packsAtlasFiles(): void {
           name: 'x',
         }),
       /give the image a \.png name/,
+    );
+    // Outputs that differ only in letter case collide before any exists.
+    throws(
+      () =>
+        buildPack({
+          ...options,
+          inputs: [join(dir, 'ui.json')],
+          out: join(dir, 'Y.json'),
+          name: 'y',
+        }),
+      /give the image a \.png name/,
+    );
+    // Without --css the stylesheet path is not an output.
+    strictEqual(
+      buildPack({ ...options, css: false, inputs: [join(dir, 'ui.json')], out: join(dir, 'z.css'), name: 'z' }).files.length,
+      2,
     );
     // A link to an input image, or another letter case of it, is the same file.
     symlinkSync(join(dir, 'ui.png'), join(dir, 'link.png'));

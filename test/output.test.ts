@@ -181,7 +181,7 @@ export function convertsToPhaserBorders(): void {
 
 /**
  * @evidence docs/spec.md#atlas-frames Checks hash and array atlases for trimming, rotation, out-of-frame borders, missing frames, and frame pixels.
- * @evidenceReview docs/spec.md#atlas-frames #62a16b1 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#atlas-frames #0dc6d1b Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function checksAtlasFrames(): void {
   const image = createRaster(80, 30);
@@ -221,6 +221,8 @@ export function checksAtlasFrames(): void {
         { filename: 'rotated', frame, rotated: true, scale9Borders: borders },
         { filename: 'outside', frame, scale9Borders: { x: 6, y: 6, w: 40, h: 18 } },
         { filename: 'stretchy', frame, scale9Borders: { x: 2, y: 6, w: 32, h: 18 } },
+        { filename: 'fractional', frame: { ...frame, y: 0.5 }, scale9Borders: borders },
+        { filename: 'beyond', frame: { ...frame, x: 41 }, scale9Borders: borders },
       ],
     },
     image,
@@ -231,6 +233,17 @@ export function checksAtlasFrames(): void {
   strictEqual(byName.get('rotated')?.ok, true);
   ok(byName.get('rotated')?.findings.some((item) => item.code === 'atlas.rotated'));
   ok(byName.get('outside')?.findings.some((item) => item.code === 'atlas.borders-outside-frame'));
+  // A rectangle that is not whole pixels, or leaves the image, is refused by name.
+  ok(
+    byName.get('fractional')?.findings.some(
+      (item) => item.code === 'atlas.frame-outside-image' && item.message.includes('whole-pixel'),
+    ),
+  );
+  ok(
+    byName.get('beyond')?.findings.some(
+      (item) => item.code === 'atlas.frame-outside-image' && item.message.includes('lies outside'),
+    ),
+  );
   ok(
     byName
       .get('stretchy')
