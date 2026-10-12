@@ -4,6 +4,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'nod
 
 import { cli, define } from 'gunshi';
 
+import { joinNegativeNumbers } from './argv.js';
 import { defaultChromaOptions, removeChroma } from './chroma.js';
 import {
   defaultInspectOptions,
@@ -788,23 +789,40 @@ const main = define({
   },
 });
 
+const subCommands = {
+  prompt,
+  inspect,
+  preview,
+  frame,
+  atlas,
+  key,
+  resize,
+  normalize,
+  pack,
+  export: exportCommand,
+  targets,
+};
+
+// Every flag that takes a number, so `--tolerance -1` reaches validation.
+const flagTypes = Object.values(subCommands).flatMap((command) =>
+  Object.entries(command.args ?? {}).map(([name, arg]) => [`--${name}`, arg.type] as const),
+);
+const numberFlags = new Set(
+  flagTypes.filter(([, type]) => type === 'number').map(([flag]) => flag),
+);
+// The set is shared by every command, so a flag name must mean a number everywhere or nowhere.
+const clashes = flagTypes.filter(([flag, type]) => type !== 'number' && numberFlags.has(flag));
+if (clashes.length > 0) {
+  throw new Error(
+    `Flags that take a number in one command and not in another: ${clashes.map(([flag]) => flag).join(', ')}.`,
+  );
+}
+
 try {
-  await cli(process.argv.slice(2), main, {
+  await cli(joinNegativeNumbers(process.argv.slice(2), numberFlags), main, {
     name: 'slicewright',
     version,
-    subCommands: {
-      prompt,
-      inspect,
-      preview,
-      frame,
-      atlas,
-      key,
-      resize,
-      normalize,
-      pack,
-      export: exportCommand,
-      targets,
-    },
+    subCommands,
     // stdout carries JSON only: no banner, no validation text; errors go to stderr.
     renderHeader: null,
     renderValidationErrors: null,
