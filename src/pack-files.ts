@@ -78,7 +78,7 @@ export function buildPack(options: PackFilesOptions): PackFilesResult {
   // disk, even before any of them exists.
   if (new Set(outputs.map((path) => path.toLowerCase())).size !== outputs.length) {
     throw new PackInputError(
-      `--out ${options.out} is also the atlas or stylesheet path for --name ${options.name}; give the image a .png name.`,
+      `--out ${options.out} names the same file as the ${options.css ? 'atlas or stylesheet' : 'atlas'} for --name ${options.name} (letter case aside); give the image a .png name or pick another --name.`,
     );
   }
   for (const input of options.inputs) {

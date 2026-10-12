@@ -333,10 +333,12 @@ export function packsAtlasFiles(): void {
         }),
       /give the image a \.png name/,
     );
-    // Without --css the stylesheet path is not an output.
-    strictEqual(
-      buildPack({ ...options, css: false, inputs: [join(dir, 'ui.json')], out: join(dir, 'z.css'), name: 'z' }).files.length,
-      2,
+    // Without --css the stylesheet path is reserved for nothing: the image may use it.
+    deepStrictEqual(
+      buildPack({ ...options, css: false, inputs: [join(dir, 'ui.json')], out: join(dir, 'z.css'), name: 'z' }).files.map(
+        (file) => file.path,
+      ),
+      [join(dir, 'z.css'), join(dir, 'z.json')],
     );
     // A link to an input image, or another letter case of it, is the same file.
     symlinkSync(join(dir, 'ui.png'), join(dir, 'link.png'));
