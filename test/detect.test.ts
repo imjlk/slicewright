@@ -168,7 +168,7 @@ export function warnsAboutTransparentMargins(): void {
 
 /**
  * @evidence docs/spec.md#chroma-spill Flags green-tinted alpha edges and ignores a clean outline.
- * @evidenceReview docs/spec.md#chroma-spill #5d153d0 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#chroma-spill #b5eefc5 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function flagsChromaSpill(): void {
   const clean = panel(40, 30, 2);
@@ -202,6 +202,17 @@ export function flagsChromaSpill(): void {
       (item) => item.code === 'alpha.chroma-spill' && item.message.includes('magenta'),
     ),
   );
+  // Translucent pink glass inside an opaque rim is art, not an edge.
+  const glass = panel(60, 40, 2);
+  fillRect(glass, 8, 8, 48, 28, [240, 80, 200, 150]);
+  strictEqual(codes(inspectRaster(glass)).includes('alpha.chroma-spill'), false);
+  // A little of the key color in the art does not hide a fringe far stronger.
+  const gem = panel(60, 40, 2);
+  fillRect(gem, 26, 16, 10, 8, [240, 80, 200, 255]);
+  for (let x = 2; x < 62; x += 1) {
+    setPixel(gem, x, 2, [240, 80, 200, 160]);
+  }
+  ok(codes(inspectRaster(gem)).includes('alpha.chroma-spill'));
 }
 
 /**
@@ -365,8 +376,10 @@ export function flagsInteriorAlphaHoles(): void {
   fillRect(nearlyOpaque, 6, 6, 48, 28, [90, 60, 40, 245]);
   strictEqual(codes(inspectRaster(nearlyOpaque)).includes('alpha.interior'), false);
   const translucent = panel(60, 40);
-  fillRect(translucent, 6, 6, 48, 28, [90, 60, 40, 200]);
+  fillRect(translucent, 6, 6, 48, 28, [90, 60, 40, 223]);
   ok(codes(inspectRaster(translucent)).includes('alpha.interior'));
+  fillRect(translucent, 6, 6, 48, 28, [90, 60, 40, 224]);
+  strictEqual(codes(inspectRaster(translucent)).includes('alpha.interior'), false);
 }
 
 void test('slice insets need a stretch span', rejectsInsetsWithoutAStretchSpan);

@@ -132,12 +132,15 @@ bounds. A fully transparent image is an error.
 Images generated on a chroma-key background often keep a tinted fringe after the
 key is removed. A pixel is dominated by a key when green, or red and blue
 together, exceed the other channels by more than 64 of 255. Edge pixels are
-visible pixels that are partly transparent (alpha below 224) or opaque beside a
-transparent pixel; the rest of the visible pixels are the art itself. A key's
-color is spill when it dominates more than 1% of the edge pixels and its share
-on the edge is more than three times its share in the art, so pink or purple
-art is not mistaken for a magenta fringe. Spill raises an `alpha.chroma-spill`
-warning that reports the count and the key.
+visible pixels within 2 px of a fully transparent pixel or the image border;
+the rest of the visible pixels, translucent fills included, are the art itself.
+A key's color is spill when it dominates more than 1% of the edge pixels and its
+share on the edge is more than three times its share in the art, each key
+judged on its own, so pink or purple art is not mistaken for a magenta fringe.
+Art drawn mostly in a key's own color hides a fringe of that color, and a
+deliberate glow or outline in a key's color looks like spill; the warning says
+so. Spill raises an `alpha.chroma-spill` warning that reports the count and the
+key.
 
 ## Interior alpha
 

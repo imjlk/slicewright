@@ -110,6 +110,8 @@ const spillRatio = 0.01;
 const spillContrast = 3;
 /** Alpha at or above this is opaque: generators often draw solid faces at 240 to 254. */
 const opaqueAlpha = 224;
+/** How far from a transparent pixel a key-colored fringe reaches. */
+const spillReach = 2;
 
 /**
  * Detects or verifies a slice layout and reports what would break when the
@@ -662,21 +664,24 @@ export function marginFindings(raster: Raster, bounds: Rect): Finding[] {
 
 /**
  * @evidence docs/spec.md#chroma-spill Counts green or magenta dominated alpha-edge pixels against the 1% threshold.
- * @evidenceReview docs/spec.md#chroma-spill #5d153d0 Checked this code against the section line by line and ran flagsChromaSpill green with pnpm test.
+ * @evidenceReview docs/spec.md#chroma-spill #b5eefc5 Checked this code against the section line by line and ran flagsChromaSpill green with pnpm test.
  */
 export function chromaSpillFindings(raster: Raster): Finding[] {
   // Edge pixels against the art's own opaque pixels: pink or purple art is
   // magenta-dominated everywhere, while spill tints only the edge.
   const edge = { pixels: 0, green: 0, magenta: 0 };
   const art = { pixels: 0, green: 0, magenta: 0 };
+  // A fringe hugs the cut-out: the edge is every visible pixel within
+  // spillReach of a fully transparent one, so a translucent fill inside the
+  // element (glass) counts as art.
+  const nearTransparency = nearTransparentMask(raster, spillReach);
   for (let y = 0; y < raster.height; y += 1) {
     for (let x = 0; x < raster.width; x += 1) {
       const alpha = alphaAt(raster, x, y);
       if (alpha === 0) {
         continue;
       }
-      const onEdge = alpha < opaqueAlpha || touchesTransparency(raster, x, y);
-      const tally = onEdge ? edge : art;
+      const tally = nearTransparency[y * raster.width + x] === 1 ? edge : art;
       tally.pixels += 1;
       const offset = pixelOffset(raster, x, y);
       const r = raster.data[offset] ?? 0;
@@ -702,7 +707,7 @@ export function chromaSpillFindings(raster: Raster): Finding[] {
     {
       code: 'alpha.chroma-spill',
       severity: 'warning',
-      message: `${edge[key]} of ${edge.pixels} alpha-edge pixels are tinted by the ${key} key, far more than the art's own ${key} share. Despill or re-key before slicing.`,
+      message: `${edge[key]} of ${edge.pixels} alpha-edge pixels are tinted by the ${key} key, far more than the art's own ${key} share. Despill or re-key before slicing; a deliberate ${key} glow or outline is fine.`,
       details: {
         edgePixels: edge.pixels,
         green: edge.green,
@@ -752,6 +757,41 @@ export function interiorAlphaFindings(raster: Raster, bounds: Rect): Finding[] {
       details: { partial, total },
     },
   ];
+}
+
+/** 1 for every pixel within `reach` (square distance) of a fully transparent pixel or the image border. */
+function nearTransparentMask(raster: Raster, reach: number): Uint8Array {
+  const { width, height } = raster;
+  let mask = new Uint8Array(width * height);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      if (alphaAt(raster, x, y) === 0) {
+        mask[y * width + x] = 1;
+      }
+    }
+  }
+  for (let step = 0; step < reach; step += 1) {
+    const next = new Uint8Array(mask);
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        if (mask[y * width + x] === 1) {
+          continue;
+        }
+        const outside = x === 0 || y === 0 || x === width - 1 || y === height - 1;
+        let near = outside;
+        for (let dy = -1; dy <= 1 && !near; dy += 1) {
+          for (let dx = -1; dx <= 1 && !near; dx += 1) {
+            near = mask[(y + dy) * width + (x + dx)] === 1;
+          }
+        }
+        if (near) {
+          next[y * width + x] = 1;
+        }
+      }
+    }
+    mask = next;
+  }
+  return mask;
 }
 
 function touchesTransparency(raster: Raster, x: number, y: number): boolean {
