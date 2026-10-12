@@ -494,7 +494,7 @@ export function multiRegionLayout(
 
 /**
  * @evidence docs/spec.md#slice-insets Rejects caller insets that leave no stretch span.
- * @evidenceReview docs/spec.md#slice-insets #5f061b0 Checked this code against the section line by line and ran rejectsInsetsWithoutAStretchSpan green with pnpm test.
+ * @evidenceReview docs/spec.md#slice-insets #09153ff Checked this code against the section line by line and ran rejectsInsetsWithoutAStretchSpan green with pnpm test.
  * @evidence docs/spec.md#stretch-uniformity Reports the first mismatching pair in each caller-given stretch span unless the axis tiles.
  * @evidenceReview docs/spec.md#stretch-uniformity #695468c Checked this code against the section line by line and ran rejectsGivenInsetsThatStretchDetail green with pnpm test.
  * @evidence docs/spec.md#three-slice Forces zero top and bottom insets in three-slice mode.
@@ -664,7 +664,7 @@ export function marginFindings(raster: Raster, bounds: Rect): Finding[] {
 
 /**
  * @evidence docs/spec.md#chroma-spill Counts green or magenta dominated alpha-edge pixels against the 1% threshold.
- * @evidenceReview docs/spec.md#chroma-spill #b5eefc5 Checked this code against the section line by line and ran flagsChromaSpill green with pnpm test.
+ * @evidenceReview docs/spec.md#chroma-spill #e573ace Checked this code against the section line by line and ran flagsChromaSpill green with pnpm test.
  */
 export function chromaSpillFindings(raster: Raster): Finding[] {
   // Edge pixels against the art's own opaque pixels: pink or purple art is
@@ -695,11 +695,19 @@ export function chromaSpillFindings(raster: Raster): Finding[] {
     }
   }
   const share = (count: number, total: number): number => (total === 0 ? 0 : count / total);
+  // With no art pixels there is no baseline: a thin all-edge sprite in a key
+  // color would otherwise always look like spill.
+  if (art.pixels === 0) {
+    return [];
+  }
   const spilled = (key: 'green' | 'magenta'): boolean => {
     const onEdge = share(edge[key], edge.pixels);
     return onEdge > spillRatio && onEdge > share(art[key], art.pixels) * spillContrast;
   };
-  const key = spilled('green') ? 'green' : spilled('magenta') ? 'magenta' : undefined;
+  // Report the stronger key when both qualify.
+  const key = (['green', 'magenta'] as const)
+    .filter((candidate) => spilled(candidate))
+    .sort((a, b) => edge[b] - edge[a])[0];
   if (key === undefined) {
     return [];
   }
@@ -759,13 +767,17 @@ export function interiorAlphaFindings(raster: Raster, bounds: Rect): Finding[] {
   ];
 }
 
-/** 1 for every pixel within `reach` (square distance) of a fully transparent pixel or the image border. */
+/**
+ * 1 for every pixel within `reach` (square distance) of a fully transparent
+ * pixel or of the image border, whose pixels seed the band like transparent ones.
+ */
 function nearTransparentMask(raster: Raster, reach: number): Uint8Array {
   const { width, height } = raster;
   let mask = new Uint8Array(width * height);
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
-      if (alphaAt(raster, x, y) === 0) {
+      const border = x === 0 || y === 0 || x === width - 1 || y === height - 1;
+      if (border || alphaAt(raster, x, y) === 0) {
         mask[y * width + x] = 1;
       }
     }
@@ -777,8 +789,8 @@ function nearTransparentMask(raster: Raster, reach: number): Uint8Array {
         if (mask[y * width + x] === 1) {
           continue;
         }
-        const outside = x === 0 || y === 0 || x === width - 1 || y === height - 1;
-        let near = outside;
+        // Border pixels are already set, so every neighbor here is in range.
+        let near = false;
         for (let dy = -1; dy <= 1 && !near; dy += 1) {
           for (let dx = -1; dx <= 1 && !near; dx += 1) {
             near = mask[(y + dy) * width + (x + dx)] === 1;
@@ -818,7 +830,7 @@ const largeInsetRatio = 0.5;
  * cannot shrink much below its source size and only a short span stretches.
  *
  * @evidence docs/spec.md#slice-insets Warns when fixed segments take more than half of a resizable axis.
- * @evidenceReview docs/spec.md#slice-insets #5f061b0 Checked this code against the section line by line and ran rejectsInsetsWithoutAStretchSpan green with pnpm test.
+ * @evidenceReview docs/spec.md#slice-insets #09153ff Checked this code against the section line by line and ran rejectsInsetsWithoutAStretchSpan green with pnpm test.
  */
 export function largeInsetFindings(layout: SliceLayout): Finding[] {
   const minimum = minimumLayoutSize(layout);

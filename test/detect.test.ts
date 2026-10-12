@@ -28,7 +28,7 @@ function codes(report: InspectReport): string[] {
 
 /**
  * @evidence docs/spec.md#slice-insets Checks negative, fractional, and span-consuming insets.
- * @evidenceReview docs/spec.md#slice-insets #5f061b0 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#slice-insets #09153ff Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function rejectsInsetsWithoutAStretchSpan(): void {
   strictEqual(insetsProblem({ left: 4, right: 4, top: 4, bottom: 4 }, 9, 9), undefined);
@@ -168,7 +168,7 @@ export function warnsAboutTransparentMargins(): void {
 
 /**
  * @evidence docs/spec.md#chroma-spill Flags green-tinted alpha edges and ignores a clean outline.
- * @evidenceReview docs/spec.md#chroma-spill #b5eefc5 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#chroma-spill #e573ace Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function flagsChromaSpill(): void {
   const clean = panel(40, 30, 2);
@@ -213,6 +213,28 @@ export function flagsChromaSpill(): void {
     setPixel(gem, x, 2, [240, 80, 200, 160]);
   }
   ok(codes(inspectRaster(gem)).includes('alpha.chroma-spill'));
+  // A sprite that is all edge has no art to compare with: not judged.
+  const thinBar = createRaster(40, 3);
+  fillRect(thinBar, 0, 0, 40, 3, [30, 200, 40, 255]);
+  strictEqual(codes(inspectRaster(thinBar)).includes('alpha.chroma-spill'), false);
+  // Both keys on the edge: the stronger one is named.
+  const mixed = panel(60, 40, 2);
+  for (let x = 2; x < 62; x += 1) {
+    setPixel(mixed, x, 2, [240, 80, 200, 160]);
+    setPixel(mixed, x, 41, [240, 80, 200, 160]);
+  }
+  for (let x = 2; x < 22; x += 1) {
+    setPixel(mixed, x, 3, [30, 200, 40, 160]);
+  }
+  const mixedFinding = inspectRaster(mixed).findings.find(
+    (item) => item.code === 'alpha.chroma-spill',
+  );
+  ok(mixedFinding?.message.includes('magenta key'));
+  // The image border seeds the band: a fringe three rows in on a cropped image is edge.
+  const cropped = createRaster(60, 40);
+  fillRect(cropped, 0, 0, 60, 40, [90, 60, 40, 255]);
+  fillRect(cropped, 0, 2, 60, 1, [30, 200, 40, 255]);
+  ok(codes(inspectRaster(cropped)).includes('alpha.chroma-spill'));
 }
 
 /**

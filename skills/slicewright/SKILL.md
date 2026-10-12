@@ -191,7 +191,7 @@ does not check that path.
 | `target.fixed` | Nothing in the layout resizes; no files were written. | Use the image as a plain sprite. |
 | `noise.tolerance` | Generated art is noisy, so matching tolerance was raised per axis. | Informational. `--noise off` restores exact matching. |
 | `noise.high` | The interior is busy along both axes. | Stretching smears it; use a flatter fill or tile it. |
-| `alpha.interior` | The middle of the element is partly transparent (alpha below 224). | Fine for deliberate glass. Otherwise a generator faking alpha: regenerate on a chroma key and run `key`. |
+| `alpha.interior` | The middle of the element is partly transparent (alpha below 224). | Fine when intended (glass, a shadow, a glow). If not, a generator faked alpha: regenerate on a chroma key and run `key`. |
 | `alpha.chroma-spill` | The alpha edge is tinted by the key color. | Re-run `key` with a lower `--keep`, or despill elsewhere. |
 | `margin.transparent` | Transparent border pixels become part of the corners. | `normalize` crops them; otherwise crop unless the spacing is intended. |
 | `rebuild.x.lossy`, `rebuild.y.lossy` | `--keep` would flatten texture or shading on that axis. | Informational: that axis kept its full span. |

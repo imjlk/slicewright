@@ -23,7 +23,9 @@ stretches both ways. The stretchable span on each axis must be at least one
 pixel wide, so `left + right` must be smaller than the width and `top + bottom`
 smaller than the height. When the fixed segments take more than half of an
 axis that resizes, an `insets.large` warning says how little stretches and how
-far the art can shrink.
+far the art can shrink, and points at `--mode three` when the height is mostly
+fixed (a pill's ends are rounded across the whole height) or `--mode
+three-vertical` when the width is.
 
 ## Slice layouts
 
@@ -132,11 +134,15 @@ bounds. A fully transparent image is an error.
 Images generated on a chroma-key background often keep a tinted fringe after the
 key is removed. A pixel is dominated by a key when green, or red and blue
 together, exceed the other channels by more than 64 of 255. Edge pixels are
-visible pixels within 2 px of a fully transparent pixel or the image border;
+visible pixels within 2 px of a fully transparent pixel or of the image border
+(the outermost three rows and columns);
 the rest of the visible pixels, translucent fills included, are the art itself.
 A key's color is spill when it dominates more than 1% of the edge pixels and its
 share on the edge is more than three times its share in the art, each key
-judged on its own, so pink or purple art is not mistaken for a magenta fringe.
+judged on its own, so pink or purple art is not mistaken for a magenta fringe;
+when both keys qualify, the one with the larger edge share is reported. Art so
+thin that every visible pixel is on the edge gives nothing to compare, so it is
+not judged.
 Art drawn mostly in a key's own color hides a fringe of that color, and a
 deliberate glow or outline in a key's color looks like spill; the warning says
 so. Spill raises an `alpha.chroma-spill` warning that reports the count and the
