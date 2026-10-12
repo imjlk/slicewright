@@ -62,7 +62,7 @@ export const defaultNormalizeOptions: NormalizeOptions = {
  * uniform stretch span.
  *
  * @evidence docs/spec.md#normalization Orders crop, resize, inspection, and rebuild, and rebuilds only uniform axes.
- * @evidenceReview docs/spec.md#normalization #0cca4e9 Checked this code against the section line by line and ran normalizesGeneratedArt green with pnpm test.
+ * @evidenceReview docs/spec.md#normalization #e2c2c11 Checked this code against the section line by line and ran normalizesGeneratedArt green with pnpm test.
  */
 export function normalizeRaster(
   source: Raster,
@@ -178,7 +178,7 @@ export function normalizeRaster(
  * Lossless when the span is uniform: every dropped line equals a kept one.
  *
  * @evidence docs/spec.md#normalization Copies the borders and the first kept lines of each span.
- * @evidenceReview docs/spec.md#normalization #0cca4e9 Checked this code against the section line by line and ran normalizesGeneratedArt green with pnpm test.
+ * @evidenceReview docs/spec.md#normalization #e2c2c11 Checked this code against the section line by line and ran normalizesGeneratedArt green with pnpm test.
  */
 export function rebuildSlices(
   raster: Raster,

@@ -100,7 +100,7 @@ export function resizesWithoutHalos(): void {
 
 /**
  * @evidence docs/spec.md#normalization Crops and resizes before inspecting, rebuilds uniform axes losslessly, and leaves a three-slice height alone.
- * @evidenceReview docs/spec.md#normalization #0cca4e9 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#normalization #e2c2c11 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function normalizesGeneratedArt(): void {
   const target = panel(40, 30);
@@ -229,6 +229,29 @@ export function normalizesGeneratedArt(): void {
     codesOf(normalizeRaster(rimmed, { ...thinOptions, width: 40 })).includes('resize.thin-lines'),
     false,
   );
+  // A double stroke (dark outline, light inner line) still reaches the fill.
+  const doubled = outlined(2);
+  fillRect(doubled, 0, 0, 200, 120, [30, 30, 30, 255]);
+  fillRect(doubled, 2, 2, 196, 116, [240, 240, 240, 255]);
+  fillRect(doubled, 4, 4, 192, 112, [40, 80, 160, 255]);
+  ok(
+    codesOf(normalizeRaster(doubled, { ...thinOptions, width: 40 })).includes('resize.thin-lines'),
+  );
+  // So does a line on translucent glass, or around an empty center.
+  const glass = outlined(2);
+  fillRect(glass, 2, 2, 196, 116, [40, 80, 160, 120]);
+  ok(codesOf(normalizeRaster(glass, { ...thinOptions, width: 40 })).includes('resize.thin-lines'));
+  const hollow = outlined(2);
+  fillRect(hollow, 2, 2, 196, 116, [0, 0, 0, 0]);
+  ok(codesOf(normalizeRaster(hollow, { ...thinOptions, width: 40 })).includes('resize.thin-lines'));
+  // Each axis uses its own factor: only the axis shrunk enough is reported.
+  const squeezed = normalizeRaster(outlined(2), { ...thinOptions, width: 40, height: 100 });
+  const squeezedFinding = squeezed.report.findings.find(
+    (item) => item.code === 'resize.thin-lines',
+  );
+  deepStrictEqual(Object.keys(squeezedFinding?.details ?? {}), ['left', 'right']);
+  // A warning: the report stays ok.
+  strictEqual(thin.report.ok, true);
 }
 
 void test('chroma removal', removesChromaBackgrounds);
