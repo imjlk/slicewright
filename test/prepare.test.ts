@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import { defaultChromaOptions, detectChromaKey, removeChroma } from '../src/chroma.js';
 import { defaultInspectOptions } from '../src/inspect.js';
 import { normalizeRaster } from '../src/normalize.js';
+import { outlineThickness } from '../src/outline.js';
 import { createRaster, pixelOffset, type Raster } from '../src/raster.js';
 import { renderSlices } from '../src/render.js';
 import { resizeRaster, targetSize } from '../src/resize.js';
@@ -58,7 +59,7 @@ export function removesChromaBackgrounds(): void {
 
 /**
  * @evidence docs/spec.md#resizing Averages in premultiplied alpha without colour halos, keeps uniform areas exact, samples nearest pixels, and fits target sizes.
- * @evidenceReview docs/spec.md#resizing #6c29064 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#resizing #66688ff Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function resizesWithoutHalos(): void {
   const edge = createRaster(2, 1);
@@ -254,6 +255,130 @@ export function normalizesGeneratedArt(): void {
   strictEqual(thin.report.ok, true);
 }
 
+/** Paints a pixel as ink (dark) and paper (light) shares of `total` samples, in straight alpha. */
+function paintMix(art: Raster, x: number, y: number, ink: number, paper: number, total: number): void {
+  const covered = ink + paper;
+  if (covered === 0) {
+    return;
+  }
+  const value = Math.round((ink * 20 + paper * 250) / covered);
+  setPixel(art, x, y, [value, value, value, Math.round((covered / total) * 255)]);
+}
+
+/** A ring of radius 100 with an outline `stroke` px thick, anti-aliased by supersampling, plus optional noise. */
+function ring(stroke: number, noise = 0): Raster {
+  const art = createRaster(220, 220);
+  const samples = 4;
+  let seed = 7;
+  const random = (): number => {
+    seed = (seed * 1103515245 + 12345) % 2147483648;
+    return seed / 2147483648;
+  };
+  for (let y = 0; y < 220; y += 1) {
+    for (let x = 0; x < 220; x += 1) {
+      let ink = 0;
+      let paper = 0;
+      for (let sy = 0; sy < samples; sy += 1) {
+        for (let sx = 0; sx < samples; sx += 1) {
+          const r = Math.hypot(x + (sx + 0.5) / samples - 110, y + (sy + 0.5) / samples - 110);
+          if (r <= 100) {
+            if (r > 100 - stroke) {
+              ink += 1;
+            } else {
+              paper += 1;
+            }
+          }
+        }
+      }
+      paintMix(art, x, y, ink, paper, samples * samples);
+      if (noise > 0 && ink + paper > 0) {
+        const at = pixelOffset(art, x, y);
+        for (let channel = 0; channel < 3; channel += 1) {
+          const shifted = (art.data[at + channel] ?? 0) + Math.round((random() * 2 - 1) * noise);
+          art.data[at + channel] = Math.min(255, Math.max(0, shifted));
+        }
+      }
+    }
+  }
+  return art;
+}
+
+/** A downward tail: slanted sides outlined `stroke` px thick, no outline along the top. */
+function tail(stroke: number, samples = 1): Raster {
+  const art = createRaster(120, 100);
+  // Edges from the top corners to the tip at (60, 100), as a x + b y + c = 0.
+  const edges = [
+    [100, -60, 0],
+    [100, 60, -12000],
+  ] as const;
+  // Supersampled, so `samples` above 1 anti-aliases the edges.
+  for (let y = 0; y < 100; y += 1) {
+    for (let x = 0; x < 120; x += 1) {
+      let ink = 0;
+      let paper = 0;
+      for (let sy = 0; sy < samples; sy += 1) {
+        for (let sx = 0; sx < samples; sx += 1) {
+          const px = x + (sx + 0.5) / samples;
+          const py = y + (sy + 0.5) / samples;
+          const distances = edges.map(([a, b, c]) => (a * px + b * py + c) / Math.hypot(a, b));
+          if ((distances[0] ?? 0) >= 0 && (distances[1] ?? 0) <= 0) {
+            const nearest = Math.min(Math.abs(distances[0] ?? 0), Math.abs(distances[1] ?? 0));
+            if (nearest < stroke) {
+              ink += 1;
+            } else {
+              paper += 1;
+            }
+          }
+        }
+      }
+      paintMix(art, x, y, ink, paper, samples * samples);
+    }
+  }
+  return art;
+}
+
+/**
+ * @evidence docs/spec.md#resizing Measures straight and slanted outlines perpendicular to the stroke, refuses art without an outline, and gives the scale that matches two outlines.
+ * @evidenceReview docs/spec.md#resizing #66688ff Checked the assertions against the section and ran this test green with pnpm test.
+ */
+export function matchesOutlineThickness(): void {
+  const body = createRaster(200, 120);
+  fillRect(body, 0, 0, 200, 120, [20, 20, 20, 255]);
+  fillRect(body, 6, 6, 188, 108, [250, 250, 250, 255]);
+  const bodyThickness = outlineThickness(body) ?? 0;
+  ok(Math.abs(bodyThickness - 6) < 0.5, `body ${bodyThickness}`);
+  // Slanted sides measure perpendicular to the stroke, not along a row.
+  const tailThickness = outlineThickness(tail(12)) ?? 0;
+  ok(Math.abs(tailThickness - 12) < 1.5, `tail ${tailThickness}`);
+  // A flat fill has no outline to measure.
+  const flat = createRaster(60, 40);
+  fillRect(flat, 0, 0, 60, 40, fill);
+  strictEqual(outlineThickness(flat), undefined);
+  // Round, anti-aliased, and noisy outlines measure across the stroke; noise
+  // below half the contrast does not cut the stroke short.
+  for (const noise of [0, 30]) {
+    const measured = outlineThickness(ring(8, noise)) ?? 0;
+    ok(Math.abs(measured - 8) < 1, `ring noise ${noise}: ${measured}`);
+  }
+  // Thin anti-aliased slanted sides count their edge pixels in part.
+  for (const stroke of [2, 3]) {
+    const measured = outlineThickness(tail(stroke, 4)) ?? 0;
+    ok(Math.abs(measured - stroke) < 0.6, `tail ${stroke}: ${measured}`);
+  }
+  // An outline thicker than a quarter of the image still has an inside to compare.
+  const thick = createRaster(300, 300);
+  fillRect(thick, 0, 0, 300, 300, [20, 20, 20, 255]);
+  fillRect(thick, 80, 80, 140, 140, [250, 250, 250, 255]);
+  const thickness = outlineThickness(thick) ?? 0;
+  ok(Math.abs(thickness - 80) / 80 < 0.05, `thick ${thickness}`);
+  // The tail scaled by the ratio ends up with the body's outline.
+  const scale = bodyThickness / tailThickness;
+  const size = targetSize(120, 100, { scale });
+  const matched = outlineThickness(resizeRaster(tail(12), size.width, size.height, 'area')) ?? 0;
+  ok(Math.abs(matched - 6) < 1.5, `matched ${matched}`);
+}
+
 void test('chroma removal', removesChromaBackgrounds);
 void test('resizing', resizesWithoutHalos);
 void test('normalization', normalizesGeneratedArt);
+void test('outline matching', matchesOutlineThickness);

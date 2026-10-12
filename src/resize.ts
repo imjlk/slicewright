@@ -7,7 +7,7 @@ export type ResizeFilter = 'area' | 'nearest';
  * neighbor for pixel art.
  *
  * @evidence docs/spec.md#resizing Averages covered source area in premultiplied alpha, or samples the nearest pixel.
- * @evidenceReview docs/spec.md#resizing #6c29064 Checked this code against the section line by line and ran resizesWithoutHalos green with pnpm test.
+ * @evidenceReview docs/spec.md#resizing #66688ff Checked this code against the section line by line and ran resizesWithoutHalos green with pnpm test.
  */
 export function resizeRaster(
   raster: Raster,

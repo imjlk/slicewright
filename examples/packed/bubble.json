@@ -1,0 +1,66 @@
+{
+  "frames": {
+    "bubble": {
+      "frame": {
+        "x": 1,
+        "y": 1,
+        "w": 320,
+        "h": 208
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 320,
+        "h": 208
+      },
+      "sourceSize": {
+        "w": 320,
+        "h": 208
+      },
+      "scale9Borders": {
+        "x": 20,
+        "y": 15,
+        "w": 280,
+        "h": 178
+      },
+      "slicewright": {
+        "contentPadding": {
+          "left": 5,
+          "right": 5,
+          "top": 5,
+          "bottom": 5
+        }
+      }
+    },
+    "bubble-tail": {
+      "frame": {
+        "x": 1,
+        "y": 213,
+        "w": 114,
+        "h": 93
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 114,
+        "h": 93
+      },
+      "sourceSize": {
+        "w": 114,
+        "h": 93
+      }
+    }
+  },
+  "meta": {
+    "image": "bubble.png",
+    "size": {
+      "w": 322,
+      "h": 307
+    },
+    "scale": "1"
+  }
+}

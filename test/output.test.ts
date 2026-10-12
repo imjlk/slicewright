@@ -258,7 +258,7 @@ export function checksAtlasFrames(): void {
 
 /**
  * @evidence docs/spec.md#generation-prompts Plans structural prompts, three-slice bars, chroma backgrounds, and follow-up steps.
- * @evidenceReview docs/spec.md#generation-prompts #cd814f8 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#generation-prompts #8589781 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function plansGenerationPrompts(): void {
   const button = buildPromptPlan({
@@ -304,6 +304,31 @@ export function plansGenerationPrompts(): void {
   ok(fill.prompt.includes('stretched horizontally only'));
   ok(fill.afterGeneration.some((step) => step.includes("track's content height")));
   ok(fill.afterGeneration.some((step) => step.includes('--mode three')));
+
+  // A bubble body has no tail; the tail is a sprite matched to the body's outline.
+  const bubble = buildPromptPlan({
+    kind: 'bubble',
+    style: 'comic',
+    background: 'chroma-green',
+    pixelArt: false,
+  });
+  strictEqual(bubble.mode, 'nine');
+  ok(bubble.prompt.includes('no tail, pointer, or notch'));
+  const tailPlan = buildPromptPlan({
+    kind: 'bubble-tail',
+    style: 'comic',
+    background: 'chroma-green',
+    pixelArt: false,
+  });
+  strictEqual(tailPlan.mode, 'sprite');
+  ok(tailPlan.prompt.includes('never stretched'));
+  ok(tailPlan.prompt.includes('no outline along it'));
+  ok(tailPlan.avoid.includes('an outline along the top edge of the tail'));
+  ok(tailPlan.afterGeneration.some((step) => step.includes('--match-outline')));
+  strictEqual(
+    tailPlan.afterGeneration.some((step) => step.includes('slicewright inspect')),
+    false,
+  );
   // atlas takes no --mode, so the plan names only the commands that do.
   strictEqual(
     fill.afterGeneration.some((step) => step.includes('every later command')),

@@ -38,7 +38,7 @@ function pixel(raster: Raster, x: number, y: number): number[] {
 
 /**
  * @evidence docs/spec.md#atlas-packing Packs a panel, a bar, and a tiled rope panel: exact pixels, extrusion, spacing, kept borders and slicewright data, a passing atlas check, one usage, and refused inputs.
- * @evidenceReview docs/spec.md#atlas-packing #8eec33b Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#atlas-packing #76a0a67 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function packsAtlases(): void {
   const pieces = [
@@ -144,7 +144,7 @@ export function packsAtlases(): void {
 
 /**
  * @evidence docs/spec.md#atlas-packing Packs committed atlases from files: one load call, tiling flags, a stylesheet whose classes point at each frame's own image, no classes for frames that are part of an image, and refused trimmed frames.
- * @evidenceReview docs/spec.md#atlas-packing #8eec33b Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#atlas-packing #76a0a67 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function packsAtlasFiles(): void {
   const dir = mkdtempSync(join(tmpdir(), 'slicewright-pack-'));
@@ -176,6 +176,16 @@ export function packsAtlasFiles(): void {
     ok(/border-image-source: url\("[^"]*examples\/real\/button\.png"\);/.test(css));
     ok(css.includes('.rope {') && css.includes('border-image-repeat: round stretch;'));
     ok(result.usage.includes('<div class="button">…</div>'));
+    // A plain PNG input is one frame without borders, named after the file.
+    const plainPng = buildPack({
+      ...options,
+      css: false,
+      inputs: ['examples/real/button.json', 'examples/real/bar.png'],
+      out: join(dir, 'with-png.png'),
+      name: 'with-png',
+    });
+    strictEqual(plainPng.ok, true);
+    ok(plainPng.usage.includes('this.add.image(x, y, "with-png", "bar");'));
 
     // Frames of a packed atlas are only part of its image: they repack, but get no CSS class.
     for (const file of result.files) {

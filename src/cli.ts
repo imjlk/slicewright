@@ -13,14 +13,16 @@ import {
   type InspectOptions,
   type InspectReport,
 } from './inspect.js';
+import { contentBounds } from './detect.js';
 import { normalizeRaster } from './normalize.js';
+import { outlineThickness } from './outline.js';
 import type { SliceLayout } from './layout.js';
 import { buildPack } from './pack-files.js';
 import { defaultPackOptions } from './pack.js';
 import { inspectAtlas } from './phaser.js';
 import { decodePng, encodePng } from './png.js';
 import { buildPromptPlan, promptBackgrounds, uiKinds } from './prompt.js';
-import type { Raster } from './raster.js';
+import { cropRaster, type Raster } from './raster.js';
 import {
   defaultPreviewMaxWidth,
   previewCellLabels,
@@ -292,16 +294,60 @@ const resize = define({
   args: {
     input: image,
     out: { type: 'string', required: true, description: 'Resized PNG to write' },
+    crop: { type: 'boolean', description: 'Crop transparent margins first' },
+    'match-outline': {
+      type: 'string',
+      description: "Scale so the outline is as thick as this PNG's (a bubble body for its tail)",
+    },
     ...sizeArgs,
   },
   run: (ctx) => {
-    const raster = readPng(ctx.values.input);
-    const size = targetSize(raster.width, raster.height, sizeRequest(ctx.values));
-    const resized = resizeRaster(raster, size.width, size.height, ctx.values.filter);
+    const source = readPng(ctx.values.input);
+    const crop = ctx.values.crop === true;
+    const bounds = crop ? contentBounds(source, 8) : undefined;
+    if (crop && bounds === undefined) {
+      throw new UsageError(`${ctx.values.input} has nothing visible to crop.`);
+    }
+    const raster = bounds === undefined ? source : cropRaster(source, bounds);
+    const reference = ctx.values['match-outline'];
+    let outline: { readonly reference: number; readonly piece: number } | undefined;
+    let request = sizeRequest(ctx.values);
+    if (reference !== undefined) {
+      if (Object.keys(request).length > 0) {
+        throw new UsageError('Give --match-outline or a size, not both.');
+      }
+      const referenceThickness = outlineThickness(readPng(reference));
+      const pieceThickness = outlineThickness(raster);
+      if (referenceThickness === undefined || pieceThickness === undefined) {
+        throw new UsageError(
+          `No outline found in ${referenceThickness === undefined ? reference : ctx.values.input}; give a size instead.`,
+        );
+      }
+      outline = { reference: referenceThickness, piece: pieceThickness };
+      request = { scale: referenceThickness / pieceThickness };
+    }
+    const size = targetSize(raster.width, raster.height, request);
+    const scaled = resizeRaster(raster, size.width, size.height, ctx.values.filter);
+    // Faint pixels kept by the first crop can average to nothing, as in normalize.
+    const recrop = crop ? contentBounds(scaled) : undefined;
+    const resized = recrop === undefined ? scaled : cropRaster(scaled, recrop);
     writeFileSync(ctx.values.out, encodePng(resized));
-    print({ image: ctx.values.input, out: ctx.values.out, from: dims(raster), to: dims(resized) });
+    print({
+      image: ctx.values.input,
+      out: ctx.values.out,
+      from: dims(source),
+      ...(bounds === undefined ? {} : { cropped: dims(raster) }),
+      to: dims(resized),
+      ...(outline === undefined
+        ? {}
+        : { outline: { reference: round2(outline.reference), piece: round2(outline.piece) } }),
+    });
   },
 });
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}
 
 const normalize = define({
   name: 'normalize',
@@ -394,7 +440,7 @@ const pack = define({
       type: 'positional',
       multiple: true,
       required: true,
-      description: 'Atlas JSON files, such as the one-frame atlases normalize and export write',
+      description: 'Atlas JSON files, such as the one-frame atlases normalize and export write, or plain PNGs',
     },
     out: {
       type: 'string',
