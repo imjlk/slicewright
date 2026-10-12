@@ -15,3 +15,4 @@ export * from './targets/index.js';
 export * from './pack.js';
 export * from './pack-files.js';
 export * from './argv.js';
+export * from './thin-lines.js';

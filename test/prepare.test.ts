@@ -100,7 +100,7 @@ export function resizesWithoutHalos(): void {
 
 /**
  * @evidence docs/spec.md#normalization Crops and resizes before inspecting, rebuilds uniform axes losslessly, and leaves a three-slice height alone.
- * @evidenceReview docs/spec.md#normalization #ef22e0f Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#normalization #0cca4e9 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function normalizesGeneratedArt(): void {
   const target = panel(40, 30);
@@ -181,6 +181,53 @@ export function normalizesGeneratedArt(): void {
         keep: 0,
       }),
     RangeError,
+  );
+
+  // A 2 px outline drawn straight onto the fill fades at a fifth of the size.
+  const outlined = (border: number): Raster => {
+    const art = createRaster(200, 120);
+    fillRect(art, 0, 0, 200, 120, [200, 200, 200, 255]);
+    fillRect(art, border, border, 200 - border * 2, 120 - border * 2, [20, 20, 20, 255]);
+    return art;
+  };
+  const thinOptions = { inspect: defaultInspectOptions, crop: true, filter: 'area' as const };
+  const thin = normalizeRaster(outlined(2), { ...thinOptions, width: 40 });
+  const finding = thin.report.findings.find((item) => item.code === 'resize.thin-lines');
+  strictEqual(finding?.severity, 'warning');
+  deepStrictEqual(finding?.details, {
+    left: [2, 2, 2, 2, 2],
+    right: [2, 2, 2, 2, 2],
+    top: [2, 2, 2, 2, 2],
+    bottom: [2, 2, 2, 2, 2],
+  });
+  // Wide enough for the factor, or a factor below 2, keeps the line.
+  const codesOf = (result: ReturnType<typeof normalizeRaster>): string[] =>
+    result.report.findings.map((item) => item.code);
+  strictEqual(
+    codesOf(normalizeRaster(outlined(4), { ...thinOptions, width: 40 })).includes(
+      'resize.thin-lines',
+    ),
+    false,
+  );
+  strictEqual(
+    codesOf(normalizeRaster(outlined(2), { ...thinOptions, width: 120 })).includes(
+      'resize.thin-lines',
+    ),
+    false,
+  );
+  // Nearest sampling can drop any line narrower than the factor.
+  ok(
+    codesOf(normalizeRaster(outlined(4), { ...thinOptions, filter: 'nearest', width: 40 })).includes(
+      'resize.thin-lines',
+    ),
+  );
+  // A thin highlight on a thick rim is not reported: the rim still marks the border.
+  const rimmed = outlined(2);
+  fillRect(rimmed, 2, 2, 196, 116, [120, 80, 40, 255]);
+  fillRect(rimmed, 16, 16, 168, 88, [20, 20, 20, 255]);
+  strictEqual(
+    codesOf(normalizeRaster(rimmed, { ...thinOptions, width: 40 })).includes('resize.thin-lines'),
+    false,
   );
 }
 

@@ -218,6 +218,21 @@ lines into their neighbors over about the stretched span divided by twice the
 keep length. When inspection reports an error, it returns the resized image
 without rebuilding.
 
+Before resizing down by a factor of 2 or more, normalization looks for drawn
+lines the resize will lose. Along five sample lines at 40% to 60% of the
+cropped image it walks in from each edge, past the transparent margin and the
+anti-aliased ramp (alpha below 224), and no further than a quarter of the
+length. Opaque pixels form runs while neighbors' colors stay within 40 of each
+other; a run is a drawn line when its color differs from both sides by more
+than 48 (from the transparency outside by its alpha). Only a line drawn
+straight onto the fill counts, one whose next run reaches the end of the
+search: a highlight on a thick rim still leaves the rim. Area averaging leaves
+a line about its width divided by the factor of its contrast, so a line
+narrower than half the factor fades; nearest sampling can drop a line narrower
+than the factor. When at least three of a side's five sample lines find such a
+line, a `resize.thin-lines` warning names the sides and widths and asks for
+thicker lines or a larger size.
+
 ## Content padding
 
 Content padding is where content such as text sits inside the frame: four sizes

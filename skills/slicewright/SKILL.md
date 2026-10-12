@@ -52,7 +52,7 @@ command exits 2 on bad input. `--help` works on each command.
    shrink the texture when the art is flat; it refuses axes where that would
    lose texture or shading, which is most painted art. Lines thinner than the
    downscale factor (generated width / `--width`) fade or vanish: a 1 px
-   outline drawn at 1600 px is gone at 320 px, with no finding. Ask for line
+   outline drawn at 1600 px is gone at 320 px (`resize.thin-lines`). Ask for line
    weights in proportion to the element ("an outline about 1/40 of the
    height") and check outlines in the preview. For pixel art, pick `--width`
    so the factor is the generated pixel size, which keeps the grid even.
@@ -194,6 +194,7 @@ does not check that path.
 | `alpha.interior` | The middle of the element is partly transparent (alpha below 224). | Fine when intended (glass, a shadow, a glow). If not, a generator faked alpha: regenerate on a chroma key and run `key`. |
 | `alpha.chroma-spill` | The alpha edge is tinted by the key color. | Re-run `key` with a lower `--keep`, or despill elsewhere. |
 | `margin.transparent` | Transparent border pixels become part of the corners. | `normalize` crops them; otherwise crop unless the spacing is intended. |
+| `resize.thin-lines` | An outline drawn straight onto the fill is narrower than the downscale can keep, so it fades (area) or can drop out (nearest). | Ask for outlines at least the named thickness in the source, or normalize to a larger size. |
 | `rebuild.x.lossy`, `rebuild.y.lossy` | `--keep` would flatten texture or shading on that axis. | Informational: that axis kept its full span. |
 | `rebuild.filtering` | A small `--keep` fades under linear texture filtering. | Use `--keep 8` or more, or nearest filtering (Phaser `pixelArt`). |
 | `padding.invalid` | Given content padding leaves no content area, is not whole and non-negative, or reaches past the fixed edge into a stretch span, where it would change with size. | Shrink `--padding` to within the insets on resizable axes. |
