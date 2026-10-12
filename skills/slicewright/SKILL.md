@@ -1,6 +1,6 @@
 ---
 name: slicewright
-description: Make and check stretchable game UI art (nine-slice and three-slice buttons, panels, dialogs, bars, tooltips, frames). Use when generating or importing UI images that a game engine will stretch, when choosing slice insets or Phaser scale9Borders, when a NineSlice looks smeared or seamed, or when checking an atlas's nine-slice frames.
+description: Make and check stretchable game UI art (nine-slice and three-slice buttons, panels, dialogs, bars and progress fills, tooltips, speech bubbles, frames). Use when generating or importing UI images that a game engine will stretch, when choosing slice insets or Phaser scale9Borders, when a NineSlice looks smeared or seamed, or when checking an atlas's nine-slice frames.
 ---
 
 # slicewright
@@ -195,7 +195,9 @@ function attachTail(body, tail, padding, along = 0.5) {
   const corner = body.getTopLeft();
   const min = body.leftWidth + tail.width / 2;
   const max = body.width - body.rightWidth - tail.width / 2;
-  const x = corner.x + Phaser.Math.Clamp(body.width * along, min, max);
+  // A tail wider than the straight edge between the corners stays centered.
+  const at = min > max ? body.width / 2 : Phaser.Math.Clamp(body.width * along, min, max);
+  const x = corner.x + at;
   tail.setOrigin(0.5, 0).setPosition(x, corner.y + body.height - padding.bottom);
 }
 const padding = this.textures.getFrame('ui', 'bubble').customData.slicewright.contentPadding;
@@ -210,12 +212,13 @@ the padding box overlaps the outline by exactly that much:
 .ui-bubble { position: relative; }
 .ui-bubble::after {
   content: ""; position: absolute; top: 100%; left: var(--tail-at, 50%);
-  width: 107px; height: 87px; /* the tail PNG's size */
+  width: 114px; height: 93px; /* the tail PNG's size */
   transform: translateX(-50%);
   background: url("ui/bubble-tail.png") no-repeat;
 }
 ```
 
+Keep `--tail-at` between the corners in CSS yourself; nothing clamps it there.
 Both were checked in Phaser 4.2 and Chrome with a generated pair, at three
 body sizes and three tail positions.
 

@@ -197,18 +197,24 @@ clamped.
 
 A piece drawn on its own, such as a speech-bubble tail, can instead be scaled
 so its outline matches another image's. The outline thickness of an image is
-measured along five sample lines from each edge: past the transparent margin
-(up to half the line, since a piece such as a tail does not reach the canvas
-edge on every line) and the anti-aliased ramp (alpha below 224), the first
-opaque run (neighbors within 40) that differs by more than 48 from what lies
-inside it, starting within a quarter of the length from the first visible
-pixel, is the stroke. Through the run's middle pixel
-the stroke's horizontal run h and vertical run v give its perpendicular
-thickness, `1 / sqrt(1 / h² + 1 / v²)`, so a slanted side measures like a
-straight one. The median over the strokes found is the thickness; fewer than
-three strokes is no measurement, which is an error. The scale is the reference
-thickness divided by the piece's. Resizing can first crop transparent margins
-(alpha of 8 or less), as normalization does.
+measured along five sample lines from each edge. Each walk starts at the first
+visible pixel (up to half the line, since a piece such as a tail does not reach
+the canvas edge on every line) and passes the anti-aliased ramp (alpha below
+224); the first opaque pixel within a quarter of the length gives the stroke
+color, the line's center gives the inside color, and the two must differ by
+more than 48. Through the stroke's middle, its horizontal run h and vertical
+run v count pixels by coverage: each pixel's premultiplied color is projected
+onto the line from the nearer background (the inside, or transparency on the
+outer side) to the stroke color, a pixel at least half stroke counts whole, and
+the pixel where the stroke ends counts by its share. Noise below half the
+contrast therefore never cuts a stroke short, and anti-aliased edges count in
+part. The perpendicular thickness is `1 / sqrt(1 / h² + 1 / v²)`, so a slanted
+side measures like a straight one. The median over the strokes found is the
+thickness; fewer than three strokes is no measurement, which is an error. The
+scale is the reference thickness divided by the piece's. Resizing can first
+crop transparent margins (alpha of 8 or less), and then crops rows and columns
+that averaged to full transparency, as normalization does; cropping an image
+with nothing visible is an error.
 
 ## Normalization
 
@@ -396,7 +402,8 @@ flags and everything after `--` are passed through unchanged.
 ## Generation prompts
 
 A prompt plan turns a UI kind (button, panel, dialog, bar, bar fill, tooltip,
-frame), a style, and a background choice into a generation prompt. The prompt asks for a
+bubble, bubble tail, frame), a style, and a background choice into a
+generation prompt. The prompt asks for a
 flat, front-facing element that fills the canvas, decoration only in the
 corners (the end caps for a bar), edges that are plain bands with no pattern,
 grain, or texture running along them (a rope or vine edge can neither stretch nor tile cleanly

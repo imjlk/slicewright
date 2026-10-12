@@ -303,7 +303,11 @@ const resize = define({
   },
   run: (ctx) => {
     const source = readPng(ctx.values.input);
-    const bounds = ctx.values.crop === true ? contentBounds(source, 8) : undefined;
+    const crop = ctx.values.crop === true;
+    const bounds = crop ? contentBounds(source, 8) : undefined;
+    if (crop && bounds === undefined) {
+      throw new UsageError(`${ctx.values.input} has nothing visible to crop.`);
+    }
     const raster = bounds === undefined ? source : cropRaster(source, bounds);
     const reference = ctx.values['match-outline'];
     let outline: { readonly reference: number; readonly piece: number } | undefined;
@@ -323,7 +327,10 @@ const resize = define({
       request = { scale: referenceThickness / pieceThickness };
     }
     const size = targetSize(raster.width, raster.height, request);
-    const resized = resizeRaster(raster, size.width, size.height, ctx.values.filter);
+    const scaled = resizeRaster(raster, size.width, size.height, ctx.values.filter);
+    // Faint pixels kept by the first crop can average to nothing, as in normalize.
+    const recrop = crop ? contentBounds(scaled) : undefined;
+    const resized = recrop === undefined ? scaled : cropRaster(scaled, recrop);
     writeFileSync(ctx.values.out, encodePng(resized));
     print({
       image: ctx.values.input,

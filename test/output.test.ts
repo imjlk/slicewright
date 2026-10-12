@@ -245,7 +245,7 @@ export function checksAtlasFrames(): void {
 
 /**
  * @evidence docs/spec.md#generation-prompts Plans structural prompts, three-slice bars, chroma backgrounds, and follow-up steps.
- * @evidenceReview docs/spec.md#generation-prompts #e110722 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#generation-prompts #8589781 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function plansGenerationPrompts(): void {
   const button = buildPromptPlan({

@@ -147,7 +147,7 @@ const backgroundLines: Readonly<Record<PromptBackground, string>> = {
  * structure and the inset numbers come from inspection afterwards.
  *
  * @evidence docs/spec.md#generation-prompts Builds the structural prompt, the avoid list, three-slice bars, and the follow-up steps.
- * @evidenceReview docs/spec.md#generation-prompts #e110722 Checked this code against the section line by line and ran plansGenerationPrompts green with pnpm test.
+ * @evidenceReview docs/spec.md#generation-prompts #8589781 Checked this code against the section line by line and ran plansGenerationPrompts green with pnpm test.
  */
 export function buildPromptPlan(request: PromptRequest): PromptPlan {
   const preset = presets[request.kind];

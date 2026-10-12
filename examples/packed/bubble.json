@@ -38,20 +38,20 @@
       "frame": {
         "x": 1,
         "y": 213,
-        "w": 107,
-        "h": 87
+        "w": 114,
+        "h": 93
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 107,
-        "h": 87
+        "w": 114,
+        "h": 93
       },
       "sourceSize": {
-        "w": 107,
-        "h": 87
+        "w": 114,
+        "h": 93
       }
     }
   },
@@ -59,7 +59,7 @@
     "image": "bubble.png",
     "size": {
       "w": 322,
-      "h": 301
+      "h": 307
     },
     "scale": "1"
   }
