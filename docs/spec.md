@@ -195,6 +195,21 @@ height in whole pixels, one side with the aspect ratio kept, or a positive scale
 never a scale together with a size; anything else is refused rather than
 clamped.
 
+A piece drawn on its own, such as a speech-bubble tail, can instead be scaled
+so its outline matches another image's. The outline thickness of an image is
+measured along five sample lines from each edge: past the transparent margin
+(up to half the line, since a piece such as a tail does not reach the canvas
+edge on every line) and the anti-aliased ramp (alpha below 224), the first
+opaque run (neighbors within 40) that differs by more than 48 from what lies
+inside it, starting within a quarter of the length from the first visible
+pixel, is the stroke. Through the run's middle pixel
+the stroke's horizontal run h and vertical run v give its perpendicular
+thickness, `1 / sqrt(1 / h² + 1 / v²)`, so a slanted side measures like a
+straight one. The median over the strokes found is the thickness; fewer than
+three strokes is no measurement, which is an error. The scale is the reference
+thickness divided by the piece's. Resizing can first crop transparent margins
+(alpha of 8 or less), as normalization does.
+
 ## Normalization
 
 Normalization prepares generated art for the engine in a fixed order: crop
@@ -346,7 +361,9 @@ still render it as a nine-slice.
 
 Packing combines frames from several atlases, usually the one-frame atlases
 that `normalize` and `export` write, into one image and one JSON Hash atlas so
-a game loads a matching set with a single `this.load.atlas` call. Every frame
+a game loads a matching set with a single `this.load.atlas` call. An input may
+also be a plain PNG, packed as one frame without borders named after the file,
+such as a speech-bubble tail. Every frame
 keeps its pixels exactly, untrimmed and unrotated, with its `scale9Borders` and
 slicewright data; frames without borders pack as plain sprites, which the
 usage adds with `this.add.image`. Frames go on
@@ -387,5 +404,10 @@ when a model draws it), a plain center, no text or icons, and the requested
 background. Bars are planned as three-slices. A bar fill is the part of a
 progress bar drawn inside the track: a three-slice strip with no frame of its
 own and short, simple ends, because it is drawn at any length down to its two
-ends, sized afterwards to the track's content height. The plan lists what to avoid and
+ends, sized afterwards to the track's content height. A speech bubble is planned
+as a nine-slice body with an even outline and no tail, and its tail as a
+separate sprite (a plan mode of `sprite`, never stretched) outlined on its sides
+with a straight, unoutlined cut across its top, so it can overlap the body's
+bottom outline; its follow-up steps match its outline to the body's instead of
+inspecting it. The plan lists what to avoid and
 the follow-up steps: remove the background, inspect, and preview.

@@ -1,0 +1,9 @@
+The tail of a speech bubble on its own, drawn to attach under a matching bubble body, cartoon comic, white fill with a thick black outline.
+Shape: a short pointer that narrows to a tip at the bottom; its two sides carry the bubble outline, and its top edge is a straight horizontal cut through the fill with no outline along it.
+Flat front view, no perspective, centered and filling the canvas edge to edge with only a few pixels of margin.
+Draw only the tail. Above the outlined part, leave a strip of plain fill at least twice as tall as the outline is thick, so it can overlap and hide the body's bottom outline.
+It is drawn once at its own size and never stretched.
+No text, letters, icons, symbols, or characters on it.
+Clean edges, no blur, no noise or grain.
+Solid pure green (#00FF00) background filling everything outside the element; no green anywhere on the element itself.
+Avoid: text or icons on the element; drop shadows or glows outside the element; perspective, tilt, or 3D camera angles; gradients or patterns along a stretch direction; decoration in the middle of an edge; rope, chain, bead, or vine patterns running along the edges; multiple elements or variants in one image; background scenery; an outline along the top edge of the tail; the bubble body or any part of it.

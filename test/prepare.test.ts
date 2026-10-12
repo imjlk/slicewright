@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import { defaultChromaOptions, detectChromaKey, removeChroma } from '../src/chroma.js';
 import { defaultInspectOptions } from '../src/inspect.js';
 import { normalizeRaster } from '../src/normalize.js';
+import { outlineThickness } from '../src/outline.js';
 import { createRaster, pixelOffset, type Raster } from '../src/raster.js';
 import { renderSlices } from '../src/render.js';
 import { resizeRaster, targetSize } from '../src/resize.js';
@@ -58,7 +59,7 @@ export function removesChromaBackgrounds(): void {
 
 /**
  * @evidence docs/spec.md#resizing Averages in premultiplied alpha without colour halos, keeps uniform areas exact, samples nearest pixels, and fits target sizes.
- * @evidenceReview docs/spec.md#resizing #6c29064 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#resizing #d5f9f9d Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function resizesWithoutHalos(): void {
   const edge = createRaster(2, 1);
@@ -184,6 +185,54 @@ export function normalizesGeneratedArt(): void {
   );
 }
 
+/** A downward tail: slanted sides outlined `stroke` px thick, no outline along the top. */
+function tail(stroke: number): Raster {
+  const art = createRaster(120, 100);
+  // Edges from the top corners to the tip at (60, 100), as a x + b y + c = 0.
+  const edges = [
+    [100, -60, 0],
+    [100, 60, -12000],
+  ] as const;
+  for (let y = 0; y < 100; y += 1) {
+    for (let x = 0; x < 120; x += 1) {
+      const px = x + 0.5;
+      const py = y + 0.5;
+      const distances = edges.map(([a, b, c]) => (a * px + b * py + c) / Math.hypot(a, b));
+      const inside = (distances[0] ?? 0) >= 0 && (distances[1] ?? 0) <= 0;
+      if (inside) {
+        const nearest = Math.min(Math.abs(distances[0] ?? 0), Math.abs(distances[1] ?? 0));
+        setPixel(art, x, y, nearest < stroke ? [20, 20, 20, 255] : [250, 250, 250, 255]);
+      }
+    }
+  }
+  return art;
+}
+
+/**
+ * @evidence docs/spec.md#resizing Measures straight and slanted outlines perpendicular to the stroke, refuses art without an outline, and gives the scale that matches two outlines.
+ * @evidenceReview docs/spec.md#resizing #d5f9f9d Checked the assertions against the section and ran this test green with pnpm test.
+ */
+export function matchesOutlineThickness(): void {
+  const body = createRaster(200, 120);
+  fillRect(body, 0, 0, 200, 120, [20, 20, 20, 255]);
+  fillRect(body, 6, 6, 188, 108, [250, 250, 250, 255]);
+  const bodyThickness = outlineThickness(body) ?? 0;
+  ok(Math.abs(bodyThickness - 6) < 0.5, `body ${bodyThickness}`);
+  // Slanted sides measure perpendicular to the stroke, not along a row.
+  const tailThickness = outlineThickness(tail(12)) ?? 0;
+  ok(Math.abs(tailThickness - 12) < 1.5, `tail ${tailThickness}`);
+  // A flat fill has no outline to measure.
+  const flat = createRaster(60, 40);
+  fillRect(flat, 0, 0, 60, 40, fill);
+  strictEqual(outlineThickness(flat), undefined);
+  // The tail scaled by the ratio ends up with the body's outline.
+  const scale = bodyThickness / tailThickness;
+  const size = targetSize(120, 100, { scale });
+  const matched = outlineThickness(resizeRaster(tail(12), size.width, size.height, 'area')) ?? 0;
+  ok(Math.abs(matched - 6) < 1.5, `matched ${matched}`);
+}
+
 void test('chroma removal', removesChromaBackgrounds);
 void test('resizing', resizesWithoutHalos);
 void test('normalization', normalizesGeneratedArt);
+void test('outline matching', matchesOutlineThickness);
