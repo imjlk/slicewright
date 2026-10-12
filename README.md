@@ -31,29 +31,34 @@ the full loop.
 
 ## Use
 
+Node 24 or newer.
+
 ```bash
-pnpm install
-pnpm build
-node dist/cli.js prompt --kind panel --style "hand-painted fantasy wood"
-node dist/cli.js key generated.png --out keyed.png
-node dist/cli.js normalize keyed.png --width 480 --out ui/panel.png --name panel --target phaser,css
-node dist/cli.js preview ui/panel.png --out panel-sheet.png
-node dist/cli.js atlas ui/panel.json
-node dist/cli.js pack ui/panel.json ui/button.json --out ui/ui.png --css
+npx slicewright prompt --kind panel --style "hand-painted fantasy wood"
+npx slicewright key generated.png --out keyed.png
+npx slicewright normalize keyed.png --width 480 --out ui/panel.png --name panel --target phaser,css
+npx slicewright preview ui/panel.png --out panel-sheet.png
+npx slicewright atlas ui/panel.json
+npx slicewright pack ui/panel.json ui/button.json --out ui/ui.png --css
 ```
 
-Run `node dist/cli.js --help` for every option. The package is not on npm yet.
+Run `npx slicewright --help` for every option. Install it in a project with
+`npm install --save-dev slicewright` to pin the version; the same functions are
+importable as a library (`import { inspectRaster } from 'slicewright'`).
+
+From a clone, `pnpm install && pnpm build`, then `node dist/cli.js`.
 
 ### Agent skill
 
-Link the skill into your agent's skill directory:
+The package ships the skill. Link it into your agent's skill directory from a
+project that installed slicewright (or from a clone, with `$PWD/skills/...`):
 
 ```bash
-ln -s "$PWD/skills/slicewright" ~/.claude/skills/slicewright
+ln -s "$PWD/node_modules/slicewright/skills/slicewright" ~/.claude/skills/slicewright
 ```
 
 ```bash
-ln -s "$PWD/skills/slicewright" ~/.codex/skills/slicewright
+ln -s "$PWD/node_modules/slicewright/skills/slicewright" ~/.codex/skills/slicewright
 ```
 
 ### Phaser 4

@@ -1,7 +1,6 @@
 {
   "name": "slicewright",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
   "description": "Prompt, inspect, and preview nine-slice and three-slice UI art for game engines.",
   "license": "MIT",
   "repository": {
@@ -39,6 +38,9 @@
     "dist",
     "skills"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "slicewright": "ttsx src/cli.ts",
     "check": "ttsc --noEmit",
@@ -46,9 +48,11 @@
     "format": "ttsc format",
     "fix": "ttsc fix",
     "test": "ttsx test/index.ts",
-    "build": "ttsc -p tsconfig.build.json",
+    "build": "pnpm clean && ttsc -p tsconfig.build.json",
     "examples": "ttsx tools/make-examples.ts",
-    "engine:check": "ttsx tools/engine-check.ts"
+    "engine:check": "ttsx tools/engine-check.ts",
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "prepublishOnly": "pnpm check && pnpm test && pnpm build"
   },
   "dependencies": {
     "fast-png": "8.0.0",
