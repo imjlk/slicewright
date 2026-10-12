@@ -54,3 +54,14 @@ enforces in `pnpm check`:
 - `pnpm fix`
 - `pnpm examples` regenerates `examples/*.png` from the test fixtures.
 - `pnpm engine:check` renders `examples/real` in Phaser 4 and CSS through headless Chrome.
+
+## Releasing
+
+- The version lives in `package.json`. A release PR bumps it and adds a short
+  entry to `CHANGELOG.md`; after it merges, push a `v<version>` tag on `main`.
+- `.github/workflows/release.yml` publishes on the tag through npm Trusted
+  Publishing (OIDC, with provenance). It refuses a tag that does not match
+  `package.json`. `prepublishOnly` runs check, test, and build.
+- The first version is published once by hand by the maintainer
+  (`npm publish` with their own npm login); then configure this workflow as
+  the package's Trusted Publisher on npmjs.com before relying on tags.

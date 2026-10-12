@@ -1,0 +1,57 @@
+name: Release
+
+# Publishes to npm when a version tag is pushed. The package must have been
+# published once by hand and have this workflow configured as its Trusted
+# Publisher on npmjs.com; npm then authenticates the run through OIDC, with no
+# token, and attaches provenance.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 11.7.0
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      # Trusted Publishing needs npm 11.5.1 or newer.
+      - run: npm install -g npm@11.20.0
+
+      - name: Tag matches package.json
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if [ "v${version}" != "${GITHUB_REF_NAME}" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match package.json version ${version}." >&2
+            exit 1
+          fi
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Cache compiled ttsc plugins
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules/.cache/ttsc/plugins
+          key: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-${{ runner.arch }}-ttsc-plugins-
+
+      - run: pnpm engine:check
+      # prepublishOnly runs check, test, and build again before publishing.
+      - run: npm publish --provenance
