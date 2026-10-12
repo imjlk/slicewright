@@ -130,17 +130,22 @@ bounds. A fully transparent image is an error.
 ## Chroma spill
 
 Images generated on a chroma-key background often keep a tinted fringe after the
-key is removed. A pixel is spill when it is visible, sits on the alpha edge
-(partly transparent, or opaque beside a transparent pixel), and is dominated by
-green or magenta by more than 64 of 255. When spill exceeds 1% of the edge
-pixels, a `alpha.chroma-spill` warning reports the count and the dominant key.
+key is removed. A pixel is dominated by a key when green, or red and blue
+together, exceed the other channels by more than 64 of 255. Edge pixels are
+visible pixels that are partly transparent (alpha below 224) or opaque beside a
+transparent pixel; the rest of the visible pixels are the art itself. A key's
+color is spill when it dominates more than 1% of the edge pixels and its share
+on the edge is more than three times its share in the art, so pink or purple
+art is not mistaken for a magenta fringe. Spill raises an `alpha.chroma-spill`
+warning that reports the count and the key.
 
 ## Interior alpha
 
 Some generators fake transparency and leave a blotchy, partly transparent hole
 in the middle of the element. When more than 5% of the pixels in the central
-half of the content have an alpha between 1 and 249, an `alpha.interior`
-warning reports the share. A fully transparent center, as a picture frame has,
+half of the content have an alpha between 1 and 223, an `alpha.interior`
+warning reports the share. Generators often draw solid faces at an alpha of 240
+to 254, which is not counted. A fully transparent center, as a picture frame has,
 is not counted.
 
 ## Tiling seams

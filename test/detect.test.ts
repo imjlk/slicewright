@@ -45,6 +45,16 @@ export function rejectsInsetsWithoutAStretchSpan(): void {
   const large = crowded.findings.find((finding) => finding.code === 'insets.large');
   deepStrictEqual(large?.details, { axis: 'x', fixed: 24, length: 40 });
   strictEqual(codes(inspectRaster(panel(40, 30))).includes('insets.large'), false);
+  // A tall fixed part points at --mode three, as a pill's rounded ends need.
+  const tall = inspectRaster(panel(40, 30), {
+    ...defaultInspectOptions,
+    insets: { left: 2, right: 2, top: 13, bottom: 13 },
+  });
+  ok(
+    tall.findings.some(
+      (finding) => finding.code === 'insets.large' && finding.message.includes('--mode three'),
+    ),
+  );
 }
 
 /**
@@ -158,7 +168,7 @@ export function warnsAboutTransparentMargins(): void {
 
 /**
  * @evidence docs/spec.md#chroma-spill Flags green-tinted alpha edges and ignores a clean outline.
- * @evidenceReview docs/spec.md#chroma-spill #420e523 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#chroma-spill #5d153d0 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function flagsChromaSpill(): void {
   const clean = panel(40, 30, 2);
@@ -174,6 +184,24 @@ export function flagsChromaSpill(): void {
   );
   strictEqual(finding?.severity, 'warning');
   ok(finding?.message.includes('green'));
+
+  // Pink art is magenta-dominated inside and on its edge alike: not spill.
+  const pink = panel(40, 30, 2);
+  fillRect(pink, 2, 2, 40, 30, [240, 90, 170, 250]);
+  for (let x = 2; x < 42; x += 1) {
+    setPixel(pink, x, 2, [240, 90, 170, 160]);
+  }
+  strictEqual(codes(inspectRaster(pink)).includes('alpha.chroma-spill'), false);
+  // The same fringe on art without that color is spill.
+  const fringed = panel(40, 30, 2);
+  for (let x = 2; x < 42; x += 1) {
+    setPixel(fringed, x, 2, [240, 90, 170, 160]);
+  }
+  ok(
+    inspectRaster(fringed).findings.some(
+      (item) => item.code === 'alpha.chroma-spill' && item.message.includes('magenta'),
+    ),
+  );
 }
 
 /**
@@ -319,7 +347,7 @@ export function tilesRepeatingEdges(): void {
 
 /**
  * @evidence docs/spec.md#interior-alpha Flags a partly transparent hole in the fill and ignores an empty frame center.
- * @evidenceReview docs/spec.md#interior-alpha #d87616b Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#interior-alpha #f158aa3 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function flagsInteriorAlphaHoles(): void {
   const holed = panel(60, 40);
@@ -331,6 +359,14 @@ export function flagsInteriorAlphaHoles(): void {
   fillRect(frame, 6, 6, 48, 28, clear);
   strictEqual(codes(inspectRaster(frame)).includes('alpha.interior'), false);
   strictEqual(codes(inspectRaster(panel(60, 40))).includes('alpha.interior'), false);
+
+  // Generators draw solid faces at an alpha of 240 to 254: not a hole.
+  const nearlyOpaque = panel(60, 40);
+  fillRect(nearlyOpaque, 6, 6, 48, 28, [90, 60, 40, 245]);
+  strictEqual(codes(inspectRaster(nearlyOpaque)).includes('alpha.interior'), false);
+  const translucent = panel(60, 40);
+  fillRect(translucent, 6, 6, 48, 28, [90, 60, 40, 200]);
+  ok(codes(inspectRaster(translucent)).includes('alpha.interior'));
 }
 
 void test('slice insets need a stretch span', rejectsInsetsWithoutAStretchSpan);
