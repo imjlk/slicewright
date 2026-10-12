@@ -106,6 +106,12 @@ const noisyOutlierRatio = 0.02;
 
 const spillDominance = 64;
 const spillRatio = 0.01;
+/** How many times the art's own share of a key color the edge must reach to count as spill. */
+const spillContrast = 3;
+/** Alpha at or above this is opaque: generators often draw solid faces at 240 to 254. */
+const opaqueAlpha = 224;
+/** How far from a transparent pixel a key-colored fringe reaches. */
+const spillReach = 2;
 
 /**
  * Detects or verifies a slice layout and reports what would break when the
@@ -488,7 +494,7 @@ export function multiRegionLayout(
 
 /**
  * @evidence docs/spec.md#slice-insets Rejects caller insets that leave no stretch span.
- * @evidenceReview docs/spec.md#slice-insets #5f061b0 Checked this code against the section line by line and ran rejectsInsetsWithoutAStretchSpan green with pnpm test.
+ * @evidenceReview docs/spec.md#slice-insets #09153ff Checked this code against the section line by line and ran rejectsInsetsWithoutAStretchSpan green with pnpm test.
  * @evidence docs/spec.md#stretch-uniformity Reports the first mismatching pair in each caller-given stretch span unless the axis tiles.
  * @evidenceReview docs/spec.md#stretch-uniformity #695468c Checked this code against the section line by line and ran rejectsGivenInsetsThatStretchDetail green with pnpm test.
  * @evidence docs/spec.md#three-slice Forces zero top and bottom insets in three-slice mode.
@@ -658,40 +664,66 @@ export function marginFindings(raster: Raster, bounds: Rect): Finding[] {
 
 /**
  * @evidence docs/spec.md#chroma-spill Counts green or magenta dominated alpha-edge pixels against the 1% threshold.
- * @evidenceReview docs/spec.md#chroma-spill #420e523 Checked this code against the section line by line and ran flagsChromaSpill green with pnpm test.
+ * @evidenceReview docs/spec.md#chroma-spill #e573ace Checked this code against the section line by line and ran flagsChromaSpill green with pnpm test.
  */
 export function chromaSpillFindings(raster: Raster): Finding[] {
-  let edgePixels = 0;
-  let green = 0;
-  let magenta = 0;
+  // Edge pixels against the art's own opaque pixels: pink or purple art is
+  // magenta-dominated everywhere, while spill tints only the edge.
+  const edge = { pixels: 0, green: 0, magenta: 0 };
+  const art = { pixels: 0, green: 0, magenta: 0 };
+  // A fringe hugs the cut-out: the edge is every visible pixel within
+  // spillReach of a fully transparent one, so a translucent fill inside the
+  // element (glass) counts as art.
+  const nearTransparency = nearTransparentMask(raster, spillReach);
   for (let y = 0; y < raster.height; y += 1) {
     for (let x = 0; x < raster.width; x += 1) {
       const alpha = alphaAt(raster, x, y);
-      if (alpha === 0 || (alpha === 255 && !touchesTransparency(raster, x, y))) {
+      if (alpha === 0) {
         continue;
       }
-      edgePixels += 1;
+      const tally = nearTransparency[y * raster.width + x] === 1 ? edge : art;
+      tally.pixels += 1;
       const offset = pixelOffset(raster, x, y);
       const r = raster.data[offset] ?? 0;
       const g = raster.data[offset + 1] ?? 0;
       const b = raster.data[offset + 2] ?? 0;
       if (g - Math.max(r, b) > spillDominance) {
-        green += 1;
+        tally.green += 1;
       } else if (Math.min(r, b) - g > spillDominance) {
-        magenta += 1;
+        tally.magenta += 1;
       }
     }
   }
-  const spill = green + magenta;
-  if (edgePixels === 0 || spill / edgePixels <= spillRatio) {
+  const share = (count: number, total: number): number => (total === 0 ? 0 : count / total);
+  // With no art pixels there is no baseline: a thin all-edge sprite in a key
+  // color would otherwise always look like spill.
+  if (art.pixels === 0) {
+    return [];
+  }
+  const spilled = (key: 'green' | 'magenta'): boolean => {
+    const onEdge = share(edge[key], edge.pixels);
+    return onEdge > spillRatio && onEdge > share(art[key], art.pixels) * spillContrast;
+  };
+  // Report the stronger key when both qualify.
+  const key = (['green', 'magenta'] as const)
+    .filter((candidate) => spilled(candidate))
+    .sort((a, b) => edge[b] - edge[a])[0];
+  if (key === undefined) {
     return [];
   }
   return [
     {
       code: 'alpha.chroma-spill',
       severity: 'warning',
-      message: `${spill} of ${edgePixels} alpha-edge pixels are tinted by the ${green >= magenta ? 'green' : 'magenta'} key. Despill or re-key before slicing.`,
-      details: { edgePixels, green, magenta },
+      message: `${edge[key]} of ${edge.pixels} alpha-edge pixels are tinted by the ${key} key, far more than the art's own ${key} share. Despill or re-key before slicing; a deliberate ${key} glow or outline is fine.`,
+      details: {
+        edgePixels: edge.pixels,
+        green: edge.green,
+        magenta: edge.magenta,
+        artPixels: art.pixels,
+        artGreen: art.green,
+        artMagenta: art.magenta,
+      },
     },
   ];
 }
@@ -704,7 +736,7 @@ const interiorAlphaRatio = 0.05;
  * generator faking alpha leaves as blotchy holes.
  *
  * @evidence docs/spec.md#interior-alpha Counts partly transparent pixels in the central half of the content against the 5% threshold.
- * @evidenceReview docs/spec.md#interior-alpha #d87616b Checked the 1-249 alpha band, the central half, and the 5% threshold against the section and ran flagsInteriorAlphaHoles green with pnpm test.
+ * @evidenceReview docs/spec.md#interior-alpha #f158aa3 Checked this code against the section line by line and ran flagsInteriorAlphaHoles green with pnpm test.
  */
 export function interiorAlphaFindings(raster: Raster, bounds: Rect): Finding[] {
   const x0 = bounds.x + Math.floor(bounds.width / 4);
@@ -717,7 +749,7 @@ export function interiorAlphaFindings(raster: Raster, bounds: Rect): Finding[] {
     for (let x = x0; x < x1; x += 1) {
       const alpha = alphaAt(raster, x, y);
       total += 1;
-      if (alpha > 0 && alpha < 250) {
+      if (alpha > 0 && alpha < opaqueAlpha) {
         partial += 1;
       }
     }
@@ -733,6 +765,45 @@ export function interiorAlphaFindings(raster: Raster, bounds: Rect): Finding[] {
       details: { partial, total },
     },
   ];
+}
+
+/**
+ * 1 for every pixel within `reach` (square distance) of a fully transparent
+ * pixel or of the image border, whose pixels seed the band like transparent ones.
+ */
+function nearTransparentMask(raster: Raster, reach: number): Uint8Array {
+  const { width, height } = raster;
+  let mask = new Uint8Array(width * height);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const border = x === 0 || y === 0 || x === width - 1 || y === height - 1;
+      if (border || alphaAt(raster, x, y) === 0) {
+        mask[y * width + x] = 1;
+      }
+    }
+  }
+  for (let step = 0; step < reach; step += 1) {
+    const next = new Uint8Array(mask);
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        if (mask[y * width + x] === 1) {
+          continue;
+        }
+        // Border pixels are already set, so every neighbor here is in range.
+        let near = false;
+        for (let dy = -1; dy <= 1 && !near; dy += 1) {
+          for (let dx = -1; dx <= 1 && !near; dx += 1) {
+            near = mask[(y + dy) * width + (x + dx)] === 1;
+          }
+        }
+        if (near) {
+          next[y * width + x] = 1;
+        }
+      }
+    }
+    mask = next;
+  }
+  return mask;
 }
 
 function touchesTransparency(raster: Raster, x: number, y: number): boolean {
@@ -759,7 +830,7 @@ const largeInsetRatio = 0.5;
  * cannot shrink much below its source size and only a short span stretches.
  *
  * @evidence docs/spec.md#slice-insets Warns when fixed segments take more than half of a resizable axis.
- * @evidenceReview docs/spec.md#slice-insets #5f061b0 Checked this code against the section line by line and ran rejectsInsetsWithoutAStretchSpan green with pnpm test.
+ * @evidenceReview docs/spec.md#slice-insets #09153ff Checked this code against the section line by line and ran rejectsInsetsWithoutAStretchSpan green with pnpm test.
  */
 export function largeInsetFindings(layout: SliceLayout): Finding[] {
   const minimum = minimumLayoutSize(layout);
@@ -774,7 +845,7 @@ export function largeInsetFindings(layout: SliceLayout): Finding[] {
       {
         code: `insets.large`,
         severity: 'warning' as const,
-        message: `The fixed parts take ${fixed} of ${length} px of the ${dimension}, so it cannot go below ${fixed} px and only ${length - fixed} px stretches. Detail along the edge often causes this; regenerate with plainer edges or check the tolerance.`,
+        message: `The fixed parts take ${fixed} of ${length} px of the ${dimension}, so it cannot go below ${fixed} px and only ${length - fixed} px stretches. Detail along the edge often causes this; regenerate with plainer edges or check the tolerance. If the ends are rounded across the whole ${dimension === 'height' ? 'height (a pill or capsule), keep the height with --mode three' : 'width, keep the width with --mode three-vertical'}.`,
         details: { axis, fixed, length },
       },
     ];
