@@ -239,6 +239,24 @@ lines into their neighbors over about the stretched span divided by twice the
 keep length. When inspection reports an error, it returns the resized image
 without rebuilding.
 
+Before resizing down, normalization looks for drawn lines the resize will
+lose. Area averaging leaves a line about its width divided by the factor of
+its contrast, so a line narrower than half the factor fades; nearest sampling
+can drop a line narrower than the factor. That width is the limit for each
+axis. Along up to five distinct sample lines at 40% to 60% of the cropped image
+it walks in from each edge, past the transparent margin and the anti-aliased
+ramp (alpha below 224), and no further than a quarter of the length, splitting
+the line into segments whose neighbors differ by at most 40 (premultiplied,
+alpha included). A segment that reaches the end of the search is the fill,
+whether opaque, translucent, or empty. A segment at least as wide as the limit
+is a rim, which keeps marking the border, so nothing is reported. Narrower
+segments are passed over, so a double stroke still reaches the fill; the first
+of them that differs from both neighbors by more than 48 (from the
+transparency outside by its alpha) is the line. When at least three of a
+side's sample lines reach the fill past such a line, a `resize.thin-lines`
+warning names the sides, widths, and factors and asks for lines at least as
+thick as the limit or a larger size.
+
 ## Content padding
 
 Content padding is where content such as text sits inside the frame: four sizes
@@ -354,7 +372,8 @@ one region per axis.
 An atlas check reads a Phaser JSON Hash or JSON Array atlas and validates every
 frame that has `scale9Borders`, or only the named frame. A trimmed frame is an
 error because Phaser's NineSlice does not support trimming. A rotated frame is a
-warning. Borders outside the frame are an error. Each frame's pixels are then
+warning. A frame rectangle that is not whole pixels or lies outside the image
+is an `atlas.frame-outside-image` error. Borders outside the frame are an error. Each frame's pixels are then
 inspected with its borders as explicit insets: borders spanning the full height
 inspect as a three-slice. Borders spanning the full width are an ordinary
 nine-slice whose columns must match, unless the frame carries
@@ -387,7 +406,8 @@ CSS is one stylesheet with a class per frame that still points at each frame's
 own image, and a frame that is only part of its image has no CSS class; with no
 class at all, no stylesheet is written. Packing refuses to write over an input
 atlas, its image, or the stylesheet beside it, comparing existing files by their
-real path, and refuses an image path that is also its own atlas or stylesheet.
+real path, and refuses an image path that is also its own atlas or, with a
+stylesheet, its stylesheet, even when they differ only in letter case.
 
 ## Command-line arguments
 

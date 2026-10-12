@@ -18,6 +18,7 @@ import { layoutFromInsets, minimumLayoutSize } from './layout.js';
 import { renderSlices } from './render.js';
 import { resizeRaster, targetSize, type ResizeFilter } from './resize.js';
 import { insetsToScale9Borders, type SliceInsets } from './slices.js';
+import { thinLineFindings } from './thin-lines.js';
 
 export interface NormalizeOptions {
   readonly inspect: InspectOptions;
@@ -61,7 +62,7 @@ export const defaultNormalizeOptions: NormalizeOptions = {
  * uniform stretch span.
  *
  * @evidence docs/spec.md#normalization Orders crop, resize, inspection, and rebuild, and rebuilds only uniform axes.
- * @evidenceReview docs/spec.md#normalization #ef22e0f Checked this code against the section line by line and ran normalizesGeneratedArt green with pnpm test.
+ * @evidenceReview docs/spec.md#normalization #e2c2c11 Checked this code against the section line by line and ran normalizesGeneratedArt green with pnpm test.
  */
 export function normalizeRaster(
   source: Raster,
@@ -78,7 +79,14 @@ export function normalizeRaster(
   }
 
   const size = targetSize(raster.width, raster.height, options);
+  let thinLines: Finding[] = [];
   if (size.width !== raster.width || size.height !== raster.height) {
+    // Judged on the cropped source, before averaging hides the lines.
+    thinLines = thinLineFindings(
+      raster,
+      { x: raster.width / size.width, y: raster.height / size.height },
+      options.filter,
+    );
     const resized = resizeRaster(raster, size.width, size.height, options.filter);
     steps.push(step('resize', raster, resized));
     raster = resized;
@@ -88,7 +96,8 @@ export function normalizeRaster(
     }
   }
 
-  const report = inspectRaster(raster, options.inspect);
+  const inspected = inspectRaster(raster, options.inspect);
+  const report = { ...inspected, findings: [...inspected.findings, ...thinLines] };
   if (options.keep === undefined || !report.ok) {
     return { raster, steps, report };
   }
@@ -169,7 +178,7 @@ export function normalizeRaster(
  * Lossless when the span is uniform: every dropped line equals a kept one.
  *
  * @evidence docs/spec.md#normalization Copies the borders and the first kept lines of each span.
- * @evidenceReview docs/spec.md#normalization #ef22e0f Checked this code against the section line by line and ran normalizesGeneratedArt green with pnpm test.
+ * @evidenceReview docs/spec.md#normalization #e2c2c11 Checked this code against the section line by line and ran normalizesGeneratedArt green with pnpm test.
  */
 export function rebuildSlices(
   raster: Raster,

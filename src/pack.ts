@@ -40,7 +40,7 @@ export interface PackResult {
  * `spacing` transparent pixels.
  *
  * @evidence docs/spec.md#atlas-packing Places frames on shelves with extrusion and spacing, copies their pixels exactly, and writes untrimmed, unrotated frames that keep their borders and slicewright data.
- * @evidenceReview docs/spec.md#atlas-packing #5cc249a Checked this code against the section line by line and ran packsAtlases green with pnpm test.
+ * @evidenceReview docs/spec.md#atlas-packing #76a0a67 Checked this code against the section line by line and ran packsAtlases green with pnpm test.
  */
 export function packFrames(
   pieces: readonly PackPiece[],
