@@ -1,0 +1,12 @@
+/* slicewright: bubble, nine */
+.bubble {
+  box-sizing: border-box;
+  border-style: solid;
+  border-width: 5px 5px 5px 5px;
+  border-image-source: url("bubble.png");
+  border-image-slice: 15 20 15 20 fill;
+  border-image-width: 15px 20px 15px 20px;
+  border-image-repeat: stretch stretch;
+  min-width: 40px;
+  min-height: 30px;
+}

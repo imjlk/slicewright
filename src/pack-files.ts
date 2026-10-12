@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
-import { dirname, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 
 import type { Finding, InspectOptions } from './inspect.js';
 import { axisTiles, type SliceLayout } from './layout.js';
@@ -61,7 +61,7 @@ interface AtlasSource {
  * stylesheet sit next to the PNG.
  *
  * @evidence docs/spec.md#atlas-packing Refuses trimmed, rotated, and out-of-image input frames, checks the packed atlas, writes one load call with a NineSlice per frame, and gives CSS classes only to frames that are a whole image.
- * @evidenceReview docs/spec.md#atlas-packing #8eec33b Checked this code against the section line by line and ran packsAtlasFiles green with pnpm test.
+ * @evidenceReview docs/spec.md#atlas-packing #76a0a67 Checked this code against the section line by line and ran packsAtlasFiles green with pnpm test.
  */
 export function buildPack(options: PackFilesOptions): PackFilesResult {
   const outDir = dirname(options.out);
@@ -150,6 +150,19 @@ export function buildPack(options: PackFilesOptions): PackFilesResult {
 
 /** Reads an atlas and its image and cuts out every frame. */
 function atlasSources(path: string): AtlasSource[] {
+  // A plain PNG, such as a speech-bubble tail, is one frame named after the file.
+  if (/\.png$/i.test(path)) {
+    const raster = decodePng(readFileSync(path));
+    const imagePath = resolve(path);
+    return [
+      {
+        piece: { name: basename(path).replace(/\.png$/i, ''), raster, data: {} },
+        layout: undefined,
+        wholeImage: imagePath,
+        image: imagePath,
+      },
+    ];
+  }
   const json: unknown = JSON.parse(readFileSync(path, 'utf8'));
   const { atlas, entries } = readAtlas(json);
   if (atlas.meta?.image === undefined) {

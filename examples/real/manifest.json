@@ -66,6 +66,11 @@
       "css": "scifi.css"
     },
     {
+      "label": "bubble",
+      "atlas": "bubble.json",
+      "css": "bubble.css"
+    },
+    {
       "label": "rope (tiled x)",
       "atlas": "../tiled/rope.json",
       "css": "../tiled/rope.css",
@@ -109,6 +114,14 @@
         "button.json",
         "bar.json",
         "../tiled/rope.json"
+      ],
+      "css": true
+    },
+    {
+      "out": "../packed/bubble.png",
+      "inputs": [
+        "bubble.json",
+        "bubble-tail.png"
       ],
       "css": true
     }

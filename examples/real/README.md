@@ -14,11 +14,16 @@ image was generated with the GPT `image_gen` route of
 | `baroque` | transparent PNG | `normalize --width 480` |
 | `scifi` | transparent PNG | `normalize --width 480` |
 | `bar-fill` | chroma-magenta PNG, `bar.png` as a reference | `key`, then `normalize --height 28 --mode three` |
+| `bubble`, `bubble-tail` | chroma-green PNGs; the tail generated with the body as a reference | body: `key`, `normalize --width 320`; tail: `key`, `resize --crop --match-outline bubble.png` |
 | `crest` | transparent PNG, hand-written prompt | `normalize --width 480 --regions multi` |
 | `bar-vertical` | the keyed bar turned a quarter turn | `normalize --height 320` |
 
 `bar-fill` is the fill for `bar`: 28 px is the track's 33 px height minus its
 top and bottom content padding (2 and 3 px).
+
+`bubble-tail` is a separate sprite: no target can keep a tail fixed in the middle
+of a stretching edge, so it is drawn on top of the body. The manifest's
+`packs` list packs it with the body (`../packed/bubble.*`).
 
 `crest` has a crest in the middle of its top edge, so its prompt is written by
 hand: `slicewright prompt` keeps decoration in the corners. No target exports a
@@ -30,7 +35,7 @@ detection change is intended, a failing check prints the new result as
 detection on the same image stretches only the span right of the crest and
 warns `insets.large`.
 
-Every sample except `crest` was normalized with `--target phaser,css`, which writes its
+Every sample except `crest` and `bubble-tail` was normalized with `--target phaser,css`, which writes its
 `.json` atlas and `.css` class. `*-min` files add `--keep 4`. For painted art, most axes report
 `rebuild.<axis>.lossy` and keep their full span; the pixel panel keeps 4 rows.
 
