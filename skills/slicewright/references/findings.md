@@ -27,6 +27,11 @@
 | `padding.invalid` | Given content padding leaves no content area, is not whole and non-negative, or reaches past the fixed edge into a stretch span, where it would change with size. | Shrink `--padding` to within the insets on resizable axes. |
 | `pack.css-skipped` | A packed frame has no CSS class: it has no borders, or is only part of its image, which `border-image` cannot address. | Pack the piece's own one-frame atlas, or use Phaser for it. |
 | `pack.css-class-collision` | Two frame names become the same CSS class. | Rename one piece. |
+| `compare.size`, `compare.mode` | States of one element differ in size or slice mode, so they cannot swap in one NineSlice. | Normalize every state to the same size and regenerate the odd one out. |
+| `compare.insets`, `compare.padding` | States' detected insets or content padding differ by more than `--slack`; corners or text would jump on swap. | Use `sharedInsets` for every state, or regenerate the state that drifted. |
+| `compare.shared-insets` | The largest insets on each side do not fit every state. | Regenerate the states so their edge detail lines up. |
+| `compare.outline` | Pieces' outline thicknesses differ by more than 1 px and a quarter. | Regenerate the odd piece, or normalize it to a size that matches the others' line weight. |
+| `compare.outline-missing` | Some pieces have no measurable outline. | Informational; compare their line weight by eye in the preview. |
 | `atlas.padding-invalid` | An atlas frame's content padding does not fit the frame or reaches past the fixed edge its `scale9Borders` leave. | Re-export the frame. |
 | `insets.asymmetric` | Opposite insets differ by more than 2 px. | Usually generator drift; check the preview. |
 | `insets.invalid` | Insets leave no stretch pixel. | Shrink the insets. |

@@ -287,6 +287,26 @@ the frame or reaches past the fixed segments its `scale9Borders` leave
 (`atlas.padding-invalid`). The preview outlines the content box on the
 guides cell.
 
+## Set comparison
+
+A comparison takes two or more images and checks that they agree. States of one
+element (normal, hover, pressed, disabled) swap in place in one NineSlice or
+element, so they must have the same size (`compare.size`) and the same slice
+mode (`compare.mode`), both errors. Each state is inspected on its own; detected
+insets or content padding that differ between states by more than the slack
+(1 px by default, a whole number of pixels) are a `compare.insets` or
+`compare.padding` warning, because the corners would jump or the text would
+move when the states swap. When the states agree on size and mode, every state
+is inspected again with the shared insets, the largest inset on each side, and a
+state that then has an error finding is a `compare.shared-insets` error: no one
+set of insets fits every state. A matching set (a dialog, a button, and a bar)
+has pieces of different sizes and slices, so only their line weight is compared.
+For both kinds, outlines are measured as for resizing, and when the thickest
+exceeds the thinnest by more than 1 px and by more than a quarter, that is a
+`compare.outline` warning; pieces without a measurable outline are named in a
+`compare.outline-missing` note. The comparison fails when any of its own
+findings or any piece's inspection is an error.
+
 ## Preview sheet
 
 A preview sheet renders the layout at several sizes on one PNG over a
