@@ -89,8 +89,11 @@ every command exits 2 on bad input. `--help` works on each command.
    there; run it from the game's served root or pass `--image-ref`. Prefix
    `--name` (`ui-button`) so CSS class names do not collide in a page. It
    prints how to use them; `slicewright targets` lists what each target
-   can represent. Only Phaser and CSS are supported; both are verified in the
-   real engine.
+   can represent. Phaser and CSS are verified in the real engine. `unity`
+   (spriteBorder values, no files, never `.meta`), `defold` (`slice9` values),
+   and `godot` (a `StyleBoxTexture` `.tres`; pass `--image-ref res://…`) are
+   experimental: they follow the documented formats but are untested in the
+   engine, so check them there before shipping.
 8. **Pack a set.** `slicewright pack ui/dialog.json ui/button.json ui/bar.json
    --out ui/ui.png` puts every piece in one image and atlas, so the game loads
    them with one `this.load.atlas`; it prints a `nineslice` call per frame,

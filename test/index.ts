@@ -8,3 +8,4 @@ import './padding.test.js';
 import './pack.test.js';
 import './build.test.js';
 import './argv.test.js';
+import './targets.test.js';

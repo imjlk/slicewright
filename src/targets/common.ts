@@ -10,7 +10,7 @@ import type { SliceTarget } from './types.js';
  * experimental target says so.
  *
  * @evidence docs/spec.md#targets Reports unsupported shapes as errors, emulation as info, and tiling gaps as warnings, from the declared capabilities.
- * @evidenceReview docs/spec.md#targets #9a4f665 Checked this code against the section line by line and ran checksTargetCapabilities green with pnpm test.
+ * @evidenceReview docs/spec.md#targets #01a5af9 Checked this code against the section line by line and ran checksTargetCapabilities green with pnpm test.
  */
 export function capabilityFindings(target: SliceTarget, layout: SliceLayout): Finding[] {
   const findings: Finding[] = [];

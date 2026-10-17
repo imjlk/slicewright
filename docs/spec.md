@@ -371,8 +371,8 @@ a `target.tile` warning, and so is a target whose tile count differs from the
 layout's rule of rounding down (CSS `round` takes the nearest whole number). Each target also
 has a status: `verified` targets are rendered in the real engine by the engine
 check, and an `experimental` target follows the documented format without being
-run, which a `target.experimental` finding states on every export. The targets
-are `phaser` and `css`, both verified; other engines are not supported.
+run, which a `target.experimental` finding states on every export. The verified
+targets are `phaser` and `css`; `unity`, `defold`, and `godot` are experimental.
 
 The layout and the image must have the same size; a target refuses a layout
 built for another size, as the renderer does.
@@ -390,6 +390,37 @@ CSS export carries a `target.tile` warning. A
 three-slice fixes the height and a vertical three-slice fixes the width; any
 other layout sets the minimum width and height. CSS cannot express more than
 one region per axis.
+
+## Experimental targets
+
+Three targets follow their engine's documented format but are not rendered by
+the engine check, so each is `experimental`. Each represents a nine-slice
+natively and emulates both three-slices with zero insets on the fixed axis;
+none exports multiple regions. Their usage text names the asset and repeats
+the content padding when there is one.
+
+Unity takes the border as a `Vector4` in its own order, `x = left`,
+`y = bottom`, `z = right`, `w = top`, for `TextureImporter.spriteBorder` or the
+Sprite Editor. The Unity target writes no file and never touches a `.meta`
+file: its usage prints the vector and editor-script lines that set it and
+reimport the texture, and the Sliced or, for a tiled axis, Tiled draw mode. Unity tiles both axes
+together and clips the last tile instead of fitting whole tiles, so a tiled
+export also carries a `target.tile` warning.
+
+Defold takes `slice9` as left, top, right, bottom on a sprite component (Size
+Mode Manual, trimming off) or a GUI box node (Size Mode Manual), and cannot
+tile. The Defold target writes no file: its usage prints `slice9` in the
+component file format, a `go.set` call on the sprite's `slice` property, and GUI
+calls that set the node's size mode to manual and its `slice9`.
+
+Godot 4 takes texture margins for `StyleBoxTexture` and patch margins for
+`NinePatchRect`, with an axis stretch mode per axis: 0 stretches and 2 (tile
+fit) tiles whole tiles scaled to fit, which may pick another count than the
+layout's rounding down, so a tiled export carries a `target.tile` warning. The
+Godot target writes `<name>.tres`, a `StyleBoxTexture` resource whose texture is
+the image reference when it starts with `res://`, and otherwise `res://` plus
+the image's path from where the command runs, taken as the project root, with content margins from the content padding; its usage prints the
+same values as `NinePatchRect` properties.
 
 ## Atlas frames
 
