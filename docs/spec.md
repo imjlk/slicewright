@@ -449,9 +449,9 @@ is a usage error. Paths in the manifest are relative to it; the pieces go to a
 `pieces` directory beside the packed PNG unless the manifest names another. A
 piece takes the same normalization settings as the normalize command. A build
 refuses to write over any piece's input or the manifest, and refuses two
-outputs at one path, its own stylesheets included, or an output that is also a
-directory another output goes into or an existing directory, (a piece named like the pack in the pack's directory),
-comparing real paths without letter case (a new file by its directory's real
+outputs at one path, its own stylesheets included (a piece named like the pack
+in the pack's directory), or an output that is also a directory another output
+goes into or an existing directory, comparing real paths without letter case (a new file by its directory's real
 path), before it writes anything it can
 name ahead. The packed atlas is checked with the most lenient matching any
 piece used, since each piece already passed its own settings and packing

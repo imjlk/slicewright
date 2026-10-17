@@ -106,7 +106,7 @@ export interface BuildReport {
  * scale or a size, and every target must exist.
  *
  * @evidence docs/spec.md#build-manifest Validates the manifest shape, unique plain piece names, size or scale, insets syntax, and known targets before anything is built.
- * @evidenceReview docs/spec.md#build-manifest #6fca211 Checked this code against the section line by line and ran buildsManifests green with pnpm test.
+ * @evidenceReview docs/spec.md#build-manifest #1eec81b Checked this code against the section line by line and ran buildsManifests green with pnpm test.
  */
 export function readBuildManifest(json: unknown): BuildManifest {
   // Unknown keys are refused, so a misspelled setting is not silently ignored.
