@@ -74,7 +74,7 @@ const sides = ['left', 'right', 'top', 'bottom'] as const;
  * than 1 px and a quarter are reported for both kinds.
  *
  * @evidence docs/spec.md#set-comparison Inspects each piece, checks states for one size, mode, slack-bound insets and padding, and the shared largest insets, and compares outline weights for states and sets.
- * @evidenceReview docs/spec.md#set-comparison #532273a Checked this code against the section line by line and ran comparesSets green with pnpm test.
+ * @evidenceReview docs/spec.md#set-comparison #c59c7f7 Checked this code against the section line by line and ran comparesSets green with pnpm test.
  */
 export function compareSet(
   pieces: readonly ComparePiece[],
@@ -88,6 +88,13 @@ export function compareSet(
   }
   if (!Number.isInteger(options.slack) || options.slack < 0) {
     throw new RangeError('The slack must be a whole, non-negative number of pixels.');
+  }
+  if (
+    options.kind === 'states' &&
+    (options.inspect.insets !== undefined || options.inspect.contentPadding !== undefined)
+  ) {
+    // Given geometry would be the same for every state and hide the drift being compared.
+    throw new RangeError('States are compared by their detected insets and padding; give neither.');
   }
   if (options.kind === 'states' && options.inspect.regions === 'multi') {
     // Shared insets describe one stretch span per axis; multi-region layouts have several.

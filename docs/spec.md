@@ -301,7 +301,8 @@ move when the states swap. When the states agree on size, mode, and tiling, ever
 is inspected again with the shared insets, the largest inset on each side, keeping
 the tiling it detected, and a
 state that then has an error finding is a `compare.shared-insets` error: no one
-set of insets fits every state. States compare single-region layouts only, since
+set of insets fits every state. States are compared by detected insets and padding, never given ones, and
+compare single-region layouts only, since
 shared insets cannot describe several stretch regions per axis. A matching set (a dialog, a button, and a bar)
 has pieces of different sizes and slices, so only their line weight is compared.
 For both kinds, outlines are measured as for resizing, and when the thickest

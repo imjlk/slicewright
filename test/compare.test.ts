@@ -46,7 +46,7 @@ function codes(report: { readonly findings: ReadonlyArray<{ readonly code: strin
 
 /**
  * @evidence docs/spec.md#set-comparison Compares matching states, then states that differ in size, mode, insets beyond the slack, shared insets that cut detail, and outline weight, and a set that only compares outlines.
- * @evidenceReview docs/spec.md#set-comparison #532273a Checked the assertions against the section's size, mode, slack, shared-insets, and outline rules and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#set-comparison #c59c7f7 Checked the assertions against the section's size, mode, slack, shared-insets, and outline rules and ran this test green with pnpm test.
  */
 export function comparesSets(): void {
   // Two identical states agree and share their insets.
@@ -202,6 +202,22 @@ export function comparesSets(): void {
       ),
     RangeError,
   );
+  for (const given of [
+    { insets: { left: 6, right: 6, top: 6, bottom: 6 } },
+    { contentPadding: { left: 6, right: 6, top: 6, bottom: 6 } },
+  ]) {
+    throws(
+      () =>
+        compareSet(
+          [
+            { name: 'a', raster: panel(40, 30) },
+            { name: 'b', raster: panel(40, 30) },
+          ],
+          { ...options, inspect: { ...options.inspect, ...given } },
+        ),
+      RangeError,
+    );
+  }
   throws(() => compareSet([{ name: 'one', raster: panel(40, 30) }], options), RangeError);
   throws(
     () =>
