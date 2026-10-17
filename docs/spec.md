@@ -423,12 +423,19 @@ padding use the command-line syntax, and every target exists. A bad manifest
 is a usage error. Paths in the manifest are relative to it; the pieces go to a
 `pieces` directory beside the packed PNG unless the manifest names another. A
 piece takes the same normalization settings as the normalize command. A build
-refuses to write over any piece's input, comparing real paths without letter
-case, before it writes anything it can name ahead. When a
+refuses to write over any piece's input or the manifest, and refuses two
+outputs at one path (a piece named like the pack in the pack's directory),
+comparing real paths without letter case, before it writes anything it can
+name ahead. The packed atlas is checked with the most lenient matching any
+piece used, since each piece already passed its own settings and packing
+copies its pixels exactly, and its stylesheet findings are reported. When a
 piece fails its inspection or export, nothing is packed and the build fails;
 otherwise the build fails exactly when the pack fails. Watching builds once,
 then again whenever the manifest or a piece's input changes, reading the
-manifest anew each time, and keeps watching after a failed build.
+manifest anew each time, and keeps watching after a failed build. A piece in a
+directory that does not exist yet is watched through its nearest existing
+ancestor until the directory appears, and an event that names no file rebuilds
+only when a watched file's modification time changed.
 
 ## Command-line arguments
 

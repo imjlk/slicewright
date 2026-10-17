@@ -10,7 +10,7 @@ import { panel, shadedBar } from './fixtures.js';
 
 /**
  * @evidence docs/spec.md#build-manifest Builds a dialog and a bar from a manifest into pieces, exports, and one packed atlas, skips packing when a piece fails, and refuses manifests the shape or the rules reject.
- * @evidenceReview docs/spec.md#build-manifest #0295c33 Checked the assertions against the section's validation, path, piece, failure, and watch-input rules and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#build-manifest #f421208 Checked the assertions against the section's validation, path, piece, failure, and watch-input rules and ran this test green with pnpm test.
  */
 export function buildsManifests(): void {
   const dir = mkdtempSync(join(tmpdir(), 'slicewright-build-'));
@@ -92,6 +92,47 @@ export function buildsManifests(): void {
         ),
       BuildManifestError,
     );
+
+    // The manifest itself, and two outputs at one path, are refused too.
+    throws(
+      () =>
+        runBuild(
+          readBuildManifest({ out: 'ui.build.json', pieces: [{ input: 'bar.png' }] }),
+          dir,
+          dir,
+          [join(dir, 'ui.build.json')],
+        ),
+      BuildManifestError,
+    );
+    throws(
+      () =>
+        runBuild(
+          readBuildManifest({
+            out: 'out/ui.png',
+            piecesDir: 'out',
+            pieces: [{ input: 'bar.png', name: 'ui' }],
+          }),
+          dir,
+          dir,
+        ),
+      BuildManifestError,
+    );
+
+    // Stylesheet collisions fail the pack and are reported with it.
+    const clashing = runBuild(
+      readBuildManifest({
+        out: 'css/ui.png',
+        css: true,
+        pieces: [
+          { input: 'dialog-raw.png', name: 'a#b', width: 40 },
+          { input: 'dialog-raw.png', name: 'a?b', width: 40 },
+        ],
+      }),
+      dir,
+      dir,
+    );
+    strictEqual(clashing.ok, false);
+    ok(clashing.pack?.cssFindings.some((finding) => finding.code === 'pack.css-class-collision'));
 
     // Manifests the shape or the rules reject.
     throws(() => readBuildManifest({ out: 'ui.png', pieces: [] }));

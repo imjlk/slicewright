@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { mkdirSync, readFileSync, watch, writeFileSync, type FSWatcher } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import { cli, define } from 'gunshi';
@@ -18,7 +18,8 @@ import { normalizeRaster } from './normalize.js';
 import { outlineThickness } from './outline.js';
 import type { SliceLayout } from './layout.js';
 import { buildPack } from './pack-files.js';
-import { buildInputs, loadBuildManifest, runBuild, type BuildManifest } from './build.js';
+import { loadBuildManifest, runBuild, type BuildManifest } from './build.js';
+import { watchBuild } from './watch.js';
 import { defaultPackOptions } from './pack.js';
 import { inspectAtlas } from './phaser.js';
 import { decodePng, encodePng } from './png.js';
@@ -526,12 +527,14 @@ const build = define({
     }
     const baseDir = dirname(resolve(path));
     if (ctx.values.watch !== true) {
-      const report = runBuild(buildManifest(path), baseDir);
+      const report = runBuild(buildManifest(path), baseDir, process.cwd(), [path]);
       print({ manifest: path, ...report });
       failOnErrors(report.ok);
       return;
     }
-    await watchBuild(path, baseDir);
+    await watchBuild(path, baseDir, buildManifest, (value) => {
+      process.stdout.write(`${JSON.stringify(value)}\n`);
+    });
   },
 });
 
@@ -542,69 +545,6 @@ function buildManifest(path: string): BuildManifest {
   } catch (error) {
     throw new UsageError(`${path}: ${error instanceof Error ? error.message : String(error)}`);
   }
-}
-
-/**
- * Builds, then builds again whenever the manifest or a piece's input changes,
- * printing one JSON line per build, until interrupted. Directories are watched
- * rather than files, so an editor that replaces a file on save still counts.
- */
-function watchBuild(path: string, baseDir: string): Promise<void> {
-  const watchers = new Map<string, FSWatcher>();
-  let watched = new Set<string>([resolve(path)]);
-  let timer: NodeJS.Timeout | undefined;
-  const line = (value: unknown): void => {
-    process.stdout.write(`${JSON.stringify(value)}\n`);
-  };
-  const rebuild = (): void => {
-    try {
-      const manifest = buildManifest(path);
-      watched = new Set(buildInputs(manifest, path));
-      const report = runBuild(manifest, baseDir);
-      line({ manifest: path, ...report });
-    } catch (error) {
-      line({
-        manifest: path,
-        ok: false,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-    const directories = new Set([...watched].map((file) => dirname(file)));
-    for (const [directory, watcher] of watchers) {
-      if (!directories.has(directory)) {
-        watcher.close();
-        watchers.delete(directory);
-      }
-    }
-    for (const directory of directories) {
-      if (!watchers.has(directory)) {
-        try {
-          watchers.set(
-            directory,
-            watch(directory, (_event, file) => {
-              if (file !== null && watched.has(join(directory, file))) {
-                clearTimeout(timer);
-                // Editors write in bursts; build once they settle.
-                timer = setTimeout(rebuild, 100);
-              }
-            }),
-          );
-        } catch {
-          // A missing directory is reported by the build; watch it once it exists.
-        }
-      }
-    }
-  };
-  rebuild();
-  return new Promise((done) => {
-    process.once('SIGINT', () => {
-      clearTimeout(timer);
-      for (const watcher of watchers.values()) {
-        watcher.close();
-      }
-      done();
-    });
-  });
 }
 
 const targets = define({

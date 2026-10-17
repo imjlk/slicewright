@@ -91,6 +91,7 @@ export interface BuildReport {
       readonly ok: boolean;
       readonly findings: readonly Finding[];
     }>;
+    readonly cssFindings: readonly Finding[];
     readonly usage: string;
   } | null;
   /** Every file written, in order. */
@@ -103,7 +104,7 @@ export interface BuildReport {
  * scale or a size, and every target must exist.
  *
  * @evidence docs/spec.md#build-manifest Validates the manifest shape, unique plain piece names, size or scale, insets syntax, and known targets before anything is built.
- * @evidenceReview docs/spec.md#build-manifest #0295c33 Checked this code against the section line by line and ran buildsManifests green with pnpm test.
+ * @evidenceReview docs/spec.md#build-manifest #f421208 Checked this code against the section line by line and ran buildsManifests green with pnpm test.
  */
 export function readBuildManifest(json: unknown): BuildManifest {
   // Unknown keys are refused, so a misspelled setting is not silently ignored.
@@ -169,13 +170,18 @@ export function runBuild(
   manifest: BuildManifest,
   baseDir: string,
   servedFrom: string = process.cwd(),
+  /** More files the build must never write over, such as the manifest itself. */
+  protect: readonly string[] = [],
 ): BuildReport {
   const out = resolve(baseDir, manifest.out);
   const piecesDir = resolve(baseDir, manifest.piecesDir ?? join(dirname(manifest.out), 'pieces'));
   const packName = manifest.name ?? stem(manifest.out);
   const files: string[] = [];
   // Sources compare by real path and letter case, as packing compares its inputs.
-  const inputs = new Set(manifest.pieces.map((piece) => realPath(resolve(baseDir, piece.input))));
+  const inputs = new Set([
+    ...manifest.pieces.map((piece) => realPath(resolve(baseDir, piece.input))),
+    ...protect.map((path) => realPath(resolve(path))),
+  ]);
   const planned = [
     out,
     join(dirname(out), `${packName}.json`),
@@ -189,6 +195,16 @@ export function runBuild(
   const clash = planned.find(overwrites);
   if (clash !== undefined) {
     throw new BuildManifestError(`The build would write over its input ${clash}.`);
+  }
+  // A piece written where the pack goes would be packed over, or refused as the pack's input.
+  const seen = new Set<string>();
+  for (const path of planned) {
+    if (seen.has(realPath(path))) {
+      throw new BuildManifestError(
+        `Two build outputs are ${path}; give the pack or the piece another name, or another piecesDir.`,
+      );
+    }
+    seen.add(realPath(path));
   }
   const write = (path: string, contents: string | Uint8Array): string => {
     if (overwrites(path)) {
@@ -269,7 +285,7 @@ export function runBuild(
     css: manifest.css === true,
     spacing: manifest.spacing ?? defaultPackOptions.spacing,
     extrude: manifest.extrude ?? defaultPackOptions.extrude,
-    match: defaultInspectOptions,
+    match: packMatch(manifest.pieces),
     servedFrom,
   });
   const packFiles = packed.files.map((file) => write(file.path, file.contents));
@@ -287,9 +303,25 @@ export function runBuild(
         ok: frame.ok,
         findings: [...frame.findings, ...(frame.inspection?.findings ?? [])],
       })),
+      cssFindings: packed.cssFindings,
       usage: packed.usage,
     },
     files,
+  };
+}
+
+/**
+ * The matching the packed atlas is checked with: each piece already passed its
+ * own settings and packing copies its pixels exactly, so the most lenient
+ * settings any piece used keep the pack check from refusing an accepted piece.
+ */
+function packMatch(pieces: readonly BuildPiece[]): InspectOptions {
+  const options = pieces.map(pieceInspectOptions);
+  return {
+    ...defaultInspectOptions,
+    tolerance: Math.max(...options.map((option) => option.tolerance)),
+    outlierRatio: Math.max(...options.map((option) => option.outlierRatio)),
+    noise: options.some((option) => option.noise === 'auto') ? 'auto' : 'off',
   };
 }
 
