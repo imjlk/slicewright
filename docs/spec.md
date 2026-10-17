@@ -428,7 +428,8 @@ an `atlas.frame-outside-image` error. Bounds that are not a whole-pixel rectangl
 size are `aseprite.bounds-invalid`, bounds past the kept frame are
 `aseprite.bounds-outside-frame`, a rotated frame is `aseprite.rotated`, and a
 center that does not lie inside its bounds with a positive size is
-`aseprite.center-invalid`, all errors. The center, relative to the bounds,
+`aseprite.center-invalid`, all errors. A whole-pixel coordinate or size is an
+integer of magnitude at most 2147483647, so rectangle sums stay exact. The center, relative to the bounds,
 becomes the insets, which are reported with the bounds and the pivot. The
 slice's pixels are inspected with them as explicit insets: a center spanning
 the full height inspects as a three-slice, as in Phaser, and one spanning the

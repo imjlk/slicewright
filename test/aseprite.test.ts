@@ -30,7 +30,7 @@ function codes(findings: ReadonlyArray<{ readonly code: string }> | undefined): 
 
 /**
  * @evidence docs/spec.md#aseprite-slices Checks keys spanning frames, a trimmed frame, centers that cut detail or leave the bounds, a full-height center, slices without a center, and keys past the last frame.
- * @evidenceReview docs/spec.md#aseprite-slices #ba518dd Checked the assertions against the section's detection, key range, mapping, error, and three-slice rules and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#aseprite-slices #8c1cbc8 Checked the assertions against the section's detection, key range, mapping, error, and three-slice rules and ran this test green with pnpm test.
  */
 export function checksAsepriteSlices(): void {
   const image = sheetImage();
@@ -142,6 +142,33 @@ export function checksAsepriteSlices(): void {
     ],
   );
   ok(array.slices[0]?.frames[0]?.ok);
+
+  // Coordinates too large for exact sums are not whole pixels.
+  const huge = inspectAsepriteSlices(
+    {
+      frames: [
+        {
+          filename: 'huge',
+          frame: { x: 0, y: 0, w: 40, h: 30 },
+          trimmed: true,
+          spriteSourceSize: { x: 1e20, y: 0, w: 40, h: 30 },
+          sourceSize: { w: 1e20, h: 30 },
+        },
+      ],
+      meta: {
+        app,
+        slices: [
+          { name: 'huge', keys: [{ frame: 0, bounds: { x: 1e20, y: 0, w: 40, h: 30 }, center }] },
+        ],
+      },
+    },
+    image,
+    defaultInspectOptions,
+  );
+  deepStrictEqual(
+    huge.slices[0]?.frames.map((frame) => codes(frame.findings)),
+    [['aseprite.bounds-invalid']],
+  );
 
   // A fractional frame or kept rectangle would crop shifted pixels.
   const fractional = inspectAsepriteSlices(

@@ -107,7 +107,7 @@ export function isAsepriteSheet(json: unknown): boolean {
  * center, or only `sliceName`, against the pixels of each frame its keys cover.
  *
  * @evidence docs/spec.md#aseprite-slices Maps each key's bounds into the sheet, turns its center into insets, and inspects every covered frame with them.
- * @evidenceReview docs/spec.md#aseprite-slices #ba518dd Checked this code against the section line by line and ran checksAsepriteSlices green with pnpm test.
+ * @evidenceReview docs/spec.md#aseprite-slices #8c1cbc8 Checked this code against the section line by line and ran checksAsepriteSlices green with pnpm test.
  */
 export function inspectAsepriteSlices(
   json: unknown,
@@ -217,6 +217,11 @@ function inspectSlice(
   };
 }
 
+/** A whole pixel coordinate small enough that sums of two stay exact. */
+function isPixel(value: number): boolean {
+  return Number.isInteger(value) && Math.abs(value) <= 0x7fffffff;
+}
+
 function inspectKey(
   key: AsepriteSliceKey,
   frame: number,
@@ -246,7 +251,7 @@ function inspectKey(
       'Rotated sheet frames cannot be mapped to slice bounds; export without rotation.',
     );
   }
-  if (![bounds.x, bounds.y, bounds.w, bounds.h].every(Number.isInteger) || bounds.w <= 0 || bounds.h <= 0) {
+  if (![bounds.x, bounds.y, bounds.w, bounds.h].every(isPixel) || bounds.w <= 0 || bounds.h <= 0) {
     return fail(
       'aseprite.bounds-invalid',
       `Slice bounds ${JSON.stringify(bounds)} are not a whole-pixel rectangle with a positive size.`,
@@ -266,7 +271,7 @@ function inspectKey(
     ['Frame', sheetFrame.frame],
     ['spriteSourceSize', kept],
   ] as const) {
-    if (![rect.x, rect.y, rect.w, rect.h].every(Number.isInteger) || rect.w <= 0 || rect.h <= 0) {
+    if (![rect.x, rect.y, rect.w, rect.h].every(isPixel) || rect.w <= 0 || rect.h <= 0) {
       return fail(
         'atlas.frame-outside-image',
         `${label} ${rect.w}x${rect.h}+${rect.x}+${rect.y} is not a whole-pixel rectangle with a positive size.`,
@@ -334,7 +339,7 @@ function inspectKey(
     return { ...base, ok: true, findings: [] };
   }
   if (
-    ![center.x, center.y, center.w, center.h].every(Number.isInteger) ||
+    ![center.x, center.y, center.w, center.h].every(isPixel) ||
     center.x < 0 ||
     center.y < 0 ||
     center.w <= 0 ||
