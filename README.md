@@ -54,7 +54,7 @@ From a clone, `pnpm install && pnpm build`, then `node dist/cli.js`.
 
 `slicewright build ui.build.json` rebuilds a whole set. Paths are relative to
 the manifest; each piece takes the `normalize` options (`width`, `height`,
-`scale`, `filter`, `crop`, `keep`, `insets`, `padding`, `mode`, `tile`,
+`scale`, `filter`, `crop`, `keep`, `insets`, `padding`, `mode`, `regions`, `tile`,
 `tolerance`, `outlierRatio`, `noise`) and optional `targets`. Pieces go to
 `pieces/` beside `out` (or `piecesDir`), then are packed into `out`:
 

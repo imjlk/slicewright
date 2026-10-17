@@ -1,4 +1,4 @@
-import { existsSync, statSync, watch, type FSWatcher } from 'node:fs';
+import { existsSync, realpathSync, statSync, watch, type FSWatcher } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 
 import { buildInputs, runBuild, type BuildManifest } from './build.js';
@@ -34,7 +34,7 @@ export function watchBuild(
   const rebuild = (): void => {
     try {
       const manifest = load(path);
-      watched = new Set(buildInputs(manifest, path));
+      watched = withTargets(buildInputs(manifest, path));
       seen = new Map([...watched].map((file) => [file, modified(file)]));
       const report = runBuild(manifest, baseDir, process.cwd(), [path]);
       line({ manifest: path, ...report });
@@ -92,4 +92,17 @@ export function watchBuild(
       done();
     });
   });
+}
+
+/** The paths, plus where each existing symlink among them points, so edits through either rebuild. */
+function withTargets(paths: readonly string[]): Set<string> {
+  const all = new Set(paths);
+  for (const path of paths) {
+    try {
+      all.add(realpathSync(path));
+    } catch {
+      // Not there yet; the lexical path is watched.
+    }
+  }
+  return all;
 }

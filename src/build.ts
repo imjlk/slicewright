@@ -30,6 +30,8 @@ export interface BuildPiece {
   /** Content padding as `l,r,t,b`, `h,v`, or `n`, instead of detecting it. */
   readonly padding?: string;
   readonly mode?: 'auto' | 'nine' | 'three' | 'three-vertical';
+  /** `multi` keeps every long stretch run on an axis, around fixed detail. */
+  readonly regions?: 'single' | 'multi';
   readonly tile?: 'x' | 'y' | 'xy';
   readonly tolerance?: number & tags.Minimum<0> & tags.Maximum<255>;
   readonly outlierRatio?: number & tags.Minimum<0> & tags.ExclusiveMaximum<1>;
@@ -104,7 +106,7 @@ export interface BuildReport {
  * scale or a size, and every target must exist.
  *
  * @evidence docs/spec.md#build-manifest Validates the manifest shape, unique plain piece names, size or scale, insets syntax, and known targets before anything is built.
- * @evidenceReview docs/spec.md#build-manifest #f421208 Checked this code against the section line by line and ran buildsManifests green with pnpm test.
+ * @evidenceReview docs/spec.md#build-manifest #9f16ca5 Checked this code against the section line by line and ran buildsManifests green with pnpm test.
  */
 export function readBuildManifest(json: unknown): BuildManifest {
   // Unknown keys are refused, so a misspelled setting is not silently ignored.
@@ -126,6 +128,9 @@ export function readBuildManifest(json: unknown): BuildManifest {
     const label = names[index] ?? piece.input;
     if (piece.scale !== undefined && (piece.width !== undefined || piece.height !== undefined)) {
       throw new BuildManifestError(`Piece "${label}" gives scale and a size; give one.`);
+    }
+    if (piece.regions === 'multi' && piece.insets !== undefined) {
+      throw new BuildManifestError(`Piece "${label}" gives insets with multi regions; give one.`);
     }
     for (const field of ['insets', 'padding'] as const) {
       const text = piece[field];
@@ -189,6 +194,7 @@ export function runBuild(
     ...manifest.pieces.flatMap((piece) => [
       join(piecesDir, `${pieceName(piece)}.png`),
       join(piecesDir, `${pieceName(piece)}.json`),
+      ...((piece.targets ?? []).includes('css') ? [join(piecesDir, `${pieceName(piece)}.css`)] : []),
     ]),
   ];
   const overwrites = (path: string): boolean => inputs.has(realPath(path));
@@ -333,20 +339,31 @@ function pieceInspectOptions(piece: BuildPiece): InspectOptions {
     outlierRatio: piece.outlierRatio ?? defaultInspectOptions.outlierRatio,
     noise: piece.noise ?? 'auto',
     mode: piece.mode ?? 'auto',
-    regions: 'single',
+    regions: piece.regions ?? 'single',
     tile: { x: tile.includes('x'), y: tile.includes('y') },
     ...(piece.insets === undefined ? {} : { insets: parseInsets(piece.insets) }),
     ...(piece.padding === undefined ? {} : { contentPadding: parseInsets(piece.padding) }),
   };
 }
 
-/** A path as it names a file: real when it exists, in lower case for case-insensitive disks. */
+/**
+ * A path as it names a file, in lower case for case-insensitive disks: its
+ * nearest existing ancestor resolved through symlinks, then the rest, so a new
+ * file under a symlinked directory names the same file as through its target.
+ */
 function realPath(path: string): string {
-  try {
-    return realpathSync(path).toLowerCase();
-  } catch {
-    return resolve(path).toLowerCase();
+  const absolute = resolve(path);
+  let base = absolute;
+  const rest: string[] = [];
+  while (dirname(base) !== base) {
+    try {
+      return join(realpathSync(base), ...rest).toLowerCase();
+    } catch {
+      rest.unshift(basename(base));
+      base = dirname(base);
+    }
   }
+  return absolute.toLowerCase();
 }
 
 function pieceName(piece: BuildPiece): string {
