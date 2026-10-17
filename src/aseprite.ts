@@ -107,7 +107,7 @@ export function isAsepriteSheet(json: unknown): boolean {
  * center, or only `sliceName`, against the pixels of each frame its keys cover.
  *
  * @evidence docs/spec.md#aseprite-slices Maps each key's bounds into the sheet, turns its center into insets, and inspects every covered frame with them.
- * @evidenceReview docs/spec.md#aseprite-slices #84b93f8 Checked this code against the section line by line and ran checksAsepriteSlices green with pnpm test.
+ * @evidenceReview docs/spec.md#aseprite-slices #03207c0 Checked this code against the section line by line and ran checksAsepriteSlices green with pnpm test.
  */
 export function inspectAsepriteSlices(
   json: unknown,
@@ -250,6 +250,18 @@ function inspectKey(
   // Bounds are on the sprite canvas; a trimmed frame keeps only spriteSourceSize of it.
   const { x, y, w, h } = sheetFrame.frame;
   const kept = sheetFrame.spriteSourceSize ?? { x: 0, y: 0, w, h };
+  // A fractional rectangle would crop at shifted byte offsets.
+  for (const [label, rect] of [
+    ['Frame', sheetFrame.frame],
+    ['spriteSourceSize', kept],
+  ] as const) {
+    if (![rect.x, rect.y, rect.w, rect.h].every(Number.isInteger) || rect.w <= 0 || rect.h <= 0) {
+      return fail(
+        'atlas.frame-outside-image',
+        `${label} ${rect.w}x${rect.h}+${rect.x}+${rect.y} is not a whole-pixel rectangle with a positive size.`,
+      );
+    }
+  }
   if (
     bounds.x < kept.x ||
     bounds.y < kept.y ||

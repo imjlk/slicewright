@@ -102,8 +102,8 @@ every command exits 2 on bad input. `--help` works on each command.
    per frame (TexturePacker 7.1+ can export them), then run
    `slicewright atlas ui.json` to check every frame against the pixels.
    Art drawn in Aseprite with 9-slice slices: export with
-   `aseprite -b ui.aseprite --sheet ui.png --data ui.json --format json-array
-   --list-slices`, then `slicewright atlas ui.json` checks each slice's center
+   `aseprite -b --list-slices ui.aseprite --sheet ui.png --data ui.json
+   --format json-array` (`--list-slices` must come before the sprite), then `slicewright atlas ui.json` checks each slice's center
    on every frame its keys cover (`--slice <name>` for one) and prints the
    insets, which `frame --insets` or `normalize --insets` take.
 

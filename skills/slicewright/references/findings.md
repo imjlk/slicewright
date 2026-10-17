@@ -35,6 +35,8 @@
 | `atlas.rotated` | Rotated frames are not a tested NineSlice input. | Disable rotation for this sprite. |
 | `aseprite.center-invalid` | An Aseprite slice's 9-slice center does not lie inside its bounds. | Redraw the center in Aseprite's slice tool. |
 | `aseprite.bounds-outside-frame` | A slice reaches past its frame, usually because the sheet was trimmed. | Export without trimming, or shrink the slice. |
-| `aseprite.bounds-invalid`, `aseprite.rotated`, `aseprite.frame-missing` | A slice key's bounds are not whole pixels, its frame is rotated, or it starts past the last frame. | Re-export the sheet from Aseprite without rotation. |
+| `aseprite.bounds-invalid` | A slice key's bounds are not a whole-pixel rectangle with a positive size. | Redraw the slice in Aseprite, or fix the bounds in the JSON. |
+| `aseprite.rotated` | A frame a slice covers is rotated in the sheet. | Re-export the sheet without rotation. |
+| `aseprite.frame-missing` | A slice key starts past the sheet's last frame. | Export every frame (no `--frame-range` or tag filter that drops them), or move the key in Aseprite. |
 | `aseprite.no-center`, `aseprite.no-slices` | A slice has no 9-slice center, or the sheet has no slices to check. | Enable 9-slices on the slice, or export with `--list-slices`. |
 | `atlas.borders-outside-frame` | `scale9Borders` does not fit the frame. | Re-export the borders. |

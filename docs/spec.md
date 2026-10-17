@@ -392,7 +392,9 @@ A key holds from its frame until the next key's frame, so each frame it covers
 is checked on its own; a key starting past the last frame is an
 `aseprite.frame-missing` error. A key's `bounds` lie on the sprite canvas and
 map into the sheet through the frame's position and, for a trimmed frame, its
-`spriteSourceSize`. Bounds that are not a whole-pixel rectangle with a positive
+`spriteSourceSize`; a frame or `spriteSourceSize` that is not a whole-pixel
+rectangle with a positive size, or that maps the bounds outside the image, is
+an `atlas.frame-outside-image` error. Bounds that are not a whole-pixel rectangle with a positive
 size are `aseprite.bounds-invalid`, bounds past the kept frame are
 `aseprite.bounds-outside-frame`, a rotated frame is `aseprite.rotated`, and a
 center that does not lie inside its bounds with a positive size is
