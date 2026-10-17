@@ -382,6 +382,26 @@ for its emulated vertical three-slice. A frame carrying that marker without
 full-width borders is an `atlas.marker-mismatch` error, because Phaser would
 still render it as a nine-slice.
 
+## Aseprite slices
+
+An Aseprite sheet, the JSON that `aseprite --sheet --data --list-slices`
+writes, is told apart from a Phaser atlas by a `meta.app` that names Aseprite
+or a `meta.slices` list. Its slices are checked instead of `scale9Borders`:
+every slice that has a nine-slice `center` in any key, or only the named slice.
+A key holds from its frame until the next key's frame, so each frame it covers
+is checked on its own; a key starting past the last frame is an
+`aseprite.frame-missing` error. A key's `bounds` lie on the sprite canvas and
+map into the sheet through the frame's position and, for a trimmed frame, its
+`spriteSourceSize`. Bounds that are not a whole-pixel rectangle with a positive
+size are `aseprite.bounds-invalid`, bounds past the kept frame are
+`aseprite.bounds-outside-frame`, a rotated frame is `aseprite.rotated`, and a
+center that does not lie inside its bounds with a positive size is
+`aseprite.center-invalid`, all errors. The center, relative to the bounds,
+becomes the insets, which are reported with the bounds and the pivot. The
+slice's pixels are inspected with them as explicit insets: a center spanning
+the full height inspects as a three-slice, as in Phaser. A slice without a
+center in any key has only its bounds checked, noted as `aseprite.no-center`.
+
 ## Atlas packing
 
 Packing combines frames from several atlases, usually the one-frame atlases

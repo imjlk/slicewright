@@ -1,6 +1,7 @@
 import './detect.test.js';
 import './output.test.js';
 import './prepare.test.js';
+import './aseprite.test.js';
 import './layout.test.js';
 import './padding.test.js';
 import './pack.test.js';
