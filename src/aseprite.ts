@@ -1,4 +1,4 @@
-import typia from 'typia';
+import typia, { type tags } from 'typia';
 
 import { inspectRaster, type Finding, type InspectOptions, type InspectReport } from './inspect.js';
 import type { PhaserAtlasMeta } from './phaser.js';
@@ -27,7 +27,7 @@ export interface AsepriteSlice {
   readonly name: string;
   readonly color?: string;
   readonly data?: string;
-  readonly keys: readonly AsepriteSliceKey[];
+  readonly keys: readonly AsepriteSliceKey[] & tags.MinItems<1>;
 }
 
 export interface AsepriteFrame {
@@ -107,7 +107,7 @@ export function isAsepriteSheet(json: unknown): boolean {
  * center, or only `sliceName`, against the pixels of each frame its keys cover.
  *
  * @evidence docs/spec.md#aseprite-slices Maps each key's bounds into the sheet, turns its center into insets, and inspects every covered frame with them.
- * @evidenceReview docs/spec.md#aseprite-slices #8ff19c7 Checked this code against the section line by line and ran checksAsepriteSlices green with pnpm test.
+ * @evidenceReview docs/spec.md#aseprite-slices #a9c75f9 Checked this code against the section line by line and ran checksAsepriteSlices green with pnpm test.
  */
 export function inspectAsepriteSlices(
   json: unknown,
@@ -286,9 +286,18 @@ function inspectKey(
         : `Slice bounds ${JSON.stringify(bounds)} reach past the ${kept.w}x${kept.h} frame.`,
     );
   }
+  // --inner-padding grows the frame by the same border on each side of the kept pixels.
+  const padX = (w - kept.w) / 2;
+  const padY = (h - kept.h) / 2;
+  if (!Number.isInteger(padX) || !Number.isInteger(padY) || padX < 0 || padY < 0) {
+    return fail(
+      'aseprite.bounds-outside-frame',
+      `The ${w}x${h} frame cannot hold its ${kept.w}x${kept.h} spriteSourceSize with an even inner padding.`,
+    );
+  }
   const rect = {
-    x: x + bounds.x - kept.x,
-    y: y + bounds.y - kept.y,
+    x: x + padX + bounds.x - kept.x,
+    y: y + padY + bounds.y - kept.y,
     width: bounds.w,
     height: bounds.h,
   };

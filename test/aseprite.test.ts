@@ -1,4 +1,4 @@
-import { deepStrictEqual, ok, strictEqual } from 'node:assert/strict';
+import { deepStrictEqual, ok, strictEqual, throws } from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { inspectAsepriteSlices, isAsepriteSheet } from '../src/aseprite.js';
@@ -30,7 +30,7 @@ function codes(findings: ReadonlyArray<{ readonly code: string }> | undefined): 
 
 /**
  * @evidence docs/spec.md#aseprite-slices Checks keys spanning frames, a trimmed frame, centers that cut detail or leave the bounds, a full-height center, slices without a center, and keys past the last frame.
- * @evidenceReview docs/spec.md#aseprite-slices #8ff19c7 Checked the assertions against the section's detection, key range, mapping, error, and three-slice rules and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#aseprite-slices #a9c75f9 Checked the assertions against the section's detection, key range, mapping, error, and three-slice rules and ran this test green with pnpm test.
  */
 export function checksAsepriteSlices(): void {
   const image = sheetImage();
@@ -220,6 +220,52 @@ export function checksAsepriteSlices(): void {
   deepStrictEqual(codes(unplaced.slices[0]?.frames[0]?.findings), [
     'aseprite.bounds-outside-frame',
   ]);
+
+  // Inner padding shifts the kept pixels into the frame, evenly on both sides.
+  const padded = inspectAsepriteSlices(
+    {
+      frames: [
+        {
+          filename: 'padded',
+          frame: { x: 0, y: 0, w: 40, h: 30 },
+          spriteSourceSize: { x: 0, y: 0, w: 38, h: 28 },
+          sourceSize: { w: 38, h: 28 },
+        },
+        {
+          filename: 'uneven',
+          frame: { x: 40, y: 0, w: 40, h: 30 },
+          spriteSourceSize: { x: 0, y: 0, w: 37, h: 28 },
+          sourceSize: { w: 37, h: 28 },
+        },
+      ],
+      meta: {
+        app,
+        slices: [
+          {
+            name: 'button',
+            keys: [
+              {
+                frame: 0,
+                bounds: { x: 0, y: 0, w: 36, h: 28 },
+                center: { x: 6, y: 6, w: 24, h: 16 },
+              },
+            ],
+          },
+        ],
+      },
+    },
+    image,
+    defaultInspectOptions,
+  );
+  strictEqual(padded.slices[0]?.frames[0]?.inspection?.width, 36);
+  deepStrictEqual(codes(padded.slices[0]?.frames[1]?.findings), ['aseprite.bounds-outside-frame']);
+  throws(() =>
+    inspectAsepriteSlices(
+      { frames, meta: { app, slices: [{ name: 'empty', keys: [] }] } },
+      image,
+      defaultInspectOptions,
+    ),
+  );
 
   // Missing and absent slices.
   const missing = inspectAsepriteSlices(

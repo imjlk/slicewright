@@ -392,9 +392,11 @@ A key holds from its frame until the next key's frame, so each frame it covers
 is checked on its own; a key starting past the last frame is an
 `aseprite.frame-missing` error, and a key with zero width or height hides the
 slice, so the frames it covers are skipped. A key's `bounds` lie on the sprite canvas and
-map into the sheet through the frame's position and, for a trimmed frame, its
-`spriteSourceSize`, which a trimmed frame must have
-(`aseprite.bounds-outside-frame` otherwise); a frame or `spriteSourceSize` that is not a whole-pixel
+map into the sheet through the frame's position, any inner padding (the
+frame's border around its `spriteSourceSize`, which must be even), and, for a
+trimmed frame, its `spriteSourceSize`, which a trimmed frame must have
+(`aseprite.bounds-outside-frame` otherwise, as is an uneven or negative inner
+padding); every slice needs at least one key; a frame or `spriteSourceSize` that is not a whole-pixel
 rectangle with a positive size, or that maps the bounds outside the image, is
 an `atlas.frame-outside-image` error. Bounds that are not a whole-pixel rectangle with a positive
 size are `aseprite.bounds-invalid`, bounds past the kept frame are
