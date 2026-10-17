@@ -50,16 +50,55 @@ From a clone, `pnpm install && pnpm build`, then `node dist/cli.js`.
 
 ### Agent skill
 
-The package ships the skill. Link it into your agent's skill directory from a
-project that installed slicewright (or from a clone, with `$PWD/skills/...`):
+slicewright ships an [Agent Skills](https://agentskills.io) skill in
+[`skills/slicewright`](skills/slicewright/SKILL.md). The skill runs the CLI
+through `npx`, so it needs Node 24 or newer but no npm install of its own.
+
+**Any agent**, with the [`skills`](https://github.com/vercel-labs/skills) CLI
+(Node 22.20 or newer). It installs into `.agents/skills/`, which Codex, Cursor,
+GitHub Copilot, Gemini CLI, OpenCode, Cline, Amp, and other agents read, links
+it for Claude Code, and supports [79 agent targets](https://github.com/vercel-labs/skills#supported-agents):
 
 ```bash
-ln -s "$PWD/node_modules/slicewright/skills/slicewright" ~/.claude/skills/slicewright
+npx skills add imjlk/slicewright                    # this project, detected agents
+npx skills add imjlk/slicewright -g                 # every project (user scope)
+npx skills add imjlk/slicewright -a claude-code -a codex -a cursor -y
+npx skills add imjlk/slicewright --agent '*' -y     # every supported agent
+npx skills update slicewright                       # later, to update
 ```
 
-```bash
-ln -s "$PWD/node_modules/slicewright/skills/slicewright" ~/.codex/skills/slicewright
+`--agent '*'` skips agents whose skill directory does not exist in the project
+yet; `--all` is short for `--skill '*' --agent '*' -y`.
+
+**Claude Code plugin**, from this repository's marketplace:
+
+```text
+/plugin marketplace add imjlk/slicewright
+/plugin install slicewright@slicewright
 ```
+
+On Claude Code 2.1.275 or newer, one step also works:
+`/plugin install slicewright --marketplace imjlk/slicewright`.
+
+**Manual:** copy or link the folder into your agent's skill directory. Create
+the directory first; `ln -sfn` replaces an older link instead of nesting one.
+
+```bash
+git clone https://github.com/imjlk/slicewright ~/.local/share/slicewright
+mkdir -p ~/.claude/skills ~/.agents/skills
+ln -sfn ~/.local/share/slicewright/skills/slicewright ~/.claude/skills/slicewright  # Claude Code
+ln -sfn ~/.local/share/slicewright/skills/slicewright ~/.agents/skills/slicewright  # Codex, Cursor, …
+```
+
+A project that installed the package can link
+`"$PWD/node_modules/slicewright/skills/slicewright"` the same way; the link
+breaks when `node_modules` is removed.
+
+| Agent | User scope | Project scope |
+| --- | --- | --- |
+| [Claude Code](https://code.claude.com/docs/en/skills) | `~/.claude/skills/` | `.claude/skills/` |
+| [Codex](https://developers.openai.com/codex/skills) | `~/.agents/skills/` | `.agents/skills/` |
+| [Cursor](https://cursor.com/docs/context/skills) | `~/.cursor/skills/`, `~/.agents/skills/` | `.cursor/skills/`, `.agents/skills/` |
 
 ### Phaser 4
 
@@ -160,7 +199,8 @@ The core is pure TypeScript over RGBA buffers. PNG input and output use
 ## Roadmap
 
 - Approximate-period tiling for hand-drawn patterned edges.
-- A first npm release once the detection settles.
+- Settle the detection toward a 1.0; until then, 0.x releases on
+  [npm](https://www.npmjs.com/package/slicewright) may change behavior.
 
 ## License
 

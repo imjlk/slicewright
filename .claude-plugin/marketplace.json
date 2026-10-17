@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "slicewright",
+  "description": "The slicewright agent skill for nine-slice and three-slice game UI art.",
+  "owner": {
+    "name": "imjlk",
+    "url": "https://github.com/imjlk"
+  },
+  "plugins": [
+    {
+      "name": "slicewright",
+      "source": "./skills/slicewright",
+      "skills": ["./"],
+      "description": "Make and check stretchable game UI art: prompt plans, chroma keying, slice inset detection, stretched previews, and Phaser 4 and CSS border-image export.",
+      "homepage": "https://github.com/imjlk/slicewright#agent-skill",
+      "repository": "https://github.com/imjlk/slicewright",
+      "license": "MIT",
+      "keywords": ["nine-slice", "9-slice", "scale9", "phaser", "game-ui", "agent-skill"],
+      "category": "game-development"
+    }
+  ]
+}
