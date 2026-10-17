@@ -2,7 +2,7 @@ import { deepStrictEqual, ok, strictEqual, throws } from 'node:assert/strict';
 import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { test } from 'node:test';
+import { test, type TestContext } from 'node:test';
 
 import { defaultInspectOptions, inspectRaster } from '../src/inspect.js';
 import { buildPack, PackInputError } from '../src/pack-files.js';
@@ -147,7 +147,7 @@ export function packsAtlases(): void {
  * @evidenceReview docs/spec.md#atlas-packing #76a0a67 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function packsAtlasFiles(): void {
-  const dir = mkdtempSync(join(tmpdir(), 'slicewright-pack-'));
+  const dir = mkdtempSync(join(tmpdir(), 'slicewright-pack-한글 경로-'));
   try {
     const options = {
       ...defaultPackOptions,
@@ -350,14 +350,15 @@ export function packsAtlasFiles(): void {
       ),
       [join(dir, 'z.css'), join(dir, 'z.json')],
     );
-    // A link to an input image, or another letter case of it, is the same file.
-    symlinkSync(join(dir, 'ui.png'), join(dir, 'link.png'));
+    // Directory junctions need no symlink privilege on Windows. The input's
+    // image is still the same file when reached through this directory alias.
+    symlinkSync(dir, join(dir, 'linked'), process.platform === 'win32' ? 'junction' : 'dir');
     throws(
       () =>
         buildPack({
           ...options,
           inputs: [join(dir, 'ui.json')],
-          out: join(dir, 'link.png'),
+          out: join(dir, 'linked/ui.png'),
           name: 'packed',
         }),
       /would overwrite/,
@@ -379,5 +380,51 @@ export function packsAtlasFiles(): void {
   }
 }
 
+/**
+ * A file symlink is distinct from a directory alias; keep both covered.
+ *
+ * @evidence docs/spec.md#atlas-packing Refuses an output image that aliases an input through a file symlink; reports an explicit skip only when Windows denies creating the link.
+ * @evidenceReview docs/spec.md#atlas-packing #76a0a67 Read the real-path overwrite rule and filePath implementation; this assertion passed in Linux and Windows CI, and local Windows reported the explicit EPERM skip.
+ */
+export function refusesFileSymlinkOutput(context: TestContext): void {
+  const dir = mkdtempSync(join(tmpdir(), 'slicewright-pack-symlink-'));
+  try {
+    const options = {
+      ...defaultPackOptions,
+      css: false,
+      match: defaultInspectOptions,
+      servedFrom: dir,
+      inputs: ['examples/real/button.json'],
+      out: join(dir, 'ui.png'),
+      name: 'ui',
+    };
+    for (const file of buildPack(options).files) {
+      writeFileSync(file.path, file.contents);
+    }
+    const alias = join(dir, 'link.png');
+    try {
+      symlinkSync(join(dir, 'ui.png'), alias, 'file');
+    } catch (error) {
+      if (
+        process.platform === 'win32' &&
+        error instanceof Error &&
+        'code' in error &&
+        error.code === 'EPERM'
+      ) {
+        context.skip('File symlinks require Windows Developer Mode or symlink privileges.');
+        return;
+      }
+      throw error;
+    }
+    throws(
+      () => buildPack({ ...options, inputs: [join(dir, 'ui.json')], out: alias, name: 'packed' }),
+      /would overwrite/,
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 void test('atlas packing', packsAtlases);
 void test('atlas packing from files', packsAtlasFiles);
+void test('atlas packing refuses file symlink outputs', refusesFileSymlinkOutput);
