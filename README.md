@@ -17,8 +17,9 @@ inspection finds or checks the exact slice insets afterwards.
   also finds the content padding: where text fits inside the frame.
 - `preview` renders the art at several stretched sizes on one PNG; pick
   cells with `--cells` and enlarge small art with `--zoom`.
-- `export` writes engine files for Phaser and CSS `border-image`; `targets`
-  lists what each can represent.
+- `export` writes engine files for Phaser and CSS `border-image`, and
+  experimental values for Unity, Defold, and Godot 4; `targets` lists what each
+  can represent and whether it is verified.
 - `frame` writes a one-frame Phaser JSON Hash atlas with `scale9Borders`.
 - `atlas` checks every nine-slice frame of a Phaser JSON Hash or JSON Array
   atlas against its pixels.
@@ -127,6 +128,9 @@ stretched, and tiled segments.
 | --- | --- | --- | --- | --- | --- |
 | `phaser` | ✓ | ✓ | emulated | ✗ | per axis |
 | `css` | ✓ | ✓ | ✓ | ✗ | per axis, nearest tile count |
+| `unity` (experimental) | ✓ | emulated | emulated | ✗ | both axes, last tile clipped |
+| `defold` (experimental) | ✓ | emulated | emulated | ✗ | ✗ |
+| `godot` (experimental) | ✓ | emulated | emulated | ✗ | per axis, tile fit |
 
 Emulated means zero insets on the fixed axis; keep that axis at its size.
 
@@ -141,9 +145,23 @@ Anything a target cannot represent is reported instead of exported.
 ### Engine support
 
 slicewright targets **Phaser 4**, with CSS `border-image` alongside it for DOM
-UI; both are rendered in the real engine by `pnpm engine:check`. Other engines
-(Godot, Unity, Android nine-patch, Defold, GameMaker, Cocos, Pixi.js, Bevy, and
-so on) are **not supported**, and none is planned for now.
+UI; both are rendered in the real engine by `pnpm engine:check`.
+
+**Experimental**: `unity`, `defold`, and `godot` follow each engine's
+documented format but are not run in the engine yet, and every export says so
+with a `target.experimental` finding.
+
+- `unity` prints `TextureImporter.spriteBorder` in Unity's order
+  (`x = left, y = bottom, z = right, w = top`) with an editor-script line. It
+  writes no file and never edits `.meta` files.
+- `defold` prints `slice9` (left, top, right, bottom) for a sprite or GUI box
+  node.
+- `godot` writes a Godot 4 `StyleBoxTexture` `.tres` and prints the matching
+  `NinePatchRect` properties. Pass `--image-ref res://…` so the texture path
+  matches the project.
+
+Other engines (Android nine-patch, GameMaker, Cocos, Pixi.js, Bevy, and so on)
+are **not supported**.
 
 **Pull requests are welcome** for new targets, ideally with a way to render the
 output in that engine. [`docs/extending.md`](docs/extending.md) explains how

@@ -3,7 +3,10 @@ import { contentLimits } from '../layout.js';
 import { paddingProblem } from '../padding.js';
 import { capabilityFindings } from './common.js';
 import { cssTarget } from './css.js';
+import { defoldTarget } from './defold.js';
+import { godotTarget } from './godot.js';
 import { phaserTarget } from './phaser.js';
+import { unityTarget } from './unity.js';
 import type { ExportInput, ExportResult, SliceTarget } from './types.js';
 
 export type {
@@ -17,7 +20,10 @@ export { capabilityFindings } from './common.js';
 
 /** Every export target, keyed by id. Add a target by adding it here. */
 export const sliceTargets: Readonly<Record<string, SliceTarget>> = Object.fromEntries(
-  [phaserTarget, cssTarget].map((target) => [target.id, target]),
+  [phaserTarget, cssTarget, unityTarget, defoldTarget, godotTarget].map((target) => [
+    target.id,
+    target,
+  ]),
 );
 
 /** The registered target with this id; inherited object keys never match. */
@@ -30,7 +36,7 @@ export function findTarget(id: string): SliceTarget | undefined {
  * produces its findings and no files.
  *
  * @evidence docs/spec.md#targets Looks the target up, checks capabilities, and writes files only when no error remains.
- * @evidenceReview docs/spec.md#targets #9a4f665 Checked this code against the section line by line and ran checksTargetCapabilities green with pnpm test.
+ * @evidenceReview docs/spec.md#targets #01a5af9 Checked this code against the section line by line and ran checksTargetCapabilities green with pnpm test.
  */
 export function exportForTarget(id: string, input: ExportInput): ExportResult {
   const target = findTarget(id);
