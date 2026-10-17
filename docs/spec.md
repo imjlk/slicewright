@@ -297,14 +297,16 @@ insets or content padding that differ between states by more than the slack
 (1 px by default, a whole number of pixels) are a `compare.insets` or
 `compare.padding` warning, because the corners would jump or the text would
 move when the states swap. When the states agree on size and mode, every state
-is inspected again with the shared insets, the largest inset on each side, and a
+is inspected again with the shared insets, the largest inset on each side, keeping
+the tiling it detected, and a
 state that then has an error finding is a `compare.shared-insets` error: no one
-set of insets fits every state. A matching set (a dialog, a button, and a bar)
+set of insets fits every state. States compare single-region layouts only, since
+shared insets cannot describe several stretch regions per axis. A matching set (a dialog, a button, and a bar)
 has pieces of different sizes and slices, so only their line weight is compared.
 For both kinds, outlines are measured as for resizing, and when the thickest
 exceeds the thinnest by more than 1 px and by more than a quarter, that is a
-`compare.outline` warning; pieces without a measurable outline are named in a
-`compare.outline-missing` note. The comparison fails when any of its own
+`compare.outline` warning; pieces without a measurable outline, even all of
+them, are named in a `compare.outline-missing` note. The comparison fails when any of its own
 findings or any piece's inspection is an error.
 
 ## Preview sheet

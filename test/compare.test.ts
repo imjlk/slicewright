@@ -4,7 +4,17 @@ import { test } from 'node:test';
 import { compareSet, defaultCompareSlack } from '../src/compare.js';
 import { defaultInspectOptions } from '../src/inspect.js';
 import { createRaster, type Raster } from '../src/raster.js';
-import { fill, fillRect, ornament, outline, panel, rim, setPixel, shadedBar } from './fixtures.js';
+import {
+  fill,
+  fillRect,
+  ornament,
+  outline,
+  panel,
+  rim,
+  ropePanel,
+  setPixel,
+  shadedBar,
+} from './fixtures.js';
 
 const options = {
   kind: 'states',
@@ -36,7 +46,7 @@ function codes(report: { readonly findings: ReadonlyArray<{ readonly code: strin
 
 /**
  * @evidence docs/spec.md#set-comparison Compares matching states, then states that differ in size, mode, insets beyond the slack, shared insets that cut detail, and outline weight, and a set that only compares outlines.
- * @evidenceReview docs/spec.md#set-comparison #e82169f Checked the assertions against the section's size, mode, slack, shared-insets, and outline rules and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#set-comparison #c944cfa Checked the assertions against the section's size, mode, slack, shared-insets, and outline rules and ran this test green with pnpm test.
  */
 export function comparesSets(): void {
   // Two identical states agree and share their insets.
@@ -142,6 +152,44 @@ export function comparesSets(): void {
   ok(!codes(set).includes('compare.size'));
   ok(!codes(set).includes('compare.mode'));
 
+  // Tiling each state detected carries into the shared-insets check.
+  const tiled = compareSet(
+    [
+      { name: 'normal', raster: ropePanel(96, 40) },
+      { name: 'hover', raster: ropePanel(96, 40) },
+    ],
+    options,
+  );
+  ok(tiled.ok);
+  ok(!codes(tiled).includes('compare.shared-insets'));
+
+  // Without any outline, the set says it compared no line weight.
+  const flat = createRaster(30, 20);
+  fillRect(flat, 0, 0, 30, 20, fill);
+  deepStrictEqual(
+    codes(
+      compareSet(
+        [
+          { name: 'a', raster: flat },
+          { name: 'b', raster: flat },
+        ],
+        { ...options, kind: 'set' },
+      ),
+    ),
+    ['compare.outline-missing'],
+  );
+
+  throws(
+    () =>
+      compareSet(
+        [
+          { name: 'a', raster: panel(40, 30) },
+          { name: 'b', raster: panel(40, 30) },
+        ],
+        { ...options, inspect: { ...options.inspect, regions: 'multi' } },
+      ),
+    RangeError,
+  );
   throws(() => compareSet([{ name: 'one', raster: panel(40, 30) }], options), RangeError);
   throws(
     () =>

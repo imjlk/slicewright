@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import { cli, define } from 'gunshi';
@@ -185,12 +185,20 @@ const compare = define({
     if (!Number.isInteger(slack) || slack < 0) {
       throw new UsageError('--slack must be a whole, non-negative number of pixels.');
     }
+    // Aliases such as button.png and ./button.png read the same file.
+    const files = inputs.map((path) => {
+      try {
+        return realpathSync(path);
+      } catch {
+        return resolve(path);
+      }
+    });
+    if (new Set(files).size !== files.length) {
+      throw new UsageError('compare needs each PNG once.');
+    }
     const stems = inputs.map((path) => basename(path).replace(/\.png$/i, ''));
     // Findings name pieces by file name; repeated file names fall back to the paths.
     const names = new Set(stems).size === stems.length ? stems : inputs;
-    if (new Set(names).size !== names.length) {
-      throw new UsageError('compare needs each PNG once.');
-    }
     const report = compareSet(
       inputs.map((path, index) => ({ name: names[index] ?? path, raster: readPng(path) })),
       {

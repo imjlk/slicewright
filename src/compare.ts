@@ -66,7 +66,7 @@ const sides = ['left', 'right', 'top', 'bottom'] as const;
  * than 1 px and a quarter are reported for both kinds.
  *
  * @evidence docs/spec.md#set-comparison Inspects each piece, checks states for one size, mode, slack-bound insets and padding, and the shared largest insets, and compares outline weights for states and sets.
- * @evidenceReview docs/spec.md#set-comparison #e82169f Checked this code against the section line by line and ran comparesSets green with pnpm test.
+ * @evidenceReview docs/spec.md#set-comparison #c944cfa Checked this code against the section line by line and ran comparesSets green with pnpm test.
  */
 export function compareSet(
   pieces: readonly ComparePiece[],
@@ -80,6 +80,10 @@ export function compareSet(
   }
   if (!Number.isInteger(options.slack) || options.slack < 0) {
     throw new RangeError('The slack must be a whole, non-negative number of pixels.');
+  }
+  if (options.kind === 'states' && options.inspect.regions === 'multi') {
+    // Shared insets describe one stretch span per axis; multi-region layouts have several.
+    throw new RangeError('States are compared with single-region layouts.');
   }
   const inspected = pieces.map((piece) => ({
     piece,
@@ -219,9 +223,16 @@ function sharedInsetFindings(
 ): Finding[] {
   const failing = inspected.flatMap(({ piece, report }) => {
     if (report.mode === 'multi') {
+      // Unreachable: states are rejected above when regions are multi.
       return [];
     }
-    const check = inspectRaster(piece.raster, { ...options, mode: report.mode, insets: shared });
+    // Keep the tiling each state detected, so a repeating edge is not checked as a stretch.
+    const check = inspectRaster(piece.raster, {
+      ...options,
+      mode: report.mode,
+      insets: shared,
+      tile: { x: options.tile.x || report.tile.x, y: options.tile.y || report.tile.y },
+    });
     const errors = check.findings.filter((finding) => finding.severity === 'error');
     return errors.length === 0 ? [] : [{ name: piece.name, codes: errors.map((e) => e.code) }];
   });
@@ -245,11 +256,14 @@ function outlineFindings(inspected: readonly Inspected[]): Finding[] {
   );
   const findings: Finding[] = [];
   const missing = inspected.filter(({ outline }) => outline === undefined);
-  if (missing.length > 0 && measured.length > 0) {
+  if (missing.length > 0) {
     findings.push({
       code: 'compare.outline-missing',
       severity: 'info',
-      message: 'Some pieces have no measurable outline, so their line weight was not compared.',
+      message:
+        measured.length === 0
+          ? 'No piece has a measurable outline, so line weight was not compared.'
+          : 'Some pieces have no measurable outline, so their line weight was not compared.',
       details: { pieces: missing.map(({ piece }) => piece.name) },
     });
   }
