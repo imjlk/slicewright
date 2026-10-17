@@ -378,15 +378,16 @@ the content padding when there is one.
 Unity takes the border as a `Vector4` in its own order, `x = left`,
 `y = bottom`, `z = right`, `w = top`, for `TextureImporter.spriteBorder` or the
 Sprite Editor. The Unity target writes no file and never touches a `.meta`
-file: its usage prints the vector and an editor-script line that sets it, and
-the Sliced or, for a tiled axis, Tiled draw mode. Unity tiles both axes
+file: its usage prints the vector and editor-script lines that set it and
+reimport the texture, and the Sliced or, for a tiled axis, Tiled draw mode. Unity tiles both axes
 together and clips the last tile instead of fitting whole tiles, so a tiled
 export also carries a `target.tile` warning.
 
 Defold takes `slice9` as left, top, right, bottom on a sprite component (Size
-Mode Manual, trimming off) or a GUI box node, and cannot tile. The Defold
-target writes no file: its usage prints `slice9` in the component file format,
-a `go.set` call on the sprite's `slice` property, and a `gui.set_slice9` call.
+Mode Manual, trimming off) or a GUI box node (Size Mode Manual), and cannot
+tile. The Defold target writes no file: its usage prints `slice9` in the
+component file format, a `go.set` call on the sprite's `slice` property, and GUI
+calls that set the node's size mode to manual and its `slice9`.
 
 Godot 4 takes texture margins for `StyleBoxTexture` and patch margins for
 `NinePatchRect`, with an axis stretch mode per axis: 0 stretches and 2 (tile

@@ -26,7 +26,7 @@ const stretchMode = (axis: AxisLayout): number => (axisTiles(axis) ? 2 : 0);
  * count than the layout's rounding down.
  *
  * @evidence docs/spec.md#experimental-targets Warns that Godot's tile fit may pick another tile count.
- * @evidenceReview docs/spec.md#experimental-targets #b27df44 Checked this code against the section line by line and ran exportsExperimentalTargets green with pnpm test.
+ * @evidenceReview docs/spec.md#experimental-targets #de67bfb Checked this code against the section line by line and ran exportsExperimentalTargets green with pnpm test.
  */
 export function checkGodotLayout(layout: SliceLayout): Finding[] {
   return axisTiles(layout.x) || axisTiles(layout.y)
@@ -49,7 +49,7 @@ export function checkGodotLayout(layout: SliceLayout): Finding[] {
  * from the working directory, taken as the project root.
  *
  * @evidence docs/spec.md#experimental-targets Writes the StyleBoxTexture .tres with margins and stretch modes and prints NinePatchRect properties.
- * @evidenceReview docs/spec.md#experimental-targets #b27df44 Checked this code against the section line by line and ran exportsExperimentalTargets green with pnpm test.
+ * @evidenceReview docs/spec.md#experimental-targets #de67bfb Checked this code against the section line by line and ran exportsExperimentalTargets green with pnpm test.
  */
 export function exportGodot({
   name,

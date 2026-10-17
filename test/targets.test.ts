@@ -11,7 +11,7 @@ function codes(findings: ReadonlyArray<{ readonly code: string }>): string[] {
 
 /**
  * @evidence docs/spec.md#experimental-targets Exports a nine-slice, a tiled panel, and a three-slice to Unity, Defold, and Godot, checking each engine's inset order, files, stretch modes, and experimental status.
- * @evidenceReview docs/spec.md#experimental-targets #b27df44 Checked the assertions against the section's orders, files, tiling, emulation, and res:// rules and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#experimental-targets #de67bfb Checked the assertions against the section's orders, files, tiling, emulation, and res:// rules and ran this test green with pnpm test.
  */
 export function exportsExperimentalTargets(): void {
   const raster = panel(40, 30);
@@ -29,6 +29,8 @@ export function exportsExperimentalTargets(): void {
   deepStrictEqual(codes(unity.findings), ['target.experimental']);
   ok(unity.usage.includes('spriteBorder: {x: 6, y: 7, z: 8, w: 5}'));
   ok(unity.usage.includes('new Vector4(6, 7, 8, 5)'));
+  ok(unity.usage.includes('importer.SaveAndReimport();'));
+  ok(!exportForTarget('unity', { ...input, name: 'a\u2028b' }).usage.includes('\u2028'));
   ok(unity.usage.includes('Sliced'));
   ok(unity.usage.includes('RectOffset(4, 4, 3, 3)'));
 
@@ -37,6 +39,7 @@ export function exportsExperimentalTargets(): void {
   deepStrictEqual(defold.files, []);
   ok(defold.usage.includes('slice9 { x: 6.0 y: 5.0 z: 8.0 w: 7.0 }'));
   ok(defold.usage.includes('go.set("#sprite", "slice", vmath.vector4(6, 5, 8, 7))'));
+  ok(defold.usage.includes('gui.set_size_mode(node, gui.SIZE_MODE_MANUAL)'));
 
   // Godot: a StyleBoxTexture with margins, content margins, and stretch modes.
   const godot = exportForTarget('godot', input);
