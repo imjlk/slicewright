@@ -380,7 +380,12 @@ export function packsAtlasFiles(): void {
   }
 }
 
-/** A file symlink is distinct from a directory alias; keep both covered. */
+/**
+ * A file symlink is distinct from a directory alias; keep both covered.
+ *
+ * @evidence docs/spec.md#atlas-packing Refuses an output image that aliases an input through a file symlink; reports an explicit skip only when Windows denies creating the link.
+ * @evidenceReview docs/spec.md#atlas-packing #76a0a67 Read the real-path overwrite rule and filePath implementation; this assertion passed in Linux and Windows CI, and local Windows reported the explicit EPERM skip.
+ */
 export function refusesFileSymlinkOutput(context: TestContext): void {
   const dir = mkdtempSync(join(tmpdir(), 'slicewright-pack-symlink-'));
   try {
