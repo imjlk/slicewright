@@ -157,8 +157,9 @@ with a `target.experimental` finding.
 - `defold` prints `slice9` (left, top, right, bottom) for a sprite or GUI box
   node.
 - `godot` writes a Godot 4 `StyleBoxTexture` `.tres` and prints the matching
-  `NinePatchRect` properties. Pass `--image-ref res://…` so the texture path
-  matches the project.
+  `NinePatchRect` properties. Its texture path is `res://` plus the image's
+  path from where you run it, so run it from the Godot project root or pass
+  `--image-ref res://…`.
 
 Other engines (Android nine-patch, GameMaker, Cocos, Pixi.js, Bevy, and so on)
 are **not supported**.

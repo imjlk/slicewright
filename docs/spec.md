@@ -393,8 +393,8 @@ Godot 4 takes texture margins for `StyleBoxTexture` and patch margins for
 fit) tiles whole tiles scaled to fit, which may pick another count than the
 layout's rounding down, so a tiled export carries a `target.tile` warning. The
 Godot target writes `<name>.tres`, a `StyleBoxTexture` resource whose texture is
-`res://` plus the image reference unless the reference already starts with
-`res://`, with content margins from the content padding; its usage prints the
+the image reference when it starts with `res://`, and otherwise `res://` plus
+the image's path from where the command runs, taken as the project root, with content margins from the content padding; its usage prints the
 same values as `NinePatchRect` properties.
 
 ## Atlas frames

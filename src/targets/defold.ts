@@ -21,7 +21,7 @@ export const defoldTarget: SliceTarget = {
  * property is `slice`, the GUI one `slice9`). No file is written.
  *
  * @evidence docs/spec.md#experimental-targets Prints slice9 in Defold's left, top, right, bottom order for sprites and GUI box nodes, and writes no files.
- * @evidenceReview docs/spec.md#experimental-targets #0f54f66 Checked this code against the section line by line and ran exportsExperimentalTargets green with pnpm test.
+ * @evidenceReview docs/spec.md#experimental-targets #b27df44 Checked this code against the section line by line and ran exportsExperimentalTargets green with pnpm test.
  */
 export function exportDefold({
   name,

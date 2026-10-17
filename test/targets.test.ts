@@ -11,7 +11,7 @@ function codes(findings: ReadonlyArray<{ readonly code: string }>): string[] {
 
 /**
  * @evidence docs/spec.md#experimental-targets Exports a nine-slice, a tiled panel, and a three-slice to Unity, Defold, and Godot, checking each engine's inset order, files, stretch modes, and experimental status.
- * @evidenceReview docs/spec.md#experimental-targets #0f54f66 Checked the assertions against the section's orders, files, tiling, emulation, and res:// rules and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#experimental-targets #b27df44 Checked the assertions against the section's orders, files, tiling, emulation, and res:// rules and ran this test green with pnpm test.
  */
 export function exportsExperimentalTargets(): void {
   const raster = panel(40, 30);
@@ -57,6 +57,12 @@ export function exportsExperimentalTargets(): void {
   }
   ok(godot.usage.includes('patch_margin_bottom = 7'));
   ok(godot.usage.includes('Content padding (left, top, right, bottom): 4, 3, 4, 3'));
+  const rooted = exportForTarget('godot', {
+    ...input,
+    imageRef: 'panel.png',
+    loaderPaths: { image: 'ui/panel.png', directory: 'ui' },
+  });
+  ok(String(rooted.files[0]?.contents).includes('path="res://ui/panel.png"'));
   const resRef = exportForTarget('godot', { ...input, imageRef: 'res://art/panel.png' });
   ok(String(resRef.files[0]?.contents).includes('path="res://art/panel.png"'));
 

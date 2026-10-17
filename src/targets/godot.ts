@@ -26,7 +26,7 @@ const stretchMode = (axis: AxisLayout): number => (axisTiles(axis) ? 2 : 0);
  * count than the layout's rounding down.
  *
  * @evidence docs/spec.md#experimental-targets Warns that Godot's tile fit may pick another tile count.
- * @evidenceReview docs/spec.md#experimental-targets #0f54f66 Checked this code against the section line by line and ran exportsExperimentalTargets green with pnpm test.
+ * @evidenceReview docs/spec.md#experimental-targets #b27df44 Checked this code against the section line by line and ran exportsExperimentalTargets green with pnpm test.
  */
 export function checkGodotLayout(layout: SliceLayout): Finding[] {
   return axisTiles(layout.x) || axisTiles(layout.y)
@@ -44,22 +44,27 @@ export function checkGodotLayout(layout: SliceLayout): Finding[] {
 /**
  * Godot 4: a `StyleBoxTexture` resource with texture margins, content margins
  * from the content padding, and an axis stretch mode per axis, plus the same
- * values as `NinePatchRect` properties. The texture path is `res://` plus the
- * image reference unless it already starts with `res://`.
+ * values as `NinePatchRect` properties. The texture path is the image
+ * reference when it starts with `res://`, else `res://` plus the image's path
+ * from the working directory, taken as the project root.
  *
  * @evidence docs/spec.md#experimental-targets Writes the StyleBoxTexture .tres with margins and stretch modes and prints NinePatchRect properties.
- * @evidenceReview docs/spec.md#experimental-targets #0f54f66 Checked this code against the section line by line and ran exportsExperimentalTargets green with pnpm test.
+ * @evidenceReview docs/spec.md#experimental-targets #b27df44 Checked this code against the section line by line and ran exportsExperimentalTargets green with pnpm test.
  */
 export function exportGodot({
   name,
   imageRef,
   layout,
+  loaderPaths,
 }: ExportInput): Omit<ExportResult, 'target' | 'findings'> {
   const { left, right, top, bottom } = exportInsets(layout);
   const padding = layout.content;
   const horizontal = stretchMode(layout.x);
   const vertical = stretchMode(layout.y);
-  const path = imageRef.startsWith('res://') ? imageRef : `res://${imageRef}`;
+  // res:// is the project root: take the image's path from where the CLI runs, not from the .tres.
+  const path = imageRef.startsWith('res://')
+    ? imageRef
+    : `res://${(loaderPaths?.image ?? imageRef).replace(/^\.\//, '')}`;
   const tres = [
     '[gd_resource type="StyleBoxTexture" load_steps=2 format=3]',
     '',
@@ -85,7 +90,7 @@ export function exportGodot({
   ].join('\n');
   const note = fixedAxisNote(layout).trim();
   const usage = [
-    `# slicewright: ${oneLine(name)}, experimental. ${name}.tres loads the texture from ${oneLine(path)}; pass --image-ref res://… when that is not its project path.`,
+    `# slicewright: ${oneLine(name)}, experimental. ${oneLine(name)}.tres loads the texture from ${oneLine(path)}; pass --image-ref res://… when that is not its project path.`,
     '# A Control theme or add_theme_stylebox_override takes the StyleBoxTexture; a NinePatchRect takes:',
     `texture = load("${godotString(path)}")`,
     `patch_margin_left = ${left}`,
