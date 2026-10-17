@@ -390,9 +390,11 @@ or a `meta.slices` list. Its slices are checked instead of `scale9Borders`:
 every slice that has a nine-slice `center` in any key, or only the named slice.
 A key holds from its frame until the next key's frame, so each frame it covers
 is checked on its own; a key starting past the last frame is an
-`aseprite.frame-missing` error. A key's `bounds` lie on the sprite canvas and
+`aseprite.frame-missing` error, and a key with zero width or height hides the
+slice, so the frames it covers are skipped. A key's `bounds` lie on the sprite canvas and
 map into the sheet through the frame's position and, for a trimmed frame, its
-`spriteSourceSize`; a frame or `spriteSourceSize` that is not a whole-pixel
+`spriteSourceSize`, which a trimmed frame must have
+(`aseprite.bounds-outside-frame` otherwise); a frame or `spriteSourceSize` that is not a whole-pixel
 rectangle with a positive size, or that maps the bounds outside the image, is
 an `atlas.frame-outside-image` error. Bounds that are not a whole-pixel rectangle with a positive
 size are `aseprite.bounds-invalid`, bounds past the kept frame are

@@ -30,7 +30,7 @@ function codes(findings: ReadonlyArray<{ readonly code: string }> | undefined): 
 
 /**
  * @evidence docs/spec.md#aseprite-slices Checks keys spanning frames, a trimmed frame, centers that cut detail or leave the bounds, a full-height center, slices without a center, and keys past the last frame.
- * @evidenceReview docs/spec.md#aseprite-slices #03207c0 Checked the assertions against the section's detection, key range, mapping, error, and three-slice rules and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#aseprite-slices #8ff19c7 Checked the assertions against the section's detection, key range, mapping, error, and three-slice rules and ran this test green with pnpm test.
  */
 export function checksAsepriteSlices(): void {
   const image = sheetImage();
@@ -162,6 +162,64 @@ export function checksAsepriteSlices(): void {
     [['atlas.frame-outside-image'], ['atlas.frame-outside-image']],
   );
   deepStrictEqual(array.slices[0]?.frames[0]?.insets, { left: 6, right: 6, top: 6, bottom: 6 });
+
+  // A zero-size key hides the slice; a far-off next key does not loop past the sheet.
+  const hiding = inspectAsepriteSlices(
+    {
+      frames,
+      meta: {
+        app,
+        slices: [
+          {
+            name: 'blink',
+            keys: [
+              { frame: 0, bounds, center: { x: 6, y: 6, w: 28, h: 18 } },
+              { frame: 1, bounds: { x: 0, y: 0, w: 0, h: 0 } },
+            ],
+          },
+          {
+            name: 'far',
+            keys: [
+              { frame: 0, bounds, center: { x: 6, y: 6, w: 28, h: 18 } },
+              { frame: 1_000_000_000, bounds, center: { x: 6, y: 6, w: 28, h: 18 } },
+            ],
+          },
+        ],
+      },
+    },
+    image,
+    defaultInspectOptions,
+  );
+  deepStrictEqual(
+    hiding.slices.map((slice) => [
+      slice.name,
+      slice.ok,
+      slice.frames.map((frame) => frame.frame),
+      codes(slice.findings),
+    ]),
+    [
+      ['blink', true, [0], []],
+      ['far', false, [0, 1], ['aseprite.frame-missing']],
+    ],
+  );
+
+  // A trimmed frame must say where its kept pixels sit on the canvas.
+  const unplaced = inspectAsepriteSlices(
+    {
+      frames: [{ filename: 'cut', frame: { x: 0, y: 0, w: 40, h: 30 }, trimmed: true }],
+      meta: {
+        app,
+        slices: [
+          { name: 'button', keys: [{ frame: 0, bounds, center: { x: 6, y: 6, w: 28, h: 18 } }] },
+        ],
+      },
+    },
+    image,
+    defaultInspectOptions,
+  );
+  deepStrictEqual(codes(unplaced.slices[0]?.frames[0]?.findings), [
+    'aseprite.bounds-outside-frame',
+  ]);
 
   // Missing and absent slices.
   const missing = inspectAsepriteSlices(

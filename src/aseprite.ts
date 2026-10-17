@@ -107,7 +107,7 @@ export function isAsepriteSheet(json: unknown): boolean {
  * center, or only `sliceName`, against the pixels of each frame its keys cover.
  *
  * @evidence docs/spec.md#aseprite-slices Maps each key's bounds into the sheet, turns its center into insets, and inspects every covered frame with them.
- * @evidenceReview docs/spec.md#aseprite-slices #03207c0 Checked this code against the section line by line and ran checksAsepriteSlices green with pnpm test.
+ * @evidenceReview docs/spec.md#aseprite-slices #8ff19c7 Checked this code against the section line by line and ran checksAsepriteSlices green with pnpm test.
  */
 export function inspectAsepriteSlices(
   json: unknown,
@@ -179,13 +179,18 @@ function inspectSlice(
   const keys = [...slice.keys].sort((a, b) => a.frame - b.frame);
   const reports: AsepriteSliceFrameReport[] = [];
   keys.forEach((key, index) => {
-    const end = keys[index + 1]?.frame ?? frames.length;
+    // The next key may itself be out of range; never loop past the last frame.
+    const end = Math.min(keys[index + 1]?.frame ?? frames.length, frames.length);
     if (!Number.isInteger(key.frame) || key.frame < 0 || key.frame >= frames.length) {
       findings.push({
         code: 'aseprite.frame-missing',
         severity: 'error',
         message: `A key of slice "${slice.name}" starts at frame ${key.frame}, but the sheet has ${frames.length} frames.`,
       });
+      return;
+    }
+    // Aseprite writes a zero-size key where the slice is hidden from that frame on.
+    if (key.bounds.w === 0 || key.bounds.h === 0) {
       return;
     }
     for (let frame = key.frame; frame < end; frame += 1) {
@@ -249,6 +254,12 @@ function inspectKey(
   }
   // Bounds are on the sprite canvas; a trimmed frame keeps only spriteSourceSize of it.
   const { x, y, w, h } = sheetFrame.frame;
+  if (sheetFrame.trimmed === true && sheetFrame.spriteSourceSize === undefined) {
+    return fail(
+      'aseprite.bounds-outside-frame',
+      'A trimmed frame without spriteSourceSize cannot place slice bounds; export without trimming.',
+    );
+  }
   const kept = sheetFrame.spriteSourceSize ?? { x: 0, y: 0, w, h };
   // A fractional rectangle would crop at shifted byte offsets.
   for (const [label, rect] of [
