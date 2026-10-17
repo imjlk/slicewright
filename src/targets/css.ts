@@ -12,6 +12,7 @@ export const cssTarget: SliceTarget = {
     tile: 'per-axis',
     tileCount: 'round',
   },
+  outputs: (name) => [`${name}.css`],
   exportLayout: exportCss,
 };
 

@@ -12,6 +12,7 @@ export const defoldTarget: SliceTarget = {
     tile: 'none',
     tileCount: 'floor',
   },
+  outputs: () => [],
   exportLayout: exportDefold,
 };
 
