@@ -30,7 +30,7 @@ function codes(findings: ReadonlyArray<{ readonly code: string }> | undefined): 
 
 /**
  * @evidence docs/spec.md#aseprite-slices Checks keys spanning frames, a trimmed frame, centers that cut detail or leave the bounds, a full-height center, slices without a center, and keys past the last frame.
- * @evidenceReview docs/spec.md#aseprite-slices #a9c75f9 Checked the assertions against the section's detection, key range, mapping, error, and three-slice rules and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#aseprite-slices #dcc0165 Checked the assertions against the section's detection, key range, mapping, error, and three-slice rules and ran this test green with pnpm test.
  */
 export function checksAsepriteSlices(): void {
   const image = sheetImage();
@@ -146,6 +146,7 @@ export function checksAsepriteSlices(): void {
       frames: [
         { filename: 'half', frame: { x: 0.5, y: 0, w: 40, h: 30 } },
         { ...trimmed, spriteSourceSize: { x: 4, y: 2.5, w: 40, h: 30 } },
+        { filename: 'off', frame: { x: -10, y: 0, w: 40, h: 30 } },
       ],
       meta: {
         app,
@@ -159,7 +160,7 @@ export function checksAsepriteSlices(): void {
   );
   deepStrictEqual(
     fractional.slices[0]?.frames.map((frame) => codes(frame.findings)),
-    [['atlas.frame-outside-image'], ['atlas.frame-outside-image']],
+    [['atlas.frame-outside-image'], ['atlas.frame-outside-image'], ['atlas.frame-outside-image']],
   );
   deepStrictEqual(array.slices[0]?.frames[0]?.insets, { left: 6, right: 6, top: 6, bottom: 6 });
 

@@ -397,7 +397,8 @@ frame's border around its `spriteSourceSize`, which must be even), and, for a
 trimmed frame, its `spriteSourceSize`, which a trimmed frame must have
 (`aseprite.bounds-outside-frame` otherwise, as is an uneven or negative inner
 padding); every slice needs at least one key; a frame or `spriteSourceSize` that is not a whole-pixel
-rectangle with a positive size, or that maps the bounds outside the image, is
+rectangle with a positive size, a frame that reaches past the image, or bounds
+that map outside the image, is
 an `atlas.frame-outside-image` error. Bounds that are not a whole-pixel rectangle with a positive
 size are `aseprite.bounds-invalid`, bounds past the kept frame are
 `aseprite.bounds-outside-frame`, a rotated frame is `aseprite.rotated`, and a

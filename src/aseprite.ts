@@ -107,7 +107,7 @@ export function isAsepriteSheet(json: unknown): boolean {
  * center, or only `sliceName`, against the pixels of each frame its keys cover.
  *
  * @evidence docs/spec.md#aseprite-slices Maps each key's bounds into the sheet, turns its center into insets, and inspects every covered frame with them.
- * @evidenceReview docs/spec.md#aseprite-slices #a9c75f9 Checked this code against the section line by line and ran checksAsepriteSlices green with pnpm test.
+ * @evidenceReview docs/spec.md#aseprite-slices #dcc0165 Checked this code against the section line by line and ran checksAsepriteSlices green with pnpm test.
  */
 export function inspectAsepriteSlices(
   json: unknown,
@@ -284,6 +284,12 @@ function inspectKey(
       sheetFrame.trimmed === true
         ? `Slice bounds ${JSON.stringify(bounds)} reach past the trimmed frame ${JSON.stringify(kept)}; export without trimming.`
         : `Slice bounds ${JSON.stringify(bounds)} reach past the ${kept.w}x${kept.h} frame.`,
+    );
+  }
+  if (x < 0 || y < 0 || x + w > image.width || y + h > image.height) {
+    return fail(
+      'atlas.frame-outside-image',
+      `Frame ${w}x${h}+${x}+${y} lies outside the ${image.width}x${image.height} image.`,
     );
   }
   // --inner-padding grows the frame by the same border on each side of the kept pixels.
