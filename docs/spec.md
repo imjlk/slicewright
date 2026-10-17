@@ -420,7 +420,8 @@ map into the sheet through the frame's position, any inner padding (the
 frame's border around its `spriteSourceSize`, which must be even), and, for a
 trimmed frame, its `spriteSourceSize`, which a trimmed frame must have
 (`aseprite.bounds-outside-frame` otherwise, as is an uneven or negative inner
-padding); every slice needs at least one key; a frame or `spriteSourceSize` that is not a whole-pixel
+padding, or a `spriteSourceSize` that leaves the sprite canvas); every slice
+needs at least one key; a frame or `spriteSourceSize` that is not a whole-pixel
 rectangle with a positive size, a frame that reaches past the image, or bounds
 that map outside the image, is
 an `atlas.frame-outside-image` error. Bounds that are not a whole-pixel rectangle with a positive
@@ -430,7 +431,8 @@ center that does not lie inside its bounds with a positive size is
 `aseprite.center-invalid`, all errors. The center, relative to the bounds,
 becomes the insets, which are reported with the bounds and the pivot. The
 slice's pixels are inspected with them as explicit insets: a center spanning
-the full height inspects as a three-slice, as in Phaser. A slice without a
+the full height inspects as a three-slice, as in Phaser, and one spanning the
+full width as a vertical three-slice. A slice without a
 center in any key has only its bounds checked, noted as `aseprite.no-center`.
 
 ## Atlas packing

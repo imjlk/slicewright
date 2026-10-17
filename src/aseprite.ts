@@ -107,7 +107,7 @@ export function isAsepriteSheet(json: unknown): boolean {
  * center, or only `sliceName`, against the pixels of each frame its keys cover.
  *
  * @evidence docs/spec.md#aseprite-slices Maps each key's bounds into the sheet, turns its center into insets, and inspects every covered frame with them.
- * @evidenceReview docs/spec.md#aseprite-slices #dcc0165 Checked this code against the section line by line and ran checksAsepriteSlices green with pnpm test.
+ * @evidenceReview docs/spec.md#aseprite-slices #ba518dd Checked this code against the section line by line and ran checksAsepriteSlices green with pnpm test.
  */
 export function inspectAsepriteSlices(
   json: unknown,
@@ -292,6 +292,18 @@ function inspectKey(
       `Frame ${w}x${h}+${x}+${y} lies outside the ${image.width}x${image.height} image.`,
     );
   }
+  // The kept pixels lie on the sprite canvas.
+  const source = sheetFrame.sourceSize;
+  if (
+    kept.x < 0 ||
+    kept.y < 0 ||
+    (source !== undefined && (kept.x + kept.w > source.w || kept.y + kept.h > source.h))
+  ) {
+    return fail(
+      'aseprite.bounds-outside-frame',
+      `spriteSourceSize ${kept.w}x${kept.h}+${kept.x}+${kept.y} reaches past the sprite canvas.`,
+    );
+  }
   // --inner-padding grows the frame by the same border on each side of the kept pixels.
   const padX = (w - kept.w) / 2;
   const padY = (h - kept.h) / 2;
@@ -344,8 +356,14 @@ function inspectKey(
   const inspection = inspectRaster(cropRaster(image, rect), {
     ...options,
     insets,
-    // A center spanning the full height leaves a fixed height, as in Phaser.
-    mode: insets.top === 0 && insets.bottom === 0 ? 'three' : 'nine',
+    // A center spanning the full height leaves a fixed height, as in Phaser;
+    // one spanning the full width leaves a fixed width.
+    mode:
+      insets.top === 0 && insets.bottom === 0
+        ? 'three'
+        : insets.left === 0 && insets.right === 0
+          ? 'three-vertical'
+          : 'nine',
   });
   return { ...base, insets, ok: inspection.ok, findings: [], inspection };
 }
