@@ -6,4 +6,5 @@ import './aseprite.test.js';
 import './layout.test.js';
 import './padding.test.js';
 import './pack.test.js';
+import './build.test.js';
 import './argv.test.js';

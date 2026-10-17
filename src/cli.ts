@@ -19,6 +19,8 @@ import { normalizeRaster } from './normalize.js';
 import { outlineThickness } from './outline.js';
 import type { SliceLayout } from './layout.js';
 import { buildPack } from './pack-files.js';
+import { loadBuildManifest, runBuild, type BuildManifest } from './build.js';
+import { watchBuild } from './watch.js';
 import { defaultPackOptions } from './pack.js';
 import { inspectAtlas } from './phaser.js';
 import { inspectAsepriteSlices, isAsepriteSheet } from './aseprite.js';
@@ -599,6 +601,49 @@ const pack = define({
   },
 });
 
+const build = define({
+  name: 'build',
+  description: 'Normalize, export, and pack every piece a manifest lists',
+  args: {
+    manifest: { type: 'positional', description: 'Build manifest JSON' },
+    watch: {
+      type: 'boolean',
+      description: 'Build again when the manifest or a piece changes; prints one JSON line per build',
+    },
+  },
+  run: async (ctx) => {
+    const path = ctx.values.manifest;
+    if (path === undefined) {
+      throw new UsageError('Missing the manifest path.');
+    }
+    const baseDir = dirname(resolve(path));
+    if (ctx.values.watch !== true) {
+      const report = runBuild(buildManifest(path), baseDir, process.cwd(), [path]);
+      print({ manifest: path, ...report });
+      failOnErrors(report.ok);
+      return;
+    }
+    const status = await watchBuild(path, baseDir, buildManifest, (value) => {
+      process.stdout.write(`${JSON.stringify(value)}\n`);
+    });
+    // The last build's outcome is the exit status, as for a single build.
+    if (status === 'error') {
+      process.exitCode = usageFailed;
+    } else {
+      failOnErrors(status === 'ok');
+    }
+  },
+});
+
+/** Reads a manifest, reporting a bad one as a usage error. */
+function buildManifest(path: string): BuildManifest {
+  try {
+    return loadBuildManifest(path);
+  } catch (error) {
+    throw new UsageError(`${path}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 const targets = define({
   name: 'targets',
   description: 'List export targets and what each can represent',
@@ -937,6 +982,7 @@ const subCommands = {
   resize,
   normalize,
   pack,
+  build,
   export: exportCommand,
   targets,
 };
