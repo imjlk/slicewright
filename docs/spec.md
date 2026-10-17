@@ -406,6 +406,36 @@ for its emulated vertical three-slice. A frame carrying that marker without
 full-width borders is an `atlas.marker-mismatch` error, because Phaser would
 still render it as a nine-slice.
 
+## Aseprite slices
+
+An Aseprite sheet, the JSON that `aseprite --sheet --data --list-slices`
+writes, is told apart from a Phaser atlas by a `meta.app` that names Aseprite
+or a `meta.slices` list. Its slices are checked instead of `scale9Borders`:
+every slice that has a nine-slice `center` in any key, or only the named slice.
+A key holds from its frame until the next key's frame, so each frame it covers
+is checked on its own; a key starting past the last frame is an
+`aseprite.frame-missing` error, and a key with zero width or height hides the
+slice, so the frames it covers are skipped. A key's `bounds` lie on the sprite canvas and
+map into the sheet through the frame's position, any inner padding (the
+frame's border around its `spriteSourceSize`, which must be even), and, for a
+trimmed frame, its `spriteSourceSize`, which a trimmed frame must have
+(`aseprite.bounds-outside-frame` otherwise, as is an uneven or negative inner
+padding, or a `spriteSourceSize` that leaves the sprite canvas); every slice
+needs at least one key; a frame or `spriteSourceSize` that is not a whole-pixel
+rectangle with a positive size, a frame that reaches past the image, or bounds
+that map outside the image, is
+an `atlas.frame-outside-image` error. Bounds that are not a whole-pixel rectangle with a positive
+size are `aseprite.bounds-invalid`, bounds past the kept frame are
+`aseprite.bounds-outside-frame`, a rotated frame is `aseprite.rotated`, and a
+center that does not lie inside its bounds with a positive size is
+`aseprite.center-invalid`, all errors. A whole-pixel coordinate or size is an
+integer of magnitude at most 2147483647, so rectangle sums stay exact. The center, relative to the bounds,
+becomes the insets, which are reported with the bounds and the pivot. The
+slice's pixels are inspected with them as explicit insets: a center spanning
+the full height inspects as a three-slice, as in Phaser, and one spanning the
+full width as a vertical three-slice. A slice without a
+center in any key has only its bounds checked, noted as `aseprite.no-center`.
+
 ## Atlas packing
 
 Packing combines frames from several atlases, usually the one-frame atlases

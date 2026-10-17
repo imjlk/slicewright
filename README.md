@@ -24,7 +24,8 @@ inspection finds or checks the exact slice insets afterwards.
   lists what each can represent.
 - `frame` writes a one-frame Phaser JSON Hash atlas with `scale9Borders`.
 - `atlas` checks every nine-slice frame of a Phaser JSON Hash or JSON Array
-  atlas against its pixels.
+  atlas against its pixels; given an Aseprite sheet exported with
+  `--list-slices`, it checks each slice's 9-slice center instead.
 - `pack` packs several atlases, such as a matching dialog, button, and bar,
   into one image and atlas, with an optional combined stylesheet.
 
