@@ -18,7 +18,7 @@ import { panel, shadedBar } from './fixtures.js';
 
 /**
  * @evidence docs/spec.md#build-manifest Builds a dialog and a bar from a manifest into pieces, exports, and one packed atlas, skips packing when a piece fails, and refuses manifests the shape or the rules reject.
- * @evidenceReview docs/spec.md#build-manifest #9f16ca5 Checked the assertions against the section's validation, path, piece, failure, and watch-input rules and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#build-manifest #6fca211 Checked the assertions against the section's validation, path, piece, failure, and watch-input rules and ran this test green with pnpm test.
  */
 export function buildsManifests(): void {
   const dir = mkdtempSync(join(tmpdir(), 'slicewright-build-'));
@@ -123,6 +123,23 @@ export function buildsManifests(): void {
           dir,
           dir,
         ),
+      BuildManifestError,
+    );
+
+    // An output that would also have to be a directory is refused.
+    throws(
+      () =>
+        runBuild(
+          readBuildManifest({ out: 'parts', piecesDir: 'parts', pieces: [{ input: 'bar.png' }] }),
+          dir,
+          dir,
+        ),
+      BuildManifestError,
+    );
+    mkdirSync(join(dir, 'taken.png'));
+    throws(
+      () =>
+        runBuild(readBuildManifest({ out: 'taken.png', pieces: [{ input: 'bar.png' }] }), dir, dir),
       BuildManifestError,
     );
 

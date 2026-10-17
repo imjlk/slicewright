@@ -449,7 +449,8 @@ is a usage error. Paths in the manifest are relative to it; the pieces go to a
 `pieces` directory beside the packed PNG unless the manifest names another. A
 piece takes the same normalization settings as the normalize command. A build
 refuses to write over any piece's input or the manifest, and refuses two
-outputs at one path, its own stylesheets included, (a piece named like the pack in the pack's directory),
+outputs at one path, its own stylesheets included, or an output that is also a
+directory another output goes into or an existing directory, (a piece named like the pack in the pack's directory),
 comparing real paths without letter case (a new file by its directory's real
 path), before it writes anything it can
 name ahead. The packed atlas is checked with the most lenient matching any
@@ -461,7 +462,8 @@ then again whenever the manifest or a piece's input changes, reading the
 manifest anew each time, and keeps watching after a failed build. A piece in a
 directory that does not exist yet is watched through its nearest existing
 ancestor until the directory appears, and an event that names no file rebuilds
-only when a watched file's modification time changed. A symlinked input is
+only when a watched file's modification time changed. A watched file that
+changed while a build ran starts another build. A symlinked input is
 watched both where the link is and where it points.
 
 ## Command-line arguments

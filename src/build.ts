@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 
 import typia, { type tags } from 'typia';
@@ -106,7 +106,7 @@ export interface BuildReport {
  * scale or a size, and every target must exist.
  *
  * @evidence docs/spec.md#build-manifest Validates the manifest shape, unique plain piece names, size or scale, insets syntax, and known targets before anything is built.
- * @evidenceReview docs/spec.md#build-manifest #9f16ca5 Checked this code against the section line by line and ran buildsManifests green with pnpm test.
+ * @evidenceReview docs/spec.md#build-manifest #6fca211 Checked this code against the section line by line and ran buildsManifests green with pnpm test.
  */
 export function readBuildManifest(json: unknown): BuildManifest {
   // Unknown keys are refused, so a misspelled setting is not silently ignored.
@@ -211,6 +211,16 @@ export function runBuild(
       );
     }
     seen.add(realPath(path));
+  }
+  // A file cannot also be a directory another output goes into, or one already there.
+  for (const path of planned) {
+    const file = realPath(path);
+    const inside = [...seen].find((other) => other.startsWith(`${file}${sep}`));
+    if (inside !== undefined || isDirectory(path)) {
+      throw new BuildManifestError(
+        `The build output ${path} is ${inside === undefined ? 'a directory' : 'also a directory of another output'}; pick another out or piecesDir.`,
+      );
+    }
   }
   const write = (path: string, contents: string | Uint8Array): string => {
     if (overwrites(path)) {
@@ -364,6 +374,14 @@ function realPath(path: string): string {
     }
   }
   return absolute.toLowerCase();
+}
+
+function isDirectory(path: string): boolean {
+  try {
+    return statSync(path).isDirectory();
+  } catch {
+    return false;
+  }
 }
 
 function pieceName(piece: BuildPiece): string {

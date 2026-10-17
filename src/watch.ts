@@ -81,6 +81,10 @@ export function watchBuild(
         // Unwatchable even after climbing; the next manifest change re-arms the watchers.
       }
     }
+    // An input that changed while the build ran may have had its event dropped with the old watchers.
+    if ([...watched].some((item) => (seen.get(item) ?? -1) !== modified(item))) {
+      schedule();
+    }
   };
   rebuild();
   return new Promise((done) => {
