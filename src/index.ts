@@ -1,4 +1,5 @@
 export * from './chroma.js';
+export * from './compare.js';
 export * from './detect.js';
 export * from './inspect.js';
 export * from './normalize.js';

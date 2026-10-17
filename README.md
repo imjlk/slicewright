@@ -15,6 +15,9 @@ inspection finds or checks the exact slice insets afterwards.
 - `inspect` detects the stretch spans, or checks insets you give, and reports
   smearing, repeating edges, seams, noise, alpha holes, margins, and spill. It
   also finds the content padding: where text fits inside the frame.
+- `compare` checks that states of one element (normal, hover, pressed) share a
+  size, slice mode, insets, and content padding, or with `--kind set` that the
+  pieces of a matching set share an outline weight.
 - `preview` renders the art at several stretched sizes on one PNG; pick
   cells with `--cells` and enlarge small art with `--zoom`.
 - `export` writes engine files for Phaser and CSS `border-image`; `targets`

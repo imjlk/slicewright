@@ -1,11 +1,12 @@
 #!/usr/bin/env node
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import { cli, define } from 'gunshi';
 
 import { joinNegativeNumbers } from './argv.js';
 import { defaultChromaOptions, removeChroma } from './chroma.js';
+import { compareSet, defaultCompareSlack } from './compare.js';
 import {
   defaultInspectOptions,
   inspectRaster,
@@ -147,6 +148,76 @@ const inspect = define({
     const raster = readPng(ctx.values.input);
     const report = inspectRaster(raster, inspectOptions(ctx.values, raster));
     print({ image: ctx.values.input, ...report });
+    failOnErrors(report.ok);
+  },
+});
+
+const compare = define({
+  name: 'compare',
+  description: 'Check that the states of one element, or the pieces of a matching set, agree',
+  args: {
+    inputs: {
+      type: 'positional',
+      multiple: true,
+      required: true,
+      description: 'Two or more PNGs: states such as normal, hover, pressed, or a set such as dialog, button, bar',
+    },
+    kind: {
+      type: 'enum',
+      choices: ['states', 'set'],
+      default: 'states',
+      description: 'states share one size and slices; a set only shares its line weight',
+    },
+    slack: {
+      type: 'number',
+      default: defaultCompareSlack,
+      description: 'Pixels insets and content padding may differ by between states',
+    },
+    mode: sliceArgs.mode,
+    tile: sliceArgs.tile,
+    ...matchArgs,
+  },
+  run: (ctx) => {
+    const inputs = ctx.values.inputs;
+    if (inputs.length < 2) {
+      throw new UsageError('compare needs at least two PNGs.');
+    }
+    const slack = ctx.values.slack;
+    if (!Number.isInteger(slack) || slack < 0) {
+      throw new UsageError('--slack must be a whole, non-negative number of pixels.');
+    }
+    // Aliases such as button.png and ./button.png read the same file.
+    const files = inputs.map((path) => {
+      try {
+        return realpathSync(path);
+      } catch {
+        return resolve(path);
+      }
+    });
+    if (new Set(files).size !== files.length) {
+      throw new UsageError('compare needs each PNG once.');
+    }
+    const stems = inputs.map((path) => basename(path).replace(/\.png$/i, ''));
+    // Findings name pieces by file name; repeated file names fall back to the paths.
+    const names = new Set(stems).size === stems.length ? stems : inputs;
+    const report = compareSet(
+      inputs.map((path, index) => ({ name: names[index] ?? path, raster: readPng(path) })),
+      {
+        kind: ctx.values.kind === 'set' ? 'set' : 'states',
+        slack,
+        inspect: inspectOptions(
+          {
+            ...ctx.values,
+            regions: 'single',
+            insets: undefined,
+            borders: undefined,
+            padding: undefined,
+          },
+          undefined,
+        ),
+      },
+    );
+    print({ inputs, ...report });
     failOnErrors(report.ok);
   },
 });
@@ -858,6 +929,7 @@ const main = define({
 const subCommands = {
   prompt,
   inspect,
+  compare,
   preview,
   frame,
   atlas,
