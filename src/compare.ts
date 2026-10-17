@@ -1,4 +1,10 @@
-import { inspectRaster, type Finding, type InspectOptions, type InspectReport } from './inspect.js';
+import {
+  inspectRaster,
+  type Finding,
+  type InspectOptions,
+  type InspectReport,
+  type TileAxes,
+} from './inspect.js';
 import { outlineThickness } from './outline.js';
 import type { Raster } from './raster.js';
 import type { SliceInsets, SliceMode } from './slices.js';
@@ -31,6 +37,8 @@ export interface ComparePieceReport {
   readonly mode: SliceMode;
   readonly insets: SliceInsets;
   readonly contentPadding: SliceInsets | null;
+  /** Axes that tile, as given or detected. */
+  readonly tile: TileAxes;
   /** Outline thickness in pixels, or null when no outline was found. */
   readonly outline: number | null;
   readonly findings: readonly Finding[];
@@ -66,7 +74,7 @@ const sides = ['left', 'right', 'top', 'bottom'] as const;
  * than 1 px and a quarter are reported for both kinds.
  *
  * @evidence docs/spec.md#set-comparison Inspects each piece, checks states for one size, mode, slack-bound insets and padding, and the shared largest insets, and compares outline weights for states and sets.
- * @evidenceReview docs/spec.md#set-comparison #c944cfa Checked this code against the section line by line and ran comparesSets green with pnpm test.
+ * @evidenceReview docs/spec.md#set-comparison #532273a Checked this code against the section line by line and ran comparesSets green with pnpm test.
  */
 export function compareSet(
   pieces: readonly ComparePiece[],
@@ -136,6 +144,7 @@ function pieceReport(
     mode: report.mode,
     insets: report.insets,
     contentPadding: report.contentPadding,
+    tile: report.tile,
     outline: outline === undefined ? null : Math.round(outline * 100) / 100,
     findings: report.findings,
   };
@@ -163,6 +172,16 @@ function stateFindings(inspected: readonly Inspected[], slack: number): Finding[
       severity: 'error',
       message: 'States slice differently (nine, three, or vertical three); pass one --mode.',
       details: { modes },
+    });
+  }
+  // Phaser takes tiling only in the NineSlice constructor, so swapped states share it.
+  const tiles = inspected.map(({ piece, report }) => ({ name: piece.name, tile: report.tile }));
+  if (new Set(tiles.map(({ tile }) => `${tile.x},${tile.y}`)).size > 1) {
+    findings.push({
+      code: 'compare.tile',
+      severity: 'error',
+      message: 'States tile different axes; regenerate them alike or pass one --tile.',
+      details: { tiles },
     });
   }
   const insets = spread(inspected.map(({ piece, report }) => [piece.name, report.insets]));

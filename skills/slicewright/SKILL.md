@@ -116,7 +116,7 @@ finished pieces into one atlas (step 8).
 
 States of one element (normal, hover, pressed, disabled) swap in place, so
 `slicewright compare ui/button-normal.png ui/button-hover.png
-ui/button-pressed.png` must exit 0: same size and mode, and one set of insets
+ui/button-pressed.png` must exit 0: same size, mode, and tiling, and one set of insets
 (`sharedInsets`) that fits every state. Also fix any `compare.insets` or
 `compare.padding` warning (insets or padding that differ by more than 1 px,
 `--slack`); warnings do not change the exit code. Use `sharedInsets` for every

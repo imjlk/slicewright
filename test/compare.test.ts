@@ -46,7 +46,7 @@ function codes(report: { readonly findings: ReadonlyArray<{ readonly code: strin
 
 /**
  * @evidence docs/spec.md#set-comparison Compares matching states, then states that differ in size, mode, insets beyond the slack, shared insets that cut detail, and outline weight, and a set that only compares outlines.
- * @evidenceReview docs/spec.md#set-comparison #c944cfa Checked the assertions against the section's size, mode, slack, shared-insets, and outline rules and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#set-comparison #532273a Checked the assertions against the section's size, mode, slack, shared-insets, and outline rules and ran this test green with pnpm test.
  */
 export function comparesSets(): void {
   // Two identical states agree and share their insets.
@@ -162,6 +162,18 @@ export function comparesSets(): void {
   );
   ok(tiled.ok);
   ok(!codes(tiled).includes('compare.shared-insets'));
+
+  // A tiled and a stretched state cannot swap in one NineSlice.
+  const tileMix = compareSet(
+    [
+      { name: 'normal', raster: ropePanel(96, 40) },
+      { name: 'hover', raster: panel(96, 40) },
+    ],
+    options,
+  );
+  ok(codes(tileMix).includes('compare.tile'));
+  strictEqual(tileMix.sharedInsets, null);
+  deepStrictEqual(tileMix.pieces[0]?.tile, { x: true, y: false });
 
   // Without any outline, the set says it compared no line weight.
   const flat = createRaster(30, 20);
