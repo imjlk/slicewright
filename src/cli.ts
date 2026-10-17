@@ -23,6 +23,7 @@ import { loadBuildManifest, runBuild, type BuildManifest } from './build.js';
 import { watchBuild } from './watch.js';
 import { defaultPackOptions } from './pack.js';
 import { inspectAtlas } from './phaser.js';
+import { inspectAsepriteSlices, isAsepriteSheet } from './aseprite.js';
 import { decodePng, encodePng } from './png.js';
 import { buildPromptPlan, promptBackgrounds, uiKinds } from './prompt.js';
 import { cropRaster, type Raster } from './raster.js';
@@ -298,17 +299,36 @@ const frame = define({
 
 const atlas = define({
   name: 'atlas',
-  description: 'Check the nine-slice frames of a Phaser JSON Hash or JSON Array atlas',
+  description:
+    'Check the nine-slice frames of a Phaser JSON Hash or JSON Array atlas, or the slices of an Aseprite sheet',
   args: {
     input: { type: 'positional', description: 'Atlas JSON' },
     image: { type: 'string', description: 'Atlas image; defaults to meta.image' },
     frame: { type: 'string', description: 'Check only this frame' },
+    slice: { type: 'string', description: 'Check only this Aseprite slice' },
     ...matchArgs,
   },
   run: (ctx) => {
     const path = ctx.values.input;
     const json: unknown = JSON.parse(readFileSync(path, 'utf8'));
     const imagePath = ctx.values.image ?? resolve(dirname(path), atlasImage(json, path));
+    if (isAsepriteSheet(json)) {
+      if (ctx.values.frame !== undefined) {
+        throw new UsageError('--frame checks a Phaser atlas; pick an Aseprite slice with --slice.');
+      }
+      const report = inspectAsepriteSlices(
+        json,
+        readPng(imagePath),
+        matchOptions(ctx.values),
+        ctx.values.slice,
+      );
+      print({ atlas: path, image: imagePath, ...report });
+      failOnErrors(report.ok);
+      return;
+    }
+    if (ctx.values.slice !== undefined) {
+      throw new UsageError('--slice checks an Aseprite sheet; pick a Phaser frame with --frame.');
+    }
     const report = inspectAtlas(
       json,
       readPng(imagePath),
