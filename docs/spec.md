@@ -386,7 +386,7 @@ export also carries a `target.tile` warning.
 Defold takes `slice9` as left, top, right, bottom on a sprite component (Size
 Mode Manual, trimming off) or a GUI box node, and cannot tile. The Defold
 target writes no file: its usage prints `slice9` in the component file format,
-a `go.set` call for a sprite, and a `gui.set_slice9` call.
+a `go.set` call on the sprite's `slice` property, and a `gui.set_slice9` call.
 
 Godot 4 takes texture margins for `StyleBoxTexture` and patch margins for
 `NinePatchRect`, with an axis stretch mode per axis: 0 stretches and 2 (tile

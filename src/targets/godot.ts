@@ -26,7 +26,7 @@ const stretchMode = (axis: AxisLayout): number => (axisTiles(axis) ? 2 : 0);
  * count than the layout's rounding down.
  *
  * @evidence docs/spec.md#experimental-targets Warns that Godot's tile fit may pick another tile count.
- * @evidenceReview docs/spec.md#experimental-targets #dc0943d Checked this code against the section line by line and ran exportsExperimentalTargets green with pnpm test.
+ * @evidenceReview docs/spec.md#experimental-targets #0f54f66 Checked this code against the section line by line and ran exportsExperimentalTargets green with pnpm test.
  */
 export function checkGodotLayout(layout: SliceLayout): Finding[] {
   return axisTiles(layout.x) || axisTiles(layout.y)
@@ -48,7 +48,7 @@ export function checkGodotLayout(layout: SliceLayout): Finding[] {
  * image reference unless it already starts with `res://`.
  *
  * @evidence docs/spec.md#experimental-targets Writes the StyleBoxTexture .tres with margins and stretch modes and prints NinePatchRect properties.
- * @evidenceReview docs/spec.md#experimental-targets #dc0943d Checked this code against the section line by line and ran exportsExperimentalTargets green with pnpm test.
+ * @evidenceReview docs/spec.md#experimental-targets #0f54f66 Checked this code against the section line by line and ran exportsExperimentalTargets green with pnpm test.
  */
 export function exportGodot({
   name,
@@ -94,6 +94,11 @@ export function exportGodot({
     `patch_margin_bottom = ${bottom}`,
     `axis_stretch_horizontal = ${horizontal}`,
     `axis_stretch_vertical = ${vertical}`,
+    ...(padding === undefined
+      ? []
+      : [
+          `# Content padding (left, top, right, bottom): ${padding.left}, ${padding.top}, ${padding.right}, ${padding.bottom}`,
+        ]),
     ...(note === '' ? [] : [`# ${note}`]),
   ].join('\n');
   return { files: [{ path: `${name}.tres`, contents: tres }], usage };

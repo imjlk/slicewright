@@ -22,7 +22,7 @@ export const unityTarget: SliceTarget = {
  * last one instead of fitting a whole number of tiles.
  *
  * @evidence docs/spec.md#experimental-targets Warns that Unity clips the last tile of a tiled span.
- * @evidenceReview docs/spec.md#experimental-targets #dc0943d Checked this code against the section line by line and ran exportsExperimentalTargets green with pnpm test.
+ * @evidenceReview docs/spec.md#experimental-targets #0f54f66 Checked this code against the section line by line and ran exportsExperimentalTargets green with pnpm test.
  */
 export function checkUnityLayout(layout: SliceLayout): Finding[] {
   return axisTiles(layout.x) || axisTiles(layout.y)
@@ -43,7 +43,7 @@ export function checkUnityLayout(layout: SliceLayout): Finding[] {
  * that sets it. No file is written; slicewright never touches `.meta` files.
  *
  * @evidence docs/spec.md#experimental-targets Prints the spriteBorder vector in Unity's left, bottom, right, top order and the draw mode, and writes no files.
- * @evidenceReview docs/spec.md#experimental-targets #dc0943d Checked this code against the section line by line and ran exportsExperimentalTargets green with pnpm test.
+ * @evidenceReview docs/spec.md#experimental-targets #0f54f66 Checked this code against the section line by line and ran exportsExperimentalTargets green with pnpm test.
  */
 export function exportUnity({
   name,

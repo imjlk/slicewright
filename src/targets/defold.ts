@@ -17,11 +17,11 @@ export const defoldTarget: SliceTarget = {
 
 /**
  * Defold: `slice9` as left, top, right, bottom, for a sprite component or a
- * GUI box node, in the component file format and as a Lua call. No file is
- * written.
+ * GUI box node, in the component file format and as Lua calls (the sprite
+ * property is `slice`, the GUI one `slice9`). No file is written.
  *
  * @evidence docs/spec.md#experimental-targets Prints slice9 in Defold's left, top, right, bottom order for sprites and GUI box nodes, and writes no files.
- * @evidenceReview docs/spec.md#experimental-targets #dc0943d Checked this code against the section line by line and ran exportsExperimentalTargets green with pnpm test.
+ * @evidenceReview docs/spec.md#experimental-targets #0f54f66 Checked this code against the section line by line and ran exportsExperimentalTargets green with pnpm test.
  */
 export function exportDefold({
   name,
@@ -35,7 +35,7 @@ export function exportDefold({
     `-- slicewright: ${oneLine(name)} (${oneLine(imageRef)}), experimental`,
     '-- Sprite: Size Mode Manual; atlas image Sprite Trim Mode Off. In the .sprite or .gui file:',
     `-- slice9 { x: ${left}.0 y: ${top}.0 z: ${right}.0 w: ${bottom}.0 }`,
-    `go.set("#sprite", "slice9", vmath.vector4(${left}, ${top}, ${right}, ${bottom}))`,
+    `go.set("#sprite", "slice", vmath.vector4(${left}, ${top}, ${right}, ${bottom}))`,
     `gui.set_slice9(gui.get_node("${luaString(name)}"), vmath.vector4(${left}, ${top}, ${right}, ${bottom}))`,
     ...(padding === undefined
       ? []
