@@ -109,8 +109,18 @@ style description used word for word in every `prompt` call, generated in one
 session. When the generator accepts reference images, generate the main piece
 first and pass it as a reference for the others. Normalize each piece to its
 own in-game width, then put the preview sheets side by side and regenerate a
-piece that drifts in color or wood tone before slicing further. Pack the
+piece that drifts in color or wood tone before slicing further. Run
+`slicewright compare --kind set ui/dialog.png ui/button.png ui/bar.png` to catch
+a piece whose outline came out heavier or lighter than the rest. Pack the
 finished pieces into one atlas (step 8).
+
+States of one element (normal, hover, pressed, disabled) swap in place, so
+`slicewright compare ui/button-normal.png ui/button-hover.png
+ui/button-pressed.png` must exit 0: same size, mode, and tiling, and one set of insets
+(`sharedInsets`) that fits every state. Also fix any `compare.insets` or
+`compare.padding` warning (insets or padding that differ by more than 1 px,
+`--slack`); warnings do not change the exit code. Use `sharedInsets` for every
+state's frame.
 
 ## References
 
