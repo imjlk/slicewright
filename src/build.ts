@@ -106,11 +106,17 @@ export interface BuildReport {
  * scale or a size, and every target must exist.
  *
  * @evidence docs/spec.md#build-manifest Validates the manifest shape, unique plain piece names, size or scale, insets syntax, and known targets before anything is built.
- * @evidenceReview docs/spec.md#build-manifest #1eec81b Checked this code against the section line by line and ran buildsManifests green with pnpm test.
+ * @evidenceReview docs/spec.md#build-manifest #b0047ef Checked this code against the section line by line and ran buildsManifests green with pnpm test.
  */
 export function readBuildManifest(json: unknown): BuildManifest {
   // Unknown keys are refused, so a misspelled setting is not silently ignored.
   const manifest = typia.assertEquals<BuildManifest>(json);
+  // No file system takes a NUL in a path; refuse it before anything is written.
+  for (const path of [manifest.out, manifest.piecesDir, ...manifest.pieces.map((p) => p.input)]) {
+    if (path?.includes('\0') === true) {
+      throw new BuildManifestError(`The path ${JSON.stringify(path)} contains a NUL character.`);
+    }
+  }
   const names = manifest.pieces.map(pieceName);
   for (const name of [...names, manifest.name ?? stem(manifest.out)]) {
     if (!plainName(name)) {
@@ -190,7 +196,7 @@ export function runBuild(
   const planned = [
     out,
     join(dirname(out), `${packName}.json`),
-    join(dirname(out), `${packName}.css`),
+    ...(manifest.css === true ? [join(dirname(out), `${packName}.css`)] : []),
     ...manifest.pieces.flatMap((piece) => [
       join(piecesDir, `${pieceName(piece)}.png`),
       join(piecesDir, `${pieceName(piece)}.json`),
@@ -393,7 +399,7 @@ function stem(path: string): string {
 }
 
 function plainName(name: string): boolean {
-  return name !== '' && name !== '.' && name !== '..' && !/[/\\]/.test(name);
+  return name !== '' && name !== '.' && name !== '..' && !/[/\\\0]/.test(name);
 }
 
 function urlPath(path: string): string {

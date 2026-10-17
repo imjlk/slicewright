@@ -18,7 +18,7 @@ import { panel, shadedBar } from './fixtures.js';
 
 /**
  * @evidence docs/spec.md#build-manifest Builds a dialog and a bar from a manifest into pieces, exports, and one packed atlas, skips packing when a piece fails, and refuses manifests the shape or the rules reject.
- * @evidenceReview docs/spec.md#build-manifest #1eec81b Checked the assertions against the section's validation, path, piece, failure, and watch-input rules and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#build-manifest #b0047ef Checked the assertions against the section's validation, path, piece, failure, and watch-input rules and ran this test green with pnpm test.
  */
 export function buildsManifests(): void {
   const dir = mkdtempSync(join(tmpdir(), 'slicewright-build-'));
@@ -89,6 +89,29 @@ export function buildsManifests(): void {
     strictEqual(failing.pack, null);
     ok(existsSync(join(dir, 'bad/parts/dialog.png')));
     ok(!existsSync(join(dir, 'bad/ui.png')));
+
+    // A NUL in a name or path is refused before anything is written.
+    throws(
+      () => readBuildManifest({ out: 'ui.png', pieces: [{ input: 'bar.png', name: 'b\0' }] }),
+      BuildManifestError,
+    );
+    throws(
+      () => readBuildManifest({ out: 'u\0i.png', pieces: [{ input: 'bar.png' }] }),
+      BuildManifestError,
+    );
+
+    // Without stylesheets, an image named like one is not a clash.
+    const plain = runBuild(
+      readBuildManifest({
+        out: 'plain/z.css',
+        name: 'z',
+        css: false,
+        pieces: [{ input: 'bar.png' }],
+      }),
+      dir,
+      dir,
+    );
+    ok(plain.files.includes(join(dir, 'plain/z.css')));
 
     // Pieces normalized next to their sources would overwrite them.
     throws(

@@ -603,9 +603,15 @@ const build = define({
       failOnErrors(report.ok);
       return;
     }
-    await watchBuild(path, baseDir, buildManifest, (value) => {
+    const status = await watchBuild(path, baseDir, buildManifest, (value) => {
       process.stdout.write(`${JSON.stringify(value)}\n`);
     });
+    // The last build's outcome is the exit status, as for a single build.
+    if (status === 'error') {
+      process.exitCode = usageFailed;
+    } else {
+      failOnErrors(status === 'ok');
+    }
   },
 });
 

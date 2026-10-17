@@ -444,12 +444,13 @@ shape cannot say: piece names, which default to the input's file
 name, and the pack name must be plain file names, piece names must be unique
 ignoring letter case, a piece gives a scale or a size but not both and not
 insets with multiple regions, insets and
-padding use the command-line syntax, and every target exists. A bad manifest
+padding use the command-line syntax, every target exists, and no path or name
+holds a NUL character. A bad manifest
 is a usage error. Paths in the manifest are relative to it; the pieces go to a
 `pieces` directory beside the packed PNG unless the manifest names another. A
 piece takes the same normalization settings as the normalize command. A build
 refuses to write over any piece's input or the manifest, and refuses two
-outputs at one path, its own stylesheets included (a piece named like the pack
+outputs at one path, its own stylesheets included when it writes them (a piece named like the pack
 in the pack's directory), or an output that is also a directory another output
 goes into or an existing directory, comparing real paths without letter case (a new file by its directory's real
 path), before it writes anything it can
@@ -463,7 +464,9 @@ manifest anew each time, and keeps watching after a failed build. A piece in a
 directory that does not exist yet is watched through its nearest existing
 ancestor until the directory appears, and an event that names no file rebuilds
 only when a watched file's modification time changed. A watched file that
-changed while a build ran starts another build. A symlinked input is
+changed while a build ran starts another build. When the watch is interrupted,
+its exit status is that of the last build: a failed build exits 1, and a bad
+manifest or a build error exits 2. A symlinked input is
 watched both where the link is and where it points.
 
 ## Command-line arguments

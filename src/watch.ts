@@ -3,6 +3,9 @@ import { basename, dirname, join, resolve } from 'node:path';
 
 import { buildInputs, runBuild, type BuildManifest } from './build.js';
 
+/** How the last build before the watch stopped went: passed, failed its findings, or errored. */
+export type WatchStatus = 'ok' | 'failed' | 'error';
+
 /**
  * Builds, then builds again whenever the manifest or a piece's input changes,
  * printing one JSON line per build, until interrupted. Directories are watched
@@ -13,12 +16,13 @@ export function watchBuild(
   baseDir: string,
   load: (path: string) => BuildManifest,
   line: (value: unknown) => void,
-): Promise<void> {
+): Promise<WatchStatus> {
   const watchers = new Map<string, FSWatcher>();
   let watched = new Set<string>([resolve(path)]);
   // Modification times at the last build, to tell a real change from an unnamed event.
   let seen = new Map<string, number>();
   let timer: NodeJS.Timeout | undefined;
+  let status: WatchStatus = 'ok';
   const modified = (file: string): number => {
     try {
       return statSync(file).mtimeMs;
@@ -37,8 +41,10 @@ export function watchBuild(
       watched = withTargets(buildInputs(manifest, path));
       seen = new Map([...watched].map((file) => [file, modified(file)]));
       const report = runBuild(manifest, baseDir, process.cwd(), [path]);
+      status = report.ok ? 'ok' : 'failed';
       line({ manifest: path, ...report });
     } catch (error) {
+      status = 'error';
       seen = new Map([...watched].map((file) => [file, modified(file)]));
       line({
         manifest: path,
@@ -93,7 +99,7 @@ export function watchBuild(
       for (const watcher of watchers.values()) {
         watcher.close();
       }
-      done();
+      done(status);
     });
   });
 }
