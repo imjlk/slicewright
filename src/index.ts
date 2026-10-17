@@ -14,6 +14,7 @@ export * from './layout.js';
 export * from './targets/index.js';
 export * from './pack.js';
 export * from './pack-files.js';
+export * from './build.js';
 export * from './argv.js';
 export * from './outline.js';
 export * from './thin-lines.js';

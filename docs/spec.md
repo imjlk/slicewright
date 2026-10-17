@@ -409,6 +409,27 @@ atlas, its image, or the stylesheet beside it, comparing existing files by their
 real path, and refuses an image path that is also its own atlas or, with a
 stylesheet, its stylesheet, even when they differ only in letter case.
 
+## Build manifest
+
+A build manifest lists the pieces of a set in one JSON file so the whole set
+is rebuilt with one command: every piece is normalized, written with its
+one-frame atlas and any exports it asks for, and then all pieces are packed.
+The manifest's shape is validated before anything is read or written, with
+unknown keys refused so a misspelled setting is not ignored, and so is what the
+shape cannot say: piece names, which default to the input's file
+name, and the pack name must be plain file names, piece names must be unique
+ignoring letter case, a piece gives a scale or a size but not both, insets and
+padding use the command-line syntax, and every target exists. A bad manifest
+is a usage error. Paths in the manifest are relative to it; the pieces go to a
+`pieces` directory beside the packed PNG unless the manifest names another. A
+piece takes the same normalization settings as the normalize command. A build
+refuses to write over any piece's input, comparing real paths without letter
+case, before it writes anything it can name ahead. When a
+piece fails its inspection or export, nothing is packed and the build fails;
+otherwise the build fails exactly when the pack fails. Watching builds once,
+then again whenever the manifest or a piece's input changes, reading the
+manifest anew each time, and keeps watching after a failed build.
+
 ## Command-line arguments
 
 A number option takes a negative value written either as `--tolerance=-1` or

@@ -95,6 +95,10 @@ every command exits 2 on bad input. `--help` works on each command.
    --out ui/ui.png` puts every piece in one image and atlas, so the game loads
    them with one `this.load.atlas`; it prints a `nineslice` call per frame,
    with tiling flags. Add `--css` for one stylesheet with a class per piece.
+   Once the settings per piece are settled, write them into a manifest
+   (`{"out": "ui/ui.png", "pieces": [{"input": "art/dialog.png", "width": 320}]}`
+   with the `normalize` options per piece) and rerun the whole set with
+   `slicewright build ui.build.json`; `--watch` rebuilds on every change.
    Packing keeps frames untrimmed and unrotated with their borders, padding,
    and tiling, extrudes each edge by 1 px and leaves 2 px between frames
    (`--extrude`, `--spacing`), and checks the result. With another packer,

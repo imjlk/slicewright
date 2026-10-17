@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, watch, writeFileSync, type FSWatcher } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import { cli, define } from 'gunshi';
@@ -18,6 +18,7 @@ import { normalizeRaster } from './normalize.js';
 import { outlineThickness } from './outline.js';
 import type { SliceLayout } from './layout.js';
 import { buildPack } from './pack-files.js';
+import { buildInputs, loadBuildManifest, runBuild, type BuildManifest } from './build.js';
 import { defaultPackOptions } from './pack.js';
 import { inspectAtlas } from './phaser.js';
 import { decodePng, encodePng } from './png.js';
@@ -508,6 +509,104 @@ const pack = define({
   },
 });
 
+const build = define({
+  name: 'build',
+  description: 'Normalize, export, and pack every piece a manifest lists',
+  args: {
+    manifest: { type: 'positional', description: 'Build manifest JSON' },
+    watch: {
+      type: 'boolean',
+      description: 'Build again when the manifest or a piece changes; prints one JSON line per build',
+    },
+  },
+  run: async (ctx) => {
+    const path = ctx.values.manifest;
+    if (path === undefined) {
+      throw new UsageError('Missing the manifest path.');
+    }
+    const baseDir = dirname(resolve(path));
+    if (ctx.values.watch !== true) {
+      const report = runBuild(buildManifest(path), baseDir);
+      print({ manifest: path, ...report });
+      failOnErrors(report.ok);
+      return;
+    }
+    await watchBuild(path, baseDir);
+  },
+});
+
+/** Reads a manifest, reporting a bad one as a usage error. */
+function buildManifest(path: string): BuildManifest {
+  try {
+    return loadBuildManifest(path);
+  } catch (error) {
+    throw new UsageError(`${path}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
+ * Builds, then builds again whenever the manifest or a piece's input changes,
+ * printing one JSON line per build, until interrupted. Directories are watched
+ * rather than files, so an editor that replaces a file on save still counts.
+ */
+function watchBuild(path: string, baseDir: string): Promise<void> {
+  const watchers = new Map<string, FSWatcher>();
+  let watched = new Set<string>([resolve(path)]);
+  let timer: NodeJS.Timeout | undefined;
+  const line = (value: unknown): void => {
+    process.stdout.write(`${JSON.stringify(value)}\n`);
+  };
+  const rebuild = (): void => {
+    try {
+      const manifest = buildManifest(path);
+      watched = new Set(buildInputs(manifest, path));
+      const report = runBuild(manifest, baseDir);
+      line({ manifest: path, ...report });
+    } catch (error) {
+      line({
+        manifest: path,
+        ok: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+    const directories = new Set([...watched].map((file) => dirname(file)));
+    for (const [directory, watcher] of watchers) {
+      if (!directories.has(directory)) {
+        watcher.close();
+        watchers.delete(directory);
+      }
+    }
+    for (const directory of directories) {
+      if (!watchers.has(directory)) {
+        try {
+          watchers.set(
+            directory,
+            watch(directory, (_event, file) => {
+              if (file !== null && watched.has(join(directory, file))) {
+                clearTimeout(timer);
+                // Editors write in bursts; build once they settle.
+                timer = setTimeout(rebuild, 100);
+              }
+            }),
+          );
+        } catch {
+          // A missing directory is reported by the build; watch it once it exists.
+        }
+      }
+    }
+  };
+  rebuild();
+  return new Promise((done) => {
+    process.once('SIGINT', () => {
+      clearTimeout(timer);
+      for (const watcher of watchers.values()) {
+        watcher.close();
+      }
+      done();
+    });
+  });
+}
+
 const targets = define({
   name: 'targets',
   description: 'List export targets and what each can represent',
@@ -845,6 +944,7 @@ const subCommands = {
   resize,
   normalize,
   pack,
+  build,
   export: exportCommand,
   targets,
 };
