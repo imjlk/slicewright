@@ -17,13 +17,14 @@ reaches the game.
 ## Run the CLI
 
 Every `slicewright <command>` in this skill and its references means
-`npx -y slicewright@0.1 <command>`; npx uses the project's installed copy when
-it matches and downloads it otherwise. From a clone of the repository, run
-`pnpm install && pnpm build` once there, then use `node <clone>/dist/cli.js
-<command>` instead. Every command prints JSON on stdout; `inspect`, `frame`,
-`normalize`, `export`, and `atlas` exit 1 when a finding is an error (for
-`export`, a layout the target cannot represent), and every command exits 2 on
-bad input. `--help` works on each command.
+`npx -y slicewright <command>`. Leave the version off: npx then runs the
+project's installed copy, at whatever version the project pins, and downloads
+the latest release only when the project has none. From a clone of the
+repository, run `pnpm install && pnpm build` once there, then use
+`node <clone>/dist/cli.js <command>` instead. Every command prints JSON on
+stdout; `inspect`, `frame`, `normalize`, `export`, and `atlas` exit 1 when a
+finding is an error (for `export`, a layout the target cannot represent), and
+every command exits 2 on bad input. `--help` works on each command.
 
 ## Workflow
 
