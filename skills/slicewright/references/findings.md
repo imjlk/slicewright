@@ -27,10 +27,21 @@
 | `padding.invalid` | Given content padding leaves no content area, is not whole and non-negative, or reaches past the fixed edge into a stretch span, where it would change with size. | Shrink `--padding` to within the insets on resizable axes. |
 | `pack.css-skipped` | A packed frame has no CSS class: it has no borders, or is only part of its image, which `border-image` cannot address. | Pack the piece's own one-frame atlas, or use Phaser for it. |
 | `pack.css-class-collision` | Two frame names become the same CSS class. | Rename one piece. |
+| `compare.size`, `compare.mode`, `compare.tile` | States of one element differ in size, slice mode, or tiled axes, so they cannot swap in one NineSlice. | Normalize every state to the same size and regenerate the odd one out. |
+| `compare.insets`, `compare.padding` | States' detected insets or content padding differ by more than `--slack`; corners or text would jump on swap. | Use `sharedInsets` for every state, or regenerate the state that drifted. |
+| `compare.shared-insets` | The largest insets on each side do not fit every state. | Regenerate the states so their edge detail lines up. |
+| `compare.outline` | Pieces' outline thicknesses differ by more than 1 px and a quarter. | Regenerate the odd piece, or normalize it to a size that matches the others' line weight. |
+| `compare.outline-missing` | Some pieces have no measurable outline. | Informational; compare their line weight by eye in the preview. |
 | `atlas.padding-invalid` | An atlas frame's content padding does not fit the frame or reaches past the fixed edge its `scale9Borders` leave. | Re-export the frame. |
 | `insets.asymmetric` | Opposite insets differ by more than 2 px. | Usually generator drift; check the preview. |
 | `insets.invalid` | Insets leave no stretch pixel. | Shrink the insets. |
 | `image.empty` | Every pixel is transparent. | The background removal took everything; redo it. |
 | `atlas.trimmed` | Phaser NineSlice does not support trimmed frames. | Disable trimming for this sprite and repack. |
 | `atlas.rotated` | Rotated frames are not a tested NineSlice input. | Disable rotation for this sprite. |
+| `aseprite.center-invalid` | An Aseprite slice's 9-slice center does not lie inside its bounds. | Redraw the center in Aseprite's slice tool. |
+| `aseprite.bounds-outside-frame` | A slice reaches past its frame, usually because the sheet was trimmed. | Export without trimming, or shrink the slice. |
+| `aseprite.bounds-invalid` | A slice key's bounds are not a whole-pixel rectangle with a positive size. | Redraw the slice in Aseprite, or fix the bounds in the JSON. |
+| `aseprite.rotated` | A frame a slice covers is rotated in the sheet. | Re-export the sheet without rotation. |
+| `aseprite.frame-missing` | A slice key starts past the sheet's last frame. | Export every frame (no `--frame-range` or tag filter that drops them), or move the key in Aseprite. |
+| `aseprite.no-center`, `aseprite.no-slices` | A slice has no 9-slice center, or the sheet has no slices to check. | Enable 9-slices on the slice, or export with `--list-slices`. |
 | `atlas.borders-outside-frame` | `scale9Borders` does not fit the frame. | Re-export the borders. |

@@ -287,6 +287,30 @@ the frame or reaches past the fixed segments its `scale9Borders` leave
 (`atlas.padding-invalid`). The preview outlines the content box on the
 guides cell.
 
+## Set comparison
+
+A comparison takes two or more images and checks that they agree. States of one
+element (normal, hover, pressed, disabled) swap in place in one NineSlice or
+element, so they must have the same size (`compare.size`) and the same slice
+mode (`compare.mode`) and tile the same axes (`compare.tile`), because Phaser
+takes tiling only when the NineSlice is created; all three are errors. Each state is inspected on its own; detected
+insets or content padding that differ between states by more than the slack
+(1 px by default, a whole number of pixels) are a `compare.insets` or
+`compare.padding` warning, because the corners would jump or the text would
+move when the states swap. When the states agree on size, mode, and tiling, every state
+is inspected again with the shared insets, the largest inset on each side, keeping
+the tiling it detected, and a
+state that then has an error finding is a `compare.shared-insets` error: no one
+set of insets fits every state. States are compared by detected insets and padding, never given ones, and
+compare single-region layouts only, since
+shared insets cannot describe several stretch regions per axis. A matching set (a dialog, a button, and a bar)
+has pieces of different sizes and slices, so only their line weight is compared.
+For both kinds, outlines are measured as for resizing, and when the thickest
+exceeds the thinnest by more than 1 px and by more than a quarter, that is a
+`compare.outline` warning; pieces without a measurable outline, even all of
+them, are named in a `compare.outline-missing` note. The comparison fails when any of its own
+findings or any piece's inspection is an error.
+
 ## Preview sheet
 
 A preview sheet renders the layout at several sizes on one PNG over a
@@ -413,6 +437,36 @@ for its emulated vertical three-slice. A frame carrying that marker without
 full-width borders is an `atlas.marker-mismatch` error, because Phaser would
 still render it as a nine-slice.
 
+## Aseprite slices
+
+An Aseprite sheet, the JSON that `aseprite --sheet --data --list-slices`
+writes, is told apart from a Phaser atlas by a `meta.app` that names Aseprite
+or a `meta.slices` list. Its slices are checked instead of `scale9Borders`:
+every slice that has a nine-slice `center` in any key, or only the named slice.
+A key holds from its frame until the next key's frame, so each frame it covers
+is checked on its own; a key starting past the last frame is an
+`aseprite.frame-missing` error, and a key with zero width or height hides the
+slice, so the frames it covers are skipped. A key's `bounds` lie on the sprite canvas and
+map into the sheet through the frame's position, any inner padding (the
+frame's border around its `spriteSourceSize`, which must be even), and, for a
+trimmed frame, its `spriteSourceSize`, which a trimmed frame must have
+(`aseprite.bounds-outside-frame` otherwise, as is an uneven or negative inner
+padding, or a `spriteSourceSize` that leaves the sprite canvas); every slice
+needs at least one key; a frame or `spriteSourceSize` that is not a whole-pixel
+rectangle with a positive size, a frame that reaches past the image, or bounds
+that map outside the image, is
+an `atlas.frame-outside-image` error. Bounds that are not a whole-pixel rectangle with a positive
+size are `aseprite.bounds-invalid`, bounds past the kept frame are
+`aseprite.bounds-outside-frame`, a rotated frame is `aseprite.rotated`, and a
+center that does not lie inside its bounds with a positive size is
+`aseprite.center-invalid`, all errors. A whole-pixel coordinate or size is an
+integer of magnitude at most 2147483647, so rectangle sums stay exact. The center, relative to the bounds,
+becomes the insets, which are reported with the bounds and the pivot. The
+slice's pixels are inspected with them as explicit insets: a center spanning
+the full height inspects as a three-slice, as in Phaser, and one spanning the
+full width as a vertical three-slice. A slice without a
+center in any key has only its bounds checked, noted as `aseprite.no-center`.
+
 ## Atlas packing
 
 Packing combines frames from several atlases, usually the one-frame atlases
@@ -439,6 +493,42 @@ class at all, no stylesheet is written. Packing refuses to write over an input
 atlas, its image, or the stylesheet beside it, comparing existing files by their
 real path, and refuses an image path that is also its own atlas or, with a
 stylesheet, its stylesheet, even when they differ only in letter case.
+
+## Build manifest
+
+A build manifest lists the pieces of a set in one JSON file so the whole set
+is rebuilt with one command: every piece is normalized, written with its
+one-frame atlas and any exports it asks for, and then all pieces are packed.
+The manifest's shape is validated before anything is read or written, with
+unknown keys refused so a misspelled setting is not ignored, and so is what the
+shape cannot say: piece names, which default to the input's file
+name, and the pack name must be plain file names, piece names must be unique
+ignoring letter case, a piece gives a scale or a size but not both and not
+insets with multiple regions, insets and
+padding use the command-line syntax, every target exists, and no path or name
+holds a NUL character. A bad manifest
+is a usage error. Paths in the manifest are relative to it; the pieces go to a
+`pieces` directory beside the packed PNG unless the manifest names another. A
+piece takes the same normalization settings as the normalize command. A build
+refuses to write over any piece's input or the manifest, and refuses two
+outputs at one path, its own stylesheets included when it writes them (a piece named like the pack
+in the pack's directory), or an output that is also a directory another output
+goes into or an existing directory, comparing real paths without letter case (a new file by its directory's real
+path), before it writes anything it can
+name ahead. The packed atlas is checked with the most lenient matching any
+piece used, since each piece already passed its own settings and packing
+copies its pixels exactly, and its stylesheet findings are reported. When a
+piece fails its inspection or export, nothing is packed and the build fails;
+otherwise the build fails exactly when the pack fails. Watching builds once,
+then again whenever the manifest or a piece's input changes, reading the
+manifest anew each time, and keeps watching after a failed build. A piece in a
+directory that does not exist yet is watched through its nearest existing
+ancestor until the directory appears, and an event that names no file rebuilds
+only when a watched file's modification time changed. A watched file that
+changed while a build ran starts another build. When the watch is interrupted,
+its exit status is that of the last build: a failed build exits 1, and a bad
+manifest or a build error exits 2. A symlinked input is
+watched both where the link is and where it points.
 
 ## Command-line arguments
 

@@ -1,11 +1,12 @@
 #!/usr/bin/env node
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import { cli, define } from 'gunshi';
 
 import { joinNegativeNumbers } from './argv.js';
 import { defaultChromaOptions, removeChroma } from './chroma.js';
+import { compareSet, defaultCompareSlack } from './compare.js';
 import {
   defaultInspectOptions,
   inspectRaster,
@@ -18,8 +19,11 @@ import { normalizeRaster } from './normalize.js';
 import { outlineThickness } from './outline.js';
 import type { SliceLayout } from './layout.js';
 import { buildPack } from './pack-files.js';
+import { loadBuildManifest, runBuild, type BuildManifest } from './build.js';
+import { watchBuild } from './watch.js';
 import { defaultPackOptions } from './pack.js';
 import { inspectAtlas } from './phaser.js';
+import { inspectAsepriteSlices, isAsepriteSheet } from './aseprite.js';
 import { decodePng, encodePng } from './png.js';
 import { buildPromptPlan, promptBackgrounds, uiKinds } from './prompt.js';
 import { cropRaster, type Raster } from './raster.js';
@@ -150,6 +154,76 @@ const inspect = define({
   },
 });
 
+const compare = define({
+  name: 'compare',
+  description: 'Check that the states of one element, or the pieces of a matching set, agree',
+  args: {
+    inputs: {
+      type: 'positional',
+      multiple: true,
+      required: true,
+      description: 'Two or more PNGs: states such as normal, hover, pressed, or a set such as dialog, button, bar',
+    },
+    kind: {
+      type: 'enum',
+      choices: ['states', 'set'],
+      default: 'states',
+      description: 'states share one size and slices; a set only shares its line weight',
+    },
+    slack: {
+      type: 'number',
+      default: defaultCompareSlack,
+      description: 'Pixels insets and content padding may differ by between states',
+    },
+    mode: sliceArgs.mode,
+    tile: sliceArgs.tile,
+    ...matchArgs,
+  },
+  run: (ctx) => {
+    const inputs = ctx.values.inputs;
+    if (inputs.length < 2) {
+      throw new UsageError('compare needs at least two PNGs.');
+    }
+    const slack = ctx.values.slack;
+    if (!Number.isInteger(slack) || slack < 0) {
+      throw new UsageError('--slack must be a whole, non-negative number of pixels.');
+    }
+    // Aliases such as button.png and ./button.png read the same file.
+    const files = inputs.map((path) => {
+      try {
+        return realpathSync(path);
+      } catch {
+        return resolve(path);
+      }
+    });
+    if (new Set(files).size !== files.length) {
+      throw new UsageError('compare needs each PNG once.');
+    }
+    const stems = inputs.map((path) => basename(path).replace(/\.png$/i, ''));
+    // Findings name pieces by file name; repeated file names fall back to the paths.
+    const names = new Set(stems).size === stems.length ? stems : inputs;
+    const report = compareSet(
+      inputs.map((path, index) => ({ name: names[index] ?? path, raster: readPng(path) })),
+      {
+        kind: ctx.values.kind === 'set' ? 'set' : 'states',
+        slack,
+        inspect: inspectOptions(
+          {
+            ...ctx.values,
+            regions: 'single',
+            insets: undefined,
+            borders: undefined,
+            padding: undefined,
+          },
+          undefined,
+        ),
+      },
+    );
+    print({ inputs, ...report });
+    failOnErrors(report.ok);
+  },
+});
+
 const preview = define({
   name: 'preview',
   description: 'Render the art at several stretched sizes on one PNG',
@@ -225,17 +299,36 @@ const frame = define({
 
 const atlas = define({
   name: 'atlas',
-  description: 'Check the nine-slice frames of a Phaser JSON Hash or JSON Array atlas',
+  description:
+    'Check the nine-slice frames of a Phaser JSON Hash or JSON Array atlas, or the slices of an Aseprite sheet',
   args: {
     input: { type: 'positional', description: 'Atlas JSON' },
     image: { type: 'string', description: 'Atlas image; defaults to meta.image' },
     frame: { type: 'string', description: 'Check only this frame' },
+    slice: { type: 'string', description: 'Check only this Aseprite slice' },
     ...matchArgs,
   },
   run: (ctx) => {
     const path = ctx.values.input;
     const json: unknown = JSON.parse(readFileSync(path, 'utf8'));
     const imagePath = ctx.values.image ?? resolve(dirname(path), atlasImage(json, path));
+    if (isAsepriteSheet(json)) {
+      if (ctx.values.frame !== undefined) {
+        throw new UsageError('--frame checks a Phaser atlas; pick an Aseprite slice with --slice.');
+      }
+      const report = inspectAsepriteSlices(
+        json,
+        readPng(imagePath),
+        matchOptions(ctx.values),
+        ctx.values.slice,
+      );
+      print({ atlas: path, image: imagePath, ...report });
+      failOnErrors(report.ok);
+      return;
+    }
+    if (ctx.values.slice !== undefined) {
+      throw new UsageError('--slice checks an Aseprite sheet; pick a Phaser frame with --frame.');
+    }
     const report = inspectAtlas(
       json,
       readPng(imagePath),
@@ -507,6 +600,49 @@ const pack = define({
     failOnErrors(result.ok);
   },
 });
+
+const build = define({
+  name: 'build',
+  description: 'Normalize, export, and pack every piece a manifest lists',
+  args: {
+    manifest: { type: 'positional', description: 'Build manifest JSON' },
+    watch: {
+      type: 'boolean',
+      description: 'Build again when the manifest or a piece changes; prints one JSON line per build',
+    },
+  },
+  run: async (ctx) => {
+    const path = ctx.values.manifest;
+    if (path === undefined) {
+      throw new UsageError('Missing the manifest path.');
+    }
+    const baseDir = dirname(resolve(path));
+    if (ctx.values.watch !== true) {
+      const report = runBuild(buildManifest(path), baseDir, process.cwd(), [path]);
+      print({ manifest: path, ...report });
+      failOnErrors(report.ok);
+      return;
+    }
+    const status = await watchBuild(path, baseDir, buildManifest, (value) => {
+      process.stdout.write(`${JSON.stringify(value)}\n`);
+    });
+    // The last build's outcome is the exit status, as for a single build.
+    if (status === 'error') {
+      process.exitCode = usageFailed;
+    } else {
+      failOnErrors(status === 'ok');
+    }
+  },
+});
+
+/** Reads a manifest, reporting a bad one as a usage error. */
+function buildManifest(path: string): BuildManifest {
+  try {
+    return loadBuildManifest(path);
+  } catch (error) {
+    throw new UsageError(`${path}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
 
 const targets = define({
   name: 'targets',
@@ -838,6 +974,7 @@ const main = define({
 const subCommands = {
   prompt,
   inspect,
+  compare,
   preview,
   frame,
   atlas,
@@ -845,6 +982,7 @@ const subCommands = {
   resize,
   normalize,
   pack,
+  build,
   export: exportCommand,
   targets,
 };

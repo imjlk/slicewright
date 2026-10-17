@@ -15,6 +15,9 @@ inspection finds or checks the exact slice insets afterwards.
 - `inspect` detects the stretch spans, or checks insets you give, and reports
   smearing, repeating edges, seams, noise, alpha holes, margins, and spill. It
   also finds the content padding: where text fits inside the frame.
+- `compare` checks that states of one element (normal, hover, pressed) share a
+  size, slice mode, insets, and content padding, or with `--kind set` that the
+  pieces of a matching set share an outline weight.
 - `preview` renders the art at several stretched sizes on one PNG; pick
   cells with `--cells` and enlarge small art with `--zoom`.
 - `export` writes engine files for Phaser and CSS `border-image`, and
@@ -22,9 +25,12 @@ inspection finds or checks the exact slice insets afterwards.
   can represent and whether it is verified.
 - `frame` writes a one-frame Phaser JSON Hash atlas with `scale9Borders`.
 - `atlas` checks every nine-slice frame of a Phaser JSON Hash or JSON Array
-  atlas against its pixels.
+  atlas against its pixels; given an Aseprite sheet exported with
+  `--list-slices`, it checks each slice's 9-slice center instead.
 - `pack` packs several atlases, such as a matching dialog, button, and bar,
   into one image and atlas, with an optional combined stylesheet.
+- `build` runs normalize, export, and pack for every piece a JSON manifest
+  lists, and with `--watch` builds again when the manifest or a piece changes.
 
 slicewright does not generate images. Pair it with any image generator; the
 agent skill in [`skills/slicewright`](skills/slicewright/SKILL.md) describes
@@ -48,6 +54,29 @@ Run `npx slicewright --help` for every option. Install it in a project with
 importable as a library (`import { inspectRaster } from 'slicewright'`).
 
 From a clone, `pnpm install && pnpm build`, then `node dist/cli.js`.
+
+### Build manifest
+
+`slicewright build ui.build.json` rebuilds a whole set. Paths are relative to
+the manifest; each piece takes the `normalize` options (`width`, `height`,
+`scale`, `filter`, `crop`, `keep`, `insets`, `padding`, `mode`, `regions`, `tile`,
+`tolerance`, `outlierRatio`, `noise`) and optional `targets`. Pieces go to
+`pieces/` beside `out` (or `piecesDir`), then are packed into `out`:
+
+```json
+{
+  "out": "ui/ui.png",
+  "css": true,
+  "pieces": [
+    { "input": "art/dialog.png", "width": 320 },
+    { "input": "art/button.png", "name": "button", "width": 160, "targets": ["css"] },
+    { "input": "art/bar.png", "width": 240, "mode": "three" }
+  ]
+}
+```
+
+Unknown keys are errors. `--watch` builds again whenever the manifest or a
+piece's PNG changes and prints one JSON line per build.
 
 ### Agent skill
 
