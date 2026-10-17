@@ -373,6 +373,8 @@ has a status: `verified` targets are rendered in the real engine by the engine
 check, and an `experimental` target follows the documented format without being
 run, which a `target.experimental` finding states on every export. The verified
 targets are `phaser` and `css`; `unity`, `defold`, and `godot` are experimental.
+Each target also declares the file names an export may write for its name, so a
+build can check them for collisions before writing anything.
 
 The layout and the image must have the same size; a target refuses a layout
 built for another size, as the renderer does.
@@ -511,8 +513,9 @@ is a usage error. Paths in the manifest are relative to it; the pieces go to a
 `pieces` directory beside the packed PNG unless the manifest names another. A
 piece takes the same normalization settings as the normalize command. A build
 refuses to write over any piece's input or the manifest, and refuses two
-outputs at one path, its own stylesheets included when it writes them (a piece named like the pack
-in the pack's directory), or an output that is also a directory another output
+outputs at one path (a piece named like the pack in the pack's directory),
+counting its own stylesheets when it writes them and every file a piece's
+targets declare, such as a Godot `.tres`, or an output that is also a directory another output
 goes into or an existing directory, comparing real paths without letter case (a new file by its directory's real
 path), before it writes anything it can
 name ahead. The packed atlas is checked with the most lenient matching any

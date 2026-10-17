@@ -15,6 +15,7 @@ export const godotTarget: SliceTarget = {
     tileCount: 'floor',
   },
   check: checkGodotLayout,
+  outputs: (name) => [`${name}.tres`],
   exportLayout: exportGodot,
 };
 

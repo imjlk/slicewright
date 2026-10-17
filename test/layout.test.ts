@@ -254,7 +254,7 @@ export function detectsMultipleRegions(): void {
 
 /**
  * @evidence docs/spec.md#targets Rejects unsupported shapes without files, notes emulation, warns about tiling gaps and fixed layouts, and lists every target.
- * @evidenceReview docs/spec.md#targets #01a5af9 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#targets #2cdaf2d Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function checksTargetCapabilities(): void {
   deepStrictEqual(Object.keys(sliceTargets).sort(), ['css', 'defold', 'godot', 'phaser', 'unity']);

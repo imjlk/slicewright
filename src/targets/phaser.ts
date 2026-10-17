@@ -15,6 +15,7 @@ export const phaserTarget: SliceTarget = {
     tileCount: 'floor',
   },
   check: checkPhaserLayout,
+  outputs: (name) => [`${name}.json`],
   exportLayout: exportPhaser,
 };
 
