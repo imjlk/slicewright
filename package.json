@@ -1,6 +1,6 @@
 {
   "name": "slicewright",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Prompt, inspect, and preview nine-slice and three-slice UI art for game engines.",
   "license": "MIT",
   "repository": {
