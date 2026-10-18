@@ -25,7 +25,7 @@ every layout it declares.
    - `status`: `experimental` until the engine itself renders the output in
      `pnpm engine:check`; then `verified`.
    - `outputs(name)`: every file name the export may write, relative to its
-     output directory (for example, `(name) => [`${name}.tres`]`), or `[]`
+     output directory (for example, `(name) => [name + '.tres']`), or `[]`
      when it only returns usage text. Builds use this declaration to reject
      path collisions before writing; keep it in sync with `exportLayout`.
    - `exportLayout`: an exported function returning files and usage text.
