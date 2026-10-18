@@ -23,6 +23,15 @@ export function exportsExperimentalTargets(): void {
     strictEqual(sliceTargets[id]?.status, 'experimental', id);
   }
 
+  // Every target declares exactly the files it writes, so builds can plan them.
+  for (const [id, target] of Object.entries(sliceTargets)) {
+    deepStrictEqual(
+      exportForTarget(id, input).files.map((file) => file.path),
+      target.outputs('panel'),
+      id,
+    );
+  }
+
   // Unity: x = left, y = bottom, z = right, w = top; values only, no files.
   const unity = exportForTarget('unity', input);
   deepStrictEqual(unity.files, []);

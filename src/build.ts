@@ -106,7 +106,7 @@ export interface BuildReport {
  * scale or a size, and every target must exist.
  *
  * @evidence docs/spec.md#build-manifest Validates the manifest shape, unique plain piece names, size or scale, insets syntax, and known targets before anything is built.
- * @evidenceReview docs/spec.md#build-manifest #b0047ef Checked this code against the section line by line and ran buildsManifests green with pnpm test.
+ * @evidenceReview docs/spec.md#build-manifest #59f064c Checked this code against the section line by line and ran buildsManifests green with pnpm test.
  */
 export function readBuildManifest(json: unknown): BuildManifest {
   // Unknown keys are refused, so a misspelled setting is not silently ignored.
@@ -200,7 +200,11 @@ export function runBuild(
     ...manifest.pieces.flatMap((piece) => [
       join(piecesDir, `${pieceName(piece)}.png`),
       join(piecesDir, `${pieceName(piece)}.json`),
-      ...((piece.targets ?? []).includes('css') ? [join(piecesDir, `${pieceName(piece)}.css`)] : []),
+      // Every file a target may write, as its export declares them; the atlas is already above.
+      ...[...new Set(piece.targets ?? [])]
+        .filter((target) => target !== 'phaser')
+        .flatMap((target) => findTarget(target)?.outputs(pieceName(piece)) ?? [])
+        .map((file) => join(piecesDir, file)),
     ]),
   ];
   const overwrites = (path: string): boolean => inputs.has(realPath(path));

@@ -14,6 +14,7 @@ export const unityTarget: SliceTarget = {
     tileCount: 'floor',
   },
   check: checkUnityLayout,
+  outputs: () => [],
   exportLayout: exportUnity,
 };
 

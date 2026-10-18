@@ -18,7 +18,7 @@ import { panel, shadedBar } from './fixtures.js';
 
 /**
  * @evidence docs/spec.md#build-manifest Builds a dialog and a bar from a manifest into pieces, exports, and one packed atlas, skips packing when a piece fails, and refuses manifests the shape or the rules reject.
- * @evidenceReview docs/spec.md#build-manifest #b0047ef Checked the assertions against the section's validation, path, piece, failure, and watch-input rules and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#build-manifest #59f064c Checked the assertions against the section's validation, path, piece, failure, and watch-input rules and ran this test green with pnpm test.
  */
 export function buildsManifests(): void {
   const dir = mkdtempSync(join(tmpdir(), 'slicewright-build-한글 경로-'));
@@ -89,6 +89,32 @@ export function buildsManifests(): void {
     strictEqual(failing.pack, null);
     ok(existsSync(join(dir, 'bad/parts/dialog.png')));
     ok(!existsSync(join(dir, 'bad/ui.png')));
+
+    // A target's own files are planned too: a Godot .tres named like the pack image clashes.
+    throws(
+      () =>
+        runBuild(
+          readBuildManifest({
+            out: 'tres/x.tres',
+            piecesDir: 'tres',
+            pieces: [{ input: 'bar.png', name: 'x', targets: ['godot'] }],
+          }),
+          dir,
+          dir,
+        ),
+      BuildManifestError,
+    );
+    ok(!existsSync(join(dir, 'tres')));
+    // Listing a target twice is still one file.
+    const twice = runBuild(
+      readBuildManifest({
+        out: 'twice/ui.png',
+        pieces: [{ input: 'bar.png', targets: ['godot', 'godot', 'unity'] }],
+      }),
+      dir,
+      dir,
+    );
+    ok(twice.files.includes(join(dir, 'twice/pieces/bar.tres')));
 
     // A NUL in a name or path is refused before anything is written.
     throws(
