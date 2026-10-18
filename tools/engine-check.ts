@@ -235,8 +235,11 @@ function compareCells(
   const background = [0x1d, 0x1d, 0x24] as const;
   const sources = new Map<string, Raster>();
   return cells.map((cell) => {
+    // Browser URL pathnames encode spaces and Unicode; the filesystem uses
+    // decoded names, just like the local HTTP server above.
     const image =
-      sources.get(cell.image) ?? decodePng(readFileSync(join(root, cell.image.replace(/^\//, ''))));
+      sources.get(cell.image) ??
+      decodePng(readFileSync(join(root, decodeURIComponent(cell.image).replace(/^\//, ''))));
     sources.set(cell.image, image);
     const { w, h } = cell.frame;
     // A packed frame is part of its image; a one-frame atlas covers all of it.
