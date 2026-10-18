@@ -47,6 +47,9 @@ for (const name of ['max-mean', 'css-max-mean'] as const) {
   }
 }
 const engines = values.engine === 'all' ? knownEngines : [values.engine];
+// Full fixture sheets are much larger than the viewport. Software-rendered
+// Windows CI can exceed Playwright's 30-second screenshot default.
+const screenshotTimeout = 120_000;
 
 /** A typo must never produce a green check that compared nothing. */
 function usage(message: string): never {
@@ -155,7 +158,7 @@ async function checkPhaser(page: Page): Promise<{
     };
     return { report: scope.slicewrightReport, comparisons: scope.slicewrightCompare() };
   });
-  const canvas = await page.locator('canvas').screenshot();
+  const canvas = await page.locator('canvas').screenshot({ timeout: screenshotTimeout });
   if (values.screenshot !== undefined) {
     writeFileSync(values.screenshot, canvas);
   }
@@ -215,7 +218,7 @@ async function checkCss(page: Page): Promise<{
   );
   // CSS `round` takes the nearest tile count, so compare with that rule.
   const comparisons = compareCells(
-    decodePng(await page.screenshot({ fullPage: true })),
+    decodePng(await page.screenshot({ fullPage: true, timeout: screenshotTimeout })),
     cells,
     'round',
   );
