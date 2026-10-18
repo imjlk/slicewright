@@ -21,7 +21,7 @@ import { panel, shadedBar } from './fixtures.js';
  * @evidenceReview docs/spec.md#build-manifest #59f064c Checked the assertions against the section's validation, path, piece, failure, and watch-input rules and ran this test green with pnpm test.
  */
 export function buildsManifests(): void {
-  const dir = mkdtempSync(join(tmpdir(), 'slicewright-build-'));
+  const dir = mkdtempSync(join(tmpdir(), 'slicewright-build-한글 경로-'));
   try {
     writeFileSync(join(dir, 'dialog-raw.png'), encodePng(panel(80, 60, 4)));
     writeFileSync(join(dir, 'bar.png'), encodePng(shadedBar(48, 12)));
@@ -208,9 +208,14 @@ export function buildsManifests(): void {
       BuildManifestError,
     );
     ok(!existsSync(join(dir, 'parts/ui.png')));
-    // A new file under a symlinked directory is the same file as under its target.
+    // A new file under a directory alias is the same file as under its target.
+    // A Windows junction exercises this without requiring symlink privileges.
     mkdirSync(join(dir, 'real'));
-    symlinkSync(join(dir, 'real'), join(dir, 'link'));
+    symlinkSync(
+      join(dir, 'real'),
+      join(dir, 'link'),
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
     throws(
       () =>
         runBuild(
@@ -226,14 +231,15 @@ export function buildsManifests(): void {
     );
     ok(!existsSync(join(dir, 'real/ui.png')));
 
-    // Stylesheet collisions fail the pack and are reported with it.
+    // Stylesheet collisions fail the pack and are reported with it. Both names
+    // are valid Windows filenames but become the same CSS class.
     const clashing = runBuild(
       readBuildManifest({
         out: 'css/ui.png',
         css: true,
         pieces: [
           { input: 'dialog-raw.png', name: 'a#b', width: 40 },
-          { input: 'dialog-raw.png', name: 'a?b', width: 40 },
+          { input: 'dialog-raw.png', name: 'a@b', width: 40 },
         ],
       }),
       dir,

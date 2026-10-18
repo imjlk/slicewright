@@ -234,6 +234,21 @@ The toolchain is [ttsc](https://ttsc.dev) on TypeScript 7:
   Chrome; `SLICEWRIGHT_CHROME_CHANNEL` picks another Playwright channel).
 - `.mcp.json` registers the `@ttsc/graph` MCP server for agents.
 
+CI runs the checks, tests, build, and engine renders on Linux and native Windows.
+The repository's `.gitattributes` keeps text files at LF even when Windows Git
+uses `core.autocrlf=true`; CRLF compiler input otherwise fails the format check.
+Use Node 24 or newer in the shell running pnpm, including PowerShell.
+
+The first compiler invocation builds native plugins with ttsc's bundled Go
+toolchain and can take several minutes. Run the initial commands sequentially;
+later runs reuse `node_modules/.cache/ttsc`.
+
+Filesystem tests use directory junctions on Windows, so the packing and manifest
+overwrite checks run without administrator privileges. One separate file-symlink
+test explicitly skips only when Windows refuses link creation with `EPERM`.
+Enable Developer Mode or use a session with symlink privileges to run that case
+too; the remaining tests still run normally.
+
 Every H2 in `docs/spec.md` is a requirement. The build fails until a source
 function and a test function cite it with `@evidence` and an
 `@evidenceReview` that says what was checked, fingerprinted so it expires when
