@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1 — 2026-10-19
+
+### Fixed
+
+- [f473e80](https://github.com/imjlk/slicewright/commit/f473e800bdcf470df0213c5e6d8186579257a8c8) `build` now checks every file a piece's export targets write, such as a Godot `.tres`, for path collisions before writing anything. Targets declare their output files for this check. — Thanks @imjlk!
+
 ## 0.2.0 — 2026-10-18
 
 ### Added
