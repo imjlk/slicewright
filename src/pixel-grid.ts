@@ -30,6 +30,8 @@ const edgeThreshold = 24;
 const cellTolerance = 24;
 /** Boundaries must line up at least this well for a grid to count. */
 const minimumFit = 0.85;
+/** A whole-number period fitting at least this well is an exact upscale. */
+const exactFit = 0.99;
 /** Fewer boundaries than this cannot show a grid. */
 const minimumEdges = 6;
 const minimumScale = 2;
@@ -45,7 +47,7 @@ export const offGridWarning = 0.1;
  * fit is the scale. Cells are then compared with their center pixel.
  *
  * @evidence docs/spec.md#pixel-grid Finds boundaries between lines, fits the largest period they agree on per axis, and measures off-grid pixels against each cell's center.
- * @evidenceReview docs/spec.md#pixel-grid #3d11372 Checked this code against the section line by line and ran detectsPixelGrid green with pnpm test.
+ * @evidenceReview docs/spec.md#pixel-grid #70f3d39 Checked this code against the section line by line and ran detectsPixelGrid green with pnpm test.
  */
 export function detectPixelGrid(raster: Raster, bounds?: Rect): PixelGrid {
   const area = bounds ?? { x: 0, y: 0, width: raster.width, height: raster.height };
@@ -68,7 +70,7 @@ export function detectPixelGrid(raster: Raster, bounds?: Rect): PixelGrid {
  * so a fractional or offset grid still lands each art pixel exactly.
  *
  * @evidence docs/spec.md#pixel-grid Samples each cell's center pixel to rebuild the art at one pixel per cell.
- * @evidenceReview docs/spec.md#pixel-grid #3d11372 Checked this code against the section line by line and ran detectsPixelGrid green with pnpm test.
+ * @evidenceReview docs/spec.md#pixel-grid #70f3d39 Checked this code against the section line by line and ran detectsPixelGrid green with pnpm test.
  */
 export function snapToPixelGrid(raster: Raster, grid: PixelGrid): Raster {
   const xs = cellCenters(grid.x, 0, raster.width);
@@ -88,7 +90,7 @@ export function snapToPixelGrid(raster: Raster, grid: PixelGrid): Raster {
  * cells that are not one flat color.
  *
  * @evidence docs/spec.md#pixel-grid Reports an upscaled grid with its snap command, off-grid pixels as a warning, and no grid as a note.
- * @evidenceReview docs/spec.md#pixel-grid #3d11372 Checked this code against the section line by line and ran detectsPixelGrid green with pnpm test.
+ * @evidenceReview docs/spec.md#pixel-grid #70f3d39 Checked this code against the section line by line and ran detectsPixelGrid green with pnpm test.
  */
 export function pixelGridFindings(grid: PixelGrid): Finding[] {
   const findings: Finding[] = [];
@@ -191,6 +193,14 @@ function fitAxis(edges: readonly number[], length: number): PixelGridAxis {
   };
   // Every cell needs room to repeat a few times.
   const largest = Math.min(maximumScale, length / 3);
+  // A whole-number upscale puts every boundary exactly on its grid; prefer
+  // the largest such period over a fractional one that only fits loosely.
+  for (let period = Math.floor(largest); period >= minimumScale; period -= 1) {
+    const { fit, phase } = agreement(period);
+    if (fit >= exactFit) {
+      return { scale: period, offset: phase * period, edges: edges.length, fit };
+    }
+  }
   for (let period = largest; period >= minimumScale; period -= scaleStep) {
     if (agreement(period).fit < minimumFit) {
       continue;

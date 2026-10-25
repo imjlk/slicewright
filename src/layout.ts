@@ -1,3 +1,5 @@
+import typia from 'typia';
+
 import type { TileAxes } from './inspect.js';
 import type { SliceInsets } from './slices.js';
 
@@ -190,4 +192,25 @@ export function contentLimits(layout: SliceLayout): SliceInsets {
   const [left, right] = ends(layout.x);
   const [top, bottom] = ends(layout.y);
   return { left, right, top, bottom };
+}
+
+/**
+ * Reads a layout from parsed JSON: a report with a `layout` field, such as
+ * the one normalize prints, or the layout itself. Validated with typia, so
+ * every axis and any content padding is complete.
+ */
+export function readLayoutJson(json: unknown): SliceLayout {
+  const layout =
+    json !== null && typeof json === 'object' && 'layout' in json
+      ? (json as { readonly layout: unknown }).layout
+      : json;
+  const result = typia.validate<SliceLayout>(layout);
+  if (!result.success) {
+    const problems = result.errors
+      .slice(0, 3)
+      .map((error) => `${error.path} should be ${error.expected}`)
+      .join('; ');
+    throw new RangeError(`No valid layout (pass the normalize report or its layout): ${problems}.`);
+  }
+  return result.data;
 }

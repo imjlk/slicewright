@@ -78,7 +78,9 @@ every command exits 2 on bad input. `--help` works on each command.
    `preview`, and `export` of that image, or they detect a nine-slice again), `--mode three-vertical` for vertical-only
    art (scroll bar tracks), `--tile x` when an edge should repeat, and
    `--regions multi` when fixed detail sits in the middle of an edge (a crest
-   on a title plate). Pass `--padding l,r,t,b` when the detected content
+   on a title plate). A multi-region `normalize --keep` texture is too small
+   to re-detect: save the normalize JSON and pass it to `inspect`, `preview`,
+   or `export` with `--layout report.json`. Pass `--padding l,r,t,b` when the detected content
    padding (where text fits inside the frame) is wrong.
 6. **Look at the preview.** `slicewright preview ui/panel.png --out
    sheet.png`, then open `sheet.png`. Cells, in order: flexible segments

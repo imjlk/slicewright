@@ -49,7 +49,7 @@ function soften(raster: Raster): Raster {
 
 /**
  * @evidence docs/spec.md#pixel-grid Detects whole and fractional upscales, snaps them back exactly, flags blurred art as off the grid, reports only when inspection asks, and snaps before a nearest resize in normalization.
- * @evidenceReview docs/spec.md#pixel-grid #3d11372 Checked this test against the section line by line and ran it green with pnpm test.
+ * @evidenceReview docs/spec.md#pixel-grid #70f3d39 Checked this test against the section line by line and ran it green with pnpm test.
  */
 export function detectsPixelGrid(): void {
   const source = art(16, 12);
@@ -68,6 +68,24 @@ export function detectsPixelGrid(): void {
     const codes = pixelGridFindings(grid).map((finding) => finding.code);
     strictEqual(codes.join(), 'pixel.upscaled');
   }
+
+  // Sparse art, few boundaries: a whole 6x upscale must not read as ~6.3x.
+  const framed = createRaster(24, 16);
+  for (let y = 0; y < 16; y += 1) {
+    for (let x = 0; x < 24; x += 1) {
+      const corner = (x === 0 || x === 23) && (y === 0 || y === 15);
+      const inner = x >= 2 && x <= 21 && y >= 2 && y <= 13;
+      const dot = (x === 2 || x === 21) && (y === 2 || y === 13);
+      if (!corner) {
+        const color = dot ? [255, 255, 255, 255] : inner ? [90, 160, 90, 255] : [20, 20, 40, 255];
+        framed.data.set(color, pixelOffset(framed, x, y));
+      }
+    }
+  }
+  const sixfold = detectPixelGrid(resizeRaster(framed, 144, 96, 'nearest'));
+  strictEqual(sixfold.x.scale, 6);
+  strictEqual(sixfold.y.scale, 6);
+  strictEqual(`${sixfold.native.width}x${sixfold.native.height}`, '24x16');
 
   const native = detectPixelGrid(source);
   strictEqual(native.x.scale, 1);
