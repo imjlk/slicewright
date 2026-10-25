@@ -533,6 +533,23 @@ its exit status is that of the last build: a failed build exits 1, and a bad
 manifest or a build error exits 2. A symlinked input is
 watched both where the link is and where it points.
 
+## Build groups
+
+A build manifest can name groups of pieces that are states of one element
+(normal, hover, pressed). Each group has a unique name and at least two piece
+names; every name must be a piece, a piece belongs to at most one group, and a
+grouped piece gives neither insets nor padding nor multi regions, since states
+are compared by detected single-region geometry. After every piece is
+normalized, and before anything is written, each group's normalized images
+are compared as states (see Set comparison) with the group's slack (1 px by
+default) and the first member's matching settings. With `sharedInsets`, a
+group whose comparison passed normalizes each member again from its source
+with the shared insets given, and that result is what is written and packed;
+a member that then has an error finding adds a `build.group-shared-insets`
+error. The report lists each group's pieces, shared insets, whether they were
+applied, and findings. A group that fails fails the build, and nothing is
+packed, as when a piece fails.
+
 ## Command-line arguments
 
 A number option takes a negative value written either as `--tolerance=-1` or
