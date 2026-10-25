@@ -10,7 +10,7 @@ import {
 
 /**
  * @evidence docs/spec.md#prompt-corrections Checks the report shape, build pieces, axis wording, deduplication, ignored info and export codes, and the appended prompt.
- * @evidenceReview docs/spec.md#prompt-corrections #0ff6b1c Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#prompt-corrections #2abf40a Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function correctsPrompts(): void {
   const report = readFindingsReport({
@@ -57,7 +57,22 @@ export function correctsPrompts(): void {
   strictEqual(promptCorrections(readFindingsReport(build, 'b')).length, 0);
   throws(() => readFindingsReport(build), /a, b/);
   throws(() => readFindingsReport(build, 'c'), /No piece named c/);
-  throws(() => readFindingsReport(report, 'a'), /only from a build report/);
+  throws(() => readFindingsReport(report, 'a'), /No piece named a/);
+
+  const compare = {
+    ok: false,
+    findings: [{ code: 'compare.size', severity: 'error' }],
+    pieces: [
+      { name: 'a', findings: [{ code: 'noise.high', severity: 'warning' }] },
+      { name: 'b', findings: [] },
+    ],
+  };
+  strictEqual(promptCorrections(readFindingsReport(compare)).length, 1);
+  strictEqual(promptCorrections(readFindingsReport(compare, 'a')).length, 2);
+  deepStrictEqual(
+    promptCorrections({ findings: [{ code: 'constructor', severity: 'warning' }] }),
+    [],
+  );
 }
 
 void test('prompt corrections', correctsPrompts);

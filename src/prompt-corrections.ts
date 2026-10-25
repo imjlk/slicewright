@@ -63,9 +63,23 @@ interface PiecesReport {
  * piece is picked by name (or is its only piece).
  *
  * @evidence docs/spec.md#prompt-corrections Accepts any report with findings, or one piece of a build report, checked with typia.
- * @evidenceReview docs/spec.md#prompt-corrections #0ff6b1c Checked this code against the section line by line and ran correctsPrompts green with pnpm test.
+ * @evidenceReview docs/spec.md#prompt-corrections #2abf40a Checked this code against the section line by line and ran correctsPrompts green with pnpm test.
  */
 export function readFindingsReport(json: unknown, piece?: string): FindingsReport {
+  // A compare report also lists pieces, but its own findings come first and
+  // hold the set-wide codes, so only a report without them is a build report.
+  if (typia.is<FindingsReport>(json)) {
+    if (piece === undefined) {
+      return json;
+    }
+    const picked = typia.is<PiecesReport>(json)
+      ? json.pieces.find((item) => item.name === piece)
+      : undefined;
+    if (picked === undefined) {
+      throw new RangeError(`No piece named ${piece} in the report.`);
+    }
+    return { findings: [...json.findings, ...picked.findings] };
+  }
   if (typia.is<PiecesReport>(json)) {
     const names = json.pieces.map((item) => item.name);
     const picked =
@@ -80,7 +94,7 @@ export function readFindingsReport(json: unknown, piece?: string): FindingsRepor
     return picked;
   }
   if (piece !== undefined) {
-    throw new RangeError('A piece is picked only from a build report.');
+    throw new RangeError('A piece is picked only from a build or compare report.');
   }
   return typia.assert<FindingsReport>(json);
 }
@@ -90,7 +104,7 @@ export function readFindingsReport(json: unknown, piece?: string): FindingsRepor
  * finding order; info findings and codes about slicing or export add none.
  *
  * @evidence docs/spec.md#prompt-corrections Maps warnings and errors to correction lines by code, axis-aware, deduplicated, ignoring info and unmapped codes.
- * @evidenceReview docs/spec.md#prompt-corrections #0ff6b1c Checked this code against the section line by line and ran correctsPrompts green with pnpm test.
+ * @evidenceReview docs/spec.md#prompt-corrections #2abf40a Checked this code against the section line by line and ran correctsPrompts green with pnpm test.
  */
 export function promptCorrections(report: FindingsReport): string[] {
   const lines: string[] = [];
@@ -100,7 +114,7 @@ export function promptCorrections(report: FindingsReport): string[] {
     }
     const axis = /\.(x|y)\./.exec(finding.code)?.[1];
     const key = axis === undefined ? finding.code : finding.code.replace(`.${axis}.`, '.axis.');
-    const template = corrections[key];
+    const template = Object.hasOwn(corrections, key) ? corrections[key] : undefined;
     if (template === undefined) {
       continue;
     }
@@ -119,7 +133,7 @@ export function promptCorrections(report: FindingsReport): string[] {
  * Appends the corrections to a plan's prompt and lists them.
  *
  * @evidence docs/spec.md#prompt-corrections Appends the corrections after the prompt under one heading line and lists them in the plan.
- * @evidenceReview docs/spec.md#prompt-corrections #0ff6b1c Checked this code against the section line by line and ran correctsPrompts green with pnpm test.
+ * @evidenceReview docs/spec.md#prompt-corrections #2abf40a Checked this code against the section line by line and ran correctsPrompts green with pnpm test.
  */
 export function correctPromptPlan(
   plan: PromptPlan,
