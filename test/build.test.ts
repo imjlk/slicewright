@@ -269,7 +269,7 @@ export function buildsManifests(): void {
 
 /**
  * @evidence docs/spec.md#build-groups Validates group membership, compares grouped states after normalizing, applies shared insets, and fails the build without packing on a mismatch.
- * @evidenceReview docs/spec.md#build-groups #e654403 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#build-groups #7f1c861 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function buildsGroups(): void {
   const dir = mkdtempSync(join(tmpdir(), 'slicewright-build-groups-'));
@@ -306,6 +306,21 @@ export function buildsGroups(): void {
     strictEqual(mismatch.pack, null);
     strictEqual(mismatch.groups[0]?.ok, false);
     ok(mismatch.groups[0]?.findings.some((finding) => finding.code === 'compare.size'));
+
+    const layout = runBuild(
+      readBuildManifest({
+        out: 'out3/ui.png',
+        pieces: [
+          { input: 'normal.png', mode: 'nine' },
+          { input: 'hover.png', mode: 'three' },
+        ],
+        groups: [{ name: 'button', pieces: ['normal', 'hover'] }],
+      }),
+      dir,
+      dir,
+    );
+    strictEqual(layout.ok, false);
+    ok(layout.groups[0]?.findings.some((finding) => finding.code === 'build.group-layout'));
 
     const manifest = (groups: unknown, extra: object = {}): unknown => ({
       out: 'out3/ui.png',

@@ -403,11 +403,13 @@ function normalizePiece(
   piece: BuildPiece,
   source: Raster,
   insets?: SliceInsets,
+  tile?: { readonly x: boolean; readonly y: boolean },
 ): NormalizeResult {
   return normalizeRaster(source, {
     inspect: {
       ...pieceInspectOptions(piece),
       ...(insets === undefined ? {} : { insets }),
+      ...(tile === undefined ? {} : { tile: { x: tile.x, y: tile.y } }),
     },
     crop: piece.crop !== false,
     filter: piece.filter ?? 'area',
@@ -425,7 +427,7 @@ function normalizePiece(
  * the comparison or, once applied, of a piece normalized again.
  *
  * @evidence docs/spec.md#build-groups Compares each group's normalized states, fails on a mismatch, and applies the shared insets by normalizing again.
- * @evidenceReview docs/spec.md#build-groups #e654403 Checked this code against the section line by line and ran buildsGroups green with pnpm test.
+ * @evidenceReview docs/spec.md#build-groups #7f1c861 Checked this code against the section line by line and ran buildsGroups green with pnpm test.
  */
 export function checkGroups(
   manifest: BuildManifest,
@@ -454,11 +456,27 @@ export function checkGroups(
     );
     const findings: Finding[] = [...compared.findings];
     let ok = compared.ok;
+    const layouts = members.map((member) => ({
+      piece: member.name,
+      mode: member.result.report.mode,
+      tile: member.result.report.tile,
+    }));
+    const layoutKey = (layout: (typeof layouts)[number]): string =>
+      `${layout.mode}:${layout.tile.x},${layout.tile.y}`;
+    if (new Set(layouts.map(layoutKey)).size > 1) {
+      ok = false;
+      findings.push({
+        code: 'build.group-layout',
+        severity: 'error',
+        message: `Pieces of group "${group.name}" export different slice modes or tile axes.`,
+        details: { group: group.name, layouts },
+      });
+    }
     const shared = compared.sharedInsets;
     const applied = ok && group.sharedInsets === true && shared !== null;
     if (applied) {
       for (const member of members) {
-        const again = normalizePiece(member.piece, member.source, shared);
+        const again = normalizePiece(member.piece, member.source, shared, member.result.report.tile);
         results[member.index] = again;
         if (!again.report.ok) {
           ok = false;
@@ -469,6 +487,19 @@ export function checkGroups(
             details: { piece: member.name, group: group.name },
           });
         }
+      }
+      const sizes = members.map((member) => {
+        const raster = results[member.index]?.raster;
+        return { piece: member.name, width: raster?.width ?? 0, height: raster?.height ?? 0 };
+      });
+      if (new Set(sizes.map((size) => `${size.width}x${size.height}`)).size > 1) {
+        ok = false;
+        findings.push({
+          code: 'build.group-size',
+          severity: 'error',
+          message: `Pieces of group "${group.name}" end up different sizes with the shared insets.`,
+          details: { group: group.name, sizes },
+        });
       }
     }
     return {
