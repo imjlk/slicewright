@@ -31,6 +31,7 @@ import {
   type SliceInsets,
   type SliceMode,
 } from './slices.js';
+import { detectPixelGrid, pixelGridFindings } from './pixel-grid.js';
 
 export type Severity = 'error' | 'warning' | 'info';
 
@@ -57,6 +58,8 @@ export interface InspectOptions extends MatchOptions {
   readonly noise: 'auto' | 'off';
   /** Caller-supplied content padding; omitted means detect it. */
   readonly contentPadding?: SliceInsets;
+  /** Look for the grid of upscaled pixel art. */
+  readonly pixelArt?: boolean;
 }
 
 /** Matching settings per axis; noise is measured separately along each. */
@@ -140,6 +143,9 @@ export function inspectRaster(
     findings.push(...marginFindings(raster, bounds));
     findings.push(...chromaSpillFindings(raster));
     findings.push(...interiorAlphaFindings(raster, bounds));
+    if (options.pixelArt === true) {
+      findings.push(...pixelGridFindings(detectPixelGrid(raster, bounds)));
+    }
   }
 
   const matching = noiseAdjusted(raster, bounds, options, findings);
@@ -762,7 +768,11 @@ export function interiorAlphaFindings(raster: Raster, bounds: Rect): Finding[] {
       code: 'alpha.interior',
       severity: 'warning',
       message: `${Math.round((partial / total) * 100)}% of the interior is partly transparent. A deliberate glass fill is fine, but generators that fake alpha leave holes like this; check the preview, or regenerate on a chroma key and run slicewright key.`,
-      details: { partial, total },
+      details: {
+        partial,
+        total,
+        region: { x: x0, y: y0, width: x1 - x0, height: y1 - y0 },
+      },
     },
   ];
 }
