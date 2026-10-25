@@ -6,10 +6,15 @@ import { buildInputs, runBuild, type BuildManifest } from './build.js';
 /** How the last build before the watch stopped went: passed, failed its findings, or errored. */
 export type WatchStatus = 'ok' | 'failed' | 'error';
 
+/** One run of a watched command: how it went, and the line to print. */
+export interface WatchRun {
+  readonly status: Exclude<WatchStatus, 'error'>;
+  readonly value: unknown;
+}
+
 /**
  * Builds, then builds again whenever the manifest or a piece's input changes,
- * printing one JSON line per build, until interrupted. Directories are watched
- * rather than files, so an editor that replaces a file on save still counts.
+ * printing one JSON line per build, until interrupted.
  */
 export function watchBuild(
   path: string,
@@ -17,12 +22,53 @@ export function watchBuild(
   load: (path: string) => BuildManifest,
   line: (value: unknown) => void,
 ): Promise<WatchStatus> {
+  return watchRuns(
+    [path],
+    { manifest: path },
+    (record) => {
+      const manifest = load(path);
+      record(buildInputs(manifest, path));
+      const report = runBuild(manifest, baseDir, process.cwd(), [path]);
+      return {
+        status: report.ok ? 'ok' : 'failed',
+        value: { manifest: path, ...report },
+      };
+    },
+    line,
+  );
+}
+
+/**
+ * Runs a command, then again whenever a file it read changes, printing one
+ * JSON line per run, until interrupted. `run` names the files it reads with
+ * `record` before reading them, so a change while it runs starts another run
+ * and a run that throws still watches them (the initial files until it first
+ * records); a throw prints
+ * `label` with `ok: false` and the error. Directories are watched rather than
+ * files, so an editor that replaces a file on save still counts.
+ *
+ * @evidence docs/spec.md#watching Runs again when any input changes, keeps watching after a failed or erroring run, and ends with the last run's status.
+ * @evidenceReview docs/spec.md#watching #2b98b4b Read the section against this function and ran watchesInputs green with pnpm test.
+ */
+export function watchRuns(
+  initial: readonly string[],
+  label: Readonly<Record<string, unknown>>,
+  run: (record: (inputs: readonly string[]) => void) => WatchRun,
+  line: (value: unknown) => void,
+  /** Stops the watch like an interrupt; for tests and embedding. */
+  signal?: AbortSignal,
+): Promise<WatchStatus> {
   const watchers = new Map<string, FSWatcher>();
-  let watched = new Set<string>([resolve(path)]);
+  let watched = new Set<string>(initial.map((file) => resolve(file)));
   // Modification times at the last build, to tell a real change from an unnamed event.
   let seen = new Map<string, number>();
   let timer: NodeJS.Timeout | undefined;
   let status: WatchStatus = 'ok';
+  // Set once stopped, so a run that aborts from inside neither re-arms nor reschedules.
+  let stopped = false;
+  // While a run is in progress, an abort from inside it resolves only once its status is recorded.
+  let running = false;
+  let finish: ((value: WatchStatus) => void) | undefined;
   const modified = (file: string): number => {
     try {
       return statSync(file).mtimeMs;
@@ -31,26 +77,32 @@ export function watchBuild(
     }
   };
   const schedule = (): void => {
+    if (stopped) {
+      return;
+    }
     clearTimeout(timer);
-    // Editors write in bursts; build once they settle.
+    // Editors write in bursts; run once they settle.
     timer = setTimeout(rebuild, 100);
   };
   const rebuild = (): void => {
-    try {
-      const manifest = load(path);
-      watched = watchTargets(buildInputs(manifest, path));
+    const record = (inputs: readonly string[]): void => {
+      watched = watchTargets(inputs.map((file) => resolve(file)));
       seen = new Map([...watched].map((file) => [file, modified(file)]));
-      const report = runBuild(manifest, baseDir, process.cwd(), [path]);
-      status = report.ok ? 'ok' : 'failed';
-      line({ manifest: path, ...report });
+    };
+    running = true;
+    try {
+      const result = run(record);
+      status = result.status;
+      line(result.value);
     } catch (error) {
       status = 'error';
       seen = new Map([...watched].map((file) => [file, modified(file)]));
-      line({
-        manifest: path,
-        ok: false,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      line({ ...label, ok: false, error: error instanceof Error ? error.message : String(error) });
+    }
+    running = false;
+    if (stopped) {
+      finish?.(status);
+      return;
     }
     // A missing directory is watched through its nearest existing ancestor, for
     // the one entry on the way down, until it exists.
@@ -67,6 +119,9 @@ export function watchBuild(
     for (const [directory, watcher] of watchers) {
       watcher.close();
       watchers.delete(directory);
+    }
+    if (stopped) {
+      return;
     }
     for (const [directory, entries] of targets) {
       const identity = inode(directory);
@@ -98,13 +153,25 @@ export function watchBuild(
   };
   rebuild();
   return new Promise((done) => {
-    process.once('SIGINT', () => {
+    const stop = (): void => {
+      stopped = true;
+      process.off('SIGINT', stop);
+      signal?.removeEventListener('abort', stop);
       clearTimeout(timer);
       for (const watcher of watchers.values()) {
         watcher.close();
       }
-      done(status);
-    });
+      if (running) {
+        finish = done;
+      } else {
+        done(status);
+      }
+    };
+    process.once('SIGINT', stop);
+    signal?.addEventListener('abort', stop, { once: true });
+    if (signal?.aborted === true) {
+      stop();
+    }
   });
 }
 

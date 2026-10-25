@@ -579,6 +579,24 @@ watched both where the link is and where it points, a dangling one (a link at
 any component of its path) where it will point, and a watched directory replaced as a whole rebuilds and is
 watched anew.
 
+## Watching
+
+Build, inspect, and preview can watch their inputs: they run once, then again
+whenever a file the run read changes, printing one JSON line per run, until
+interrupted. A run names its inputs before reading them (a build its manifest
+and every piece's input, inspect and preview the image), so a change during
+the run starts another; one that fails before naming them keeps watching the
+files of the run before, or the command's own input at first. A run that
+throws prints the command's input with `ok: false` and the error, and the
+watch goes on. Inputs are watched as for builds (see Build manifest): through
+their directories, missing directories through the nearest existing ancestor,
+symlinks where they are and where they point, and a replaced directory anew;
+an event that names no file runs again only when a watched file's
+modification time changed, and changes settle for 100 ms first. When the
+watch stops, its exit status is that of the last run: 1 when inspect or build
+failed its findings, 2 when the run threw. A preview writes its sheet whatever
+the findings, so only an error fails it.
+
 ## Build groups
 
 A build manifest can name groups of pieces that are states of one element
