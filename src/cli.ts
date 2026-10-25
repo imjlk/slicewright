@@ -20,7 +20,7 @@ import { outlineThickness } from './outline.js';
 import type { SliceLayout } from './layout.js';
 import { buildPack } from './pack-files.js';
 import { loadBuildManifest, runBuild, type BuildManifest } from './build.js';
-import { watchBuild } from './watch.js';
+import { watchBuild, watchRuns, type WatchRun, type WatchStatus } from './watch.js';
 import { defaultPackOptions } from './pack.js';
 import { inspectAtlas } from './phaser.js';
 import { inspectAsepriteSlices, isAsepriteSheet } from './aseprite.js';
@@ -145,12 +145,27 @@ const prompt = define({
 const inspect = define({
   name: 'inspect',
   description: 'Detect or check slice insets and report what breaks when stretched',
-  args: { input: image, ...sliceArgs },
-  run: (ctx) => {
-    const raster = readPng(ctx.values.input);
-    const report = inspectRaster(raster, inspectOptions(ctx.values, raster));
-    print({ image: ctx.values.input, ...report });
-    failOnErrors(report.ok);
+  args: {
+    input: image,
+    watch: {
+      type: 'boolean',
+      description: 'Inspect again when the image changes; prints one JSON line per run',
+    },
+    ...sliceArgs,
+  },
+  run: async (ctx) => {
+    const once = (): WatchRun => {
+      const raster = readPng(ctx.values.input);
+      const report = inspectRaster(raster, inspectOptions(ctx.values, raster));
+      return { status: report.ok ? 'ok' : 'failed', value: { image: ctx.values.input, ...report } };
+    };
+    if (ctx.values.watch !== true) {
+      const result = once();
+      print(result.value);
+      failOnErrors(result.status === 'ok');
+      return;
+    }
+    await watchImage(ctx.values.input, once);
   },
 });
 
@@ -244,21 +259,36 @@ const preview = define({
       default: defaultPreviewMaxWidth,
       description: 'Wrap cells to a new row past this sheet width',
     },
+    watch: {
+      type: 'boolean',
+      description: 'Render again when the image changes; prints one JSON line per run',
+    },
     ...sliceArgs,
   },
-  run: (ctx) => {
-    const raster = readPng(ctx.values.input);
-    const settings = inspectOptions(ctx.values, raster);
+  run: async (ctx) => {
     const options = previewOptions(ctx.values);
-    const report = inspectRaster(raster, settings);
-    const sheet = renderPreviewSheet(raster, report.layout, options);
-    writeFileSync(ctx.values.out, encodePng(sheet.raster));
-    print({
-      image: ctx.values.input,
-      sheet: ctx.values.out,
-      cells: sheet.cells,
-      ...summary(report),
-    });
+    const once = (): WatchRun => {
+      const raster = readPng(ctx.values.input);
+      const settings = inspectOptions(ctx.values, raster);
+      const report = inspectRaster(raster, settings);
+      const sheet = renderPreviewSheet(raster, report.layout, options);
+      writeFileSync(ctx.values.out, encodePng(sheet.raster));
+      return {
+        // A preview is written whatever the findings, so only an error fails it.
+        status: 'ok',
+        value: {
+          image: ctx.values.input,
+          sheet: ctx.values.out,
+          cells: sheet.cells,
+          ...summary(report),
+        },
+      };
+    };
+    if (ctx.values.watch !== true) {
+      print(once().value);
+      return;
+    }
+    await watchImage(ctx.values.input, once);
   },
 });
 
@@ -626,14 +656,37 @@ const build = define({
     const status = await watchBuild(path, baseDir, buildManifest, (value) => {
       process.stdout.write(`${JSON.stringify(value)}\n`);
     });
-    // The last build's outcome is the exit status, as for a single build.
-    if (status === 'error') {
-      process.exitCode = usageFailed;
-    } else {
-      failOnErrors(status === 'ok');
-    }
+    exitWithWatchStatus(status);
   },
 });
+
+/** Watches one image, running `once` on every change, and exits as the last run did. */
+async function watchImage(input: string | undefined, once: () => WatchRun): Promise<void> {
+  if (input === undefined) {
+    throw new UsageError('Missing the image path.');
+  }
+  const status = await watchRuns(
+    [input],
+    { image: input },
+    (record) => {
+      record([input]);
+      return once();
+    },
+    (value) => {
+      process.stdout.write(`${JSON.stringify(value)}\n`);
+    },
+  );
+  exitWithWatchStatus(status);
+}
+
+function exitWithWatchStatus(status: WatchStatus): void {
+  // The last run's outcome is the exit status, as for a single run.
+  if (status === 'error') {
+    process.exitCode = usageFailed;
+  } else {
+    failOnErrors(status === 'ok');
+  }
+}
 
 /** Reads a manifest, reporting a bad one as a usage error. */
 function buildManifest(path: string): BuildManifest {
