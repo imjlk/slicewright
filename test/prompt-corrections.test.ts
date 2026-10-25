@@ -69,6 +69,7 @@ export function correctsPrompts(): void {
   };
   strictEqual(promptCorrections(readFindingsReport(compare)).length, 1);
   strictEqual(promptCorrections(readFindingsReport(compare, 'a')).length, 2);
+  throws(() => readFindingsReport({ ...compare, findings: [{ code: 'x' }] }, 'a'));
   deepStrictEqual(
     promptCorrections({ findings: [{ code: 'constructor', severity: 'warning' }] }),
     [],

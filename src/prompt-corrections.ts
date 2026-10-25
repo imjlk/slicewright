@@ -80,7 +80,8 @@ export function readFindingsReport(json: unknown, piece?: string): FindingsRepor
     }
     return { findings: [...json.findings, ...picked.findings] };
   }
-  if (typia.is<PiecesReport>(json)) {
+  const ownFindings = typeof json === 'object' && json !== null && Object.hasOwn(json, 'findings');
+  if (!ownFindings && typia.is<PiecesReport>(json)) {
     const names = json.pieces.map((item) => item.name);
     const picked =
       piece === undefined && json.pieces.length === 1
