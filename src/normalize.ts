@@ -24,6 +24,7 @@ import {
 import { renderLayout } from './render.js';
 import { resizeRaster, targetSize, type ResizeFilter } from './resize.js';
 import { insetsToScale9Borders, type SliceInsets } from './slices.js';
+import { detectPixelGrid, pixelGridFindings, snapToPixelGrid } from './pixel-grid.js';
 import { thinLineFindings } from './thin-lines.js';
 
 export interface NormalizeOptions {
@@ -36,10 +37,12 @@ export interface NormalizeOptions {
   readonly filter: ResizeFilter;
   /** Stretch-span length to keep per axis; undefined keeps the spans whole. */
   readonly keep?: number;
+  /** Snap upscaled pixel art to one pixel per grid cell, then resize with nearest sampling. */
+  readonly pixelArt?: boolean;
 }
 
 export interface NormalizeStep {
-  readonly step: 'crop' | 'resize' | 'rebuild';
+  readonly step: 'crop' | 'snap' | 'resize' | 'rebuild';
   readonly from: { readonly width: number; readonly height: number };
   readonly to: { readonly width: number; readonly height: number };
 }
@@ -84,6 +87,18 @@ export function normalizeRaster(
     raster = cropTo(raster, contentBounds(raster, cropAlpha), steps);
   }
 
+  let gridFindings: Finding[] = [];
+  if (options.pixelArt === true) {
+    const grid = detectPixelGrid(raster);
+    gridFindings = pixelGridFindings(grid);
+    if (grid.x.scale !== 1 || grid.y.scale !== 1) {
+      const snapped = snapToPixelGrid(raster, grid);
+      steps.push(step('snap', raster, snapped));
+      raster = snapped;
+    }
+  }
+  const filter = options.pixelArt === true ? 'nearest' : options.filter;
+
   const size = targetSize(raster.width, raster.height, options);
   let thinLines: Finding[] = [];
   if (size.width !== raster.width || size.height !== raster.height) {
@@ -91,9 +106,9 @@ export function normalizeRaster(
     thinLines = thinLineFindings(
       raster,
       { x: raster.width / size.width, y: raster.height / size.height },
-      options.filter,
+      filter,
     );
-    const resized = resizeRaster(raster, size.width, size.height, options.filter);
+    const resized = resizeRaster(raster, size.width, size.height, filter);
     steps.push(step('resize', raster, resized));
     raster = resized;
     if (options.crop) {
@@ -102,8 +117,12 @@ export function normalizeRaster(
     }
   }
 
-  const inspected = inspectRaster(raster, options.inspect);
-  const report = { ...inspected, findings: [...inspected.findings, ...thinLines] };
+  // The grid was judged before snapping; the snapped art has none left to find.
+  const inspected = inspectRaster(raster, { ...options.inspect, pixelArt: false });
+  const report = {
+    ...inspected,
+    findings: [...inspected.findings, ...gridFindings, ...thinLines],
+  };
   if (options.keep === undefined || !report.ok) {
     return { raster, steps, report };
   }

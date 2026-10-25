@@ -216,6 +216,31 @@ crop transparent margins (alpha of 8 or less), and then crops rows and columns
 that averaged to full transparency, as normalization does; cropping an image
 with nothing visible is an error.
 
+## Pixel grid
+
+Pixel art generated at a large size draws each art pixel as a block of image
+pixels, often a fractional or offset block. Along each axis, inside the
+content bounds, a boundary is a position where some pair of adjacent lines
+differs by more than 24 (premultiplied, alpha included), and a run of
+adjacent boundaries (one blurred edge) counts once, at its middle. With at
+least six boundaries, every period from the smaller of 32 and a third of the length
+down to 2 pixels is scored by how closely the boundaries' phases agree (the
+length of their mean unit vector). The largest period scoring at least 0.85
+is refined to its best score within the next half pixel, and a period within
+0.03 of a whole number becomes that number; the mean phase gives the offset.
+An axis with no such period has scale 1. A divisor of the true period also
+fits, which is why the largest one wins. When either axis has a grid, the
+share of visible pixels differing by more than 24 from the center pixels of
+their cell and its neighbors (a fractional grid rounds its boundaries) is the
+off-grid share. Inspection with pixel art reports
+`pixel.upscaled` with the scale, offset, fit, and native size, adds a
+`pixel.off-grid` warning when more than 10% of pixels are off the grid, and
+reports `pixel.no-grid` when there is none. Normalization with pixel art
+snaps the cropped image to one pixel per cell by sampling each cell's center
+(a `snap` step) before resizing, resizes with nearest sampling whatever the
+filter, reports the grid findings judged before the snap, and does not look
+for a grid again in the snapped image.
+
 ## Normalization
 
 Normalization prepares generated art for the engine in a fixed order: crop
@@ -317,7 +342,8 @@ findings or any piece's inspection is an error.
 A preview sheet renders the layout at several sizes on one PNG over a
 checkerboard: the source with flexible segments tinted, the source size, the
 minimum size, wide and tall (each only when that axis can resize), and doubled
-on the axes that can resize. Cells sit in rows that wrap before a cell would
+on the axes that can resize, then a diagnostics cell when findings mark a place
+(see Preview diagnostics). Cells sit in rows that wrap before a cell would
 cross the maximum width (2048 px by default); a cell wider than that sits alone
 in its row. The caller can choose cells, which keep this order, and zoom every
 cell by a whole number from 1 to 8, repeating each pixel, so small art stays
@@ -331,6 +357,19 @@ segment length divided by the source length rounded down and at least one, each
 scaled to fill the segment, as Phaser does; the renderer can round to the
 nearest count instead, to compare with CSS `round`. A size below the fixed segments is
 raised to them; a requested size must be a whole, non-negative number of pixels.
+
+## Preview diagnostics
+
+A preview sheet given a report's findings adds a diagnostics cell at the
+source size, after the other cells, when any finding marks a place: the source
+dimmed halfway toward gray (alpha at least 96 so empty areas show), with the
+first differing pair of columns or rows of a `stretch.<axis>.nonuniform`
+finding and the first and last line of the tiled span of a `tile.<axis>.seam`
+finding drawn in red, and the partly transparent pixels (alpha above 0 and
+below 224) inside the interior region of an `alpha.interior` finding, which
+the finding reports, in yellow, each marker drawn over the ones before it. Without such a finding the cell does not
+exist, so asking for it is an error. The preview command passes its
+inspection findings and lists each marker's code, kind, and count.
 
 ## Phaser scale9Borders
 
@@ -454,8 +493,10 @@ map into the sheet through the frame's position, any inner padding (the
 frame's border around its `spriteSourceSize`, which must be even), and, for a
 trimmed frame, its `spriteSourceSize`, which a trimmed frame must have
 (`aseprite.bounds-outside-frame` otherwise, as is an uneven or negative inner
-padding, or a `spriteSourceSize` that leaves the sprite canvas); every slice
-needs at least one key; a frame or `spriteSourceSize` that is not a whole-pixel
+padding, a `spriteSourceSize` that leaves the sprite canvas, or a `sourceSize`
+that is not a whole-pixel size with a positive width and height); every slice
+needs at least one key, and a slice with two keys at one frame is an
+`aseprite.key-duplicate` error; a frame or `spriteSourceSize` that is not a whole-pixel
 rectangle with a positive size, a frame that reaches past the image, or bounds
 that map outside the image, is
 an `atlas.frame-outside-image` error. Bounds that are not a whole-pixel rectangle with a positive
@@ -517,9 +558,11 @@ refuses to write over any piece's input or the manifest, and refuses two
 outputs at one path (a piece named like the pack in the pack's directory),
 counting its own stylesheets when it writes them and every file a piece's
 targets declare, such as a Godot `.tres`, or an output that is also a directory another output
-goes into or an existing directory, comparing real paths without letter case (a new file by its directory's real
-path), before it writes anything it can
-name ahead. The packed atlas is checked with the most lenient matching any
+goes into or an existing directory, or an output under an existing file (also through a symlinked parent),
+comparing real paths without letter case (a new file by its directory's real
+path, and a dangling symlink by where it points) and existing files by device
+and inode, so a hard link to an input is refused too, before it writes
+anything it can name ahead. The packed atlas is checked with the most lenient matching any
 piece used, since each piece already passed its own settings and packing
 copies its pixels exactly, and its stylesheet findings are reported. When a
 piece fails its inspection or export, nothing is packed and the build fails;
@@ -532,7 +575,32 @@ only when a watched file's modification time changed. A watched file that
 changed while a build ran starts another build. When the watch is interrupted,
 its exit status is that of the last build: a failed build exits 1, and a bad
 manifest or a build error exits 2. A symlinked input is
-watched both where the link is and where it points.
+watched both where the link is and where it points, a dangling one (a link at
+any component of its path) where it will point, and a watched directory replaced as a whole rebuilds and is
+watched anew.
+
+## Build groups
+
+A build manifest can name groups of pieces that are states of one element
+(normal, hover, pressed). Each group has a unique name and at least two piece
+names; every name must be a piece, a piece belongs to at most one group, and a
+grouped piece gives neither insets nor padding nor multi regions, since states
+are compared by detected single-region geometry. A member of a group with
+`sharedInsets` gives neither a scale nor a size, since the shared insets are
+measured on normalized pixels that a resize would shift per state. After every piece is
+normalized, and before anything is written, each group's normalized images
+are compared as states (see Set comparison) with the group's slack (1 px by
+default) and the first member's matching settings; members whose own
+normalization exported different slice modes or tile axes add a
+`build.group-layout` error, since their frames could not swap in one slice.
+With `sharedInsets`, a group whose comparison passed normalizes each member
+again from its source with the shared insets (each side the largest of the
+members' normalized insets, which `keep` leaves as verified) and the slice
+mode and tile axes it resolved the first time, and that result is what is written and packed; a member that
+then has an error finding adds a `build.group-shared-insets` error, and
+members that then differ in size add a `build.group-size` error. The report lists each group's pieces, shared insets, whether they were
+applied, and findings. A group that fails fails the build, and nothing is
+packed, as when a piece fails.
 
 ## Command-line arguments
 
@@ -563,3 +631,20 @@ with a straight, unoutlined cut across its top, so it can overlap the body's
 bottom outline; its follow-up steps match its outline to the body's instead of
 inspecting it. The plan lists what to avoid and
 the follow-up steps: remove the background, inspect, and preview.
+
+## Prompt corrections
+
+A prompt plan can start from an earlier report, the JSON that inspect,
+normalize, compare, or build printed for the last attempt. The report must be
+an object whose `findings` each carry a `code` and a `severity`, or a build
+report (pieces but no top-level findings), whose piece is named or is its
+only piece; anything else is a usage error. A report with top-level findings,
+such as a compare report, is read whole, and naming a piece adds that piece's
+findings after the report's own. Codes are looked up as the table's own
+entries, so a code such as `constructor` adds nothing. Each warning or error whose code has a correction adds one
+line, once, in finding order; an axis code (`.x.` or `.y.`) names the top and
+bottom edges and columns for x, the left and right edges and rows for y. Info
+findings and codes about how the art is sliced, packed, or exported, not how
+it is drawn, add nothing. The lines are appended to the prompt under
+"Corrections from the previous attempt:" and listed as `corrections`, empty
+when nothing applies.

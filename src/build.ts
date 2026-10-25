@@ -1,14 +1,23 @@
-import { mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  readFileSync,
+  readlinkSync,
+  realpathSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 
 import typia, { type tags } from 'typia';
 
 import { defaultInspectOptions, type Finding, type InspectOptions } from './inspect.js';
-import { normalizeRaster, type NormalizeStep } from './normalize.js';
+import { compareSet } from './compare.js';
+import { normalizeRaster, type NormalizeResult, type NormalizeStep } from './normalize.js';
 import { buildPack, type PackFilesResult } from './pack-files.js';
 import { defaultPackOptions } from './pack.js';
 import { decodePng, encodePng } from './png.js';
-import { parseInsets, type SliceInsets } from './slices.js';
+import type { Raster } from './raster.js';
+import { parseInsets, type SliceInsets, type SliceMode } from './slices.js';
 import { exportForTarget, findTarget, sliceTargets } from './targets/index.js';
 
 /** One piece of a build: a PNG and how to normalize it. */
@@ -40,6 +49,17 @@ export interface BuildPiece {
   readonly targets?: readonly string[];
 }
 
+/** States of one element that swap in place, checked together after normalizing. */
+export interface BuildGroup {
+  readonly name: string;
+  /** Piece names, at least two. */
+  readonly pieces: readonly string[] & tags.MinItems<2>;
+  /** Largest inset or padding difference between states, in pixels; 1 by default. */
+  readonly slack?: number & tags.Type<'uint32'>;
+  /** Normalize every state again with the group's shared insets. */
+  readonly sharedInsets?: boolean;
+}
+
 /** A `slicewright build` manifest: pieces normalized, exported, and packed into one atlas. */
 export interface BuildManifest {
   /** The packed PNG, relative to the manifest; its atlas goes next to it. */
@@ -53,6 +73,8 @@ export interface BuildManifest {
   readonly spacing?: number & tags.Type<'uint32'> & tags.Maximum<64>;
   readonly extrude?: number & tags.Type<'uint32'> & tags.Maximum<64>;
   readonly pieces: readonly BuildPiece[] & tags.MinItems<1>;
+  /** States compared after normalizing; a mismatch fails the build. */
+  readonly groups?: readonly BuildGroup[];
 }
 
 /** A manifest that parses but cannot be built; the CLI reports it as a usage error. */
@@ -78,9 +100,21 @@ export interface BuildPieceReport {
   }>;
 }
 
+export interface BuildGroupReport {
+  readonly name: string;
+  readonly ok: boolean;
+  readonly pieces: readonly string[];
+  /** The largest inset on each side, or null when the states do not agree. */
+  readonly sharedInsets: SliceInsets | null;
+  /** Whether the pieces were normalized again with the shared insets. */
+  readonly applied: boolean;
+  readonly findings: readonly Finding[];
+}
+
 export interface BuildReport {
   readonly ok: boolean;
   readonly pieces: readonly BuildPieceReport[];
+  readonly groups: readonly BuildGroupReport[];
   /** The pack, or null when a piece failed and nothing was packed. */
   readonly pack: {
     readonly ok: boolean;
@@ -106,7 +140,7 @@ export interface BuildReport {
  * scale or a size, and every target must exist.
  *
  * @evidence docs/spec.md#build-manifest Validates the manifest shape, unique plain piece names, size or scale, insets syntax, and known targets before anything is built.
- * @evidenceReview docs/spec.md#build-manifest #59f064c Checked this code against the section line by line and ran buildsManifests green with pnpm test.
+ * @evidenceReview docs/spec.md#build-manifest #81ef4f6 Checked this code against the section line by line and ran buildsManifests green with pnpm test.
  */
 export function readBuildManifest(json: unknown): BuildManifest {
   // Unknown keys are refused, so a misspelled setting is not silently ignored.
@@ -129,6 +163,47 @@ export function readBuildManifest(json: unknown): BuildManifest {
       throw new BuildManifestError(`Two pieces are named "${name}"; give one a name.`);
     }
     seen.add(name.toLowerCase());
+  }
+  const grouped = new Map<string, string>();
+  const groupNames = new Set<string>();
+  for (const group of manifest.groups ?? []) {
+    if (groupNames.has(group.name)) {
+      throw new BuildManifestError(`Two groups are named "${group.name}".`);
+    }
+    groupNames.add(group.name);
+    for (const member of group.pieces) {
+      const piece = manifest.pieces.find((item) => pieceName(item) === member);
+      if (piece === undefined) {
+        throw new BuildManifestError(`Group "${group.name}" names unknown piece "${member}".`);
+      }
+      const other = grouped.get(member);
+      if (other !== undefined) {
+        throw new BuildManifestError(
+          `Piece "${member}" is in group "${other}"${other === group.name ? ' twice' : ` and "${group.name}"`}; a piece belongs to one group.`,
+        );
+      }
+      grouped.set(member, group.name);
+      // States are compared by detected geometry on one stretch region per axis.
+      if (piece.insets !== undefined || piece.padding !== undefined) {
+        throw new BuildManifestError(
+          `Piece "${member}" in group "${group.name}" gives insets or padding; states are compared by detected ones.`,
+        );
+      }
+      // Shared insets are measured on each state's normalized pixels; a resize would shift them per state.
+      if (
+        group.sharedInsets === true &&
+        (piece.scale !== undefined || piece.width !== undefined || piece.height !== undefined)
+      ) {
+        throw new BuildManifestError(
+          `Piece "${member}" in group "${group.name}" gives a scale or a size; shared insets need unresized states.`,
+        );
+      }
+      if (piece.regions === 'multi') {
+        throw new BuildManifestError(
+          `Piece "${member}" in group "${group.name}" uses multi regions; groups compare single-region layouts.`,
+        );
+      }
+    }
   }
   manifest.pieces.forEach((piece, index) => {
     const label = names[index] ?? piece.input;
@@ -207,7 +282,20 @@ export function runBuild(
         .map((file) => join(piecesDir, file)),
     ]),
   ];
-  const overwrites = (path: string): boolean => inputs.has(realPath(path));
+  // A hard link shares its file with an input under another real path.
+  const inputFiles = [
+    ...manifest.pieces.map((piece) => resolve(baseDir, piece.input)),
+    ...protect.map((path) => resolve(path)),
+  ]
+    .map(fileIdentity)
+    .filter((identity) => identity !== undefined);
+  const overwrites = (path: string): boolean => {
+    if (inputs.has(realPath(path))) {
+      return true;
+    }
+    const identity = fileIdentity(path);
+    return identity !== undefined && inputFiles.includes(identity);
+  };
   const clash = planned.find(overwrites);
   if (clash !== undefined) {
     throw new BuildManifestError(`The build would write over its input ${clash}.`);
@@ -232,6 +320,15 @@ export function runBuild(
       );
     }
   }
+  // A write needs every existing parent to be a directory.
+  for (const path of planned) {
+    const blocked = fileAncestor(path);
+    if (blocked !== undefined) {
+      throw new BuildManifestError(
+        `The build output ${path} needs ${blocked} to be a directory, but it is a file.`,
+      );
+    }
+  }
   const write = (path: string, contents: string | Uint8Array): string => {
     if (overwrites(path)) {
       throw new BuildManifestError(`The build would write over its input ${path}.`);
@@ -242,18 +339,21 @@ export function runBuild(
     return path;
   };
 
-  const pieces = manifest.pieces.map((piece): BuildPieceReport => {
+  const loaded = manifest.pieces.map((piece) => {
+    const source = decodePng(readFileSync(resolve(baseDir, piece.input)));
+    return { source, result: normalizePiece(piece, source) };
+  });
+  const sources = loaded.map((item) => item.source);
+  const results = loaded.map((item) => item.result);
+  const groups = checkGroups(manifest, sources, results);
+
+  const pieces = manifest.pieces.map((piece, index): BuildPieceReport => {
     const name = pieceName(piece);
     const input = resolve(baseDir, piece.input);
-    const result = normalizeRaster(decodePng(readFileSync(input)), {
-      inspect: pieceInspectOptions(piece),
-      crop: piece.crop !== false,
-      filter: piece.filter ?? 'area',
-      ...(piece.width === undefined ? {} : { width: piece.width }),
-      ...(piece.height === undefined ? {} : { height: piece.height }),
-      ...(piece.scale === undefined ? {} : { scale: piece.scale }),
-      ...(piece.keep === undefined ? {} : { keep: piece.keep }),
-    });
+    const result = results[index];
+    if (result === undefined) {
+      throw new Error(`Piece "${name}" was not normalized.`);
+    }
     const image = write(join(piecesDir, `${name}.png`), encodePng(result.raster));
     const exportInput = {
       name,
@@ -301,8 +401,8 @@ export function runBuild(
     };
   });
 
-  if (!pieces.every((piece) => piece.ok)) {
-    return { ok: false, pieces, pack: null, files };
+  if (!pieces.every((piece) => piece.ok) || !groups.every((group) => group.ok)) {
+    return { ok: false, pieces, groups, pack: null, files };
   }
   const packed = buildPack({
     inputs: pieces.flatMap((piece) => (piece.atlas === undefined ? [] : [piece.atlas])),
@@ -318,6 +418,7 @@ export function runBuild(
   return {
     ok: packed.ok,
     pieces,
+    groups,
     pack: {
       ok: packed.ok,
       files: packFiles,
@@ -334,6 +435,139 @@ export function runBuild(
     },
     files,
   };
+}
+
+function normalizePiece(
+  piece: BuildPiece,
+  source: Raster,
+  insets?: SliceInsets,
+  tile?: { readonly x: boolean; readonly y: boolean },
+  mode?: SliceMode,
+): NormalizeResult {
+  return normalizeRaster(source, {
+    inspect: {
+      ...pieceInspectOptions(piece),
+      ...(insets === undefined ? {} : { insets }),
+      ...(tile === undefined ? {} : { tile: { x: tile.x, y: tile.y } }),
+      ...(mode === undefined || mode === 'multi' ? {} : { mode }),
+    },
+    crop: piece.crop !== false,
+    filter: piece.filter ?? 'area',
+    ...(piece.width === undefined ? {} : { width: piece.width }),
+    ...(piece.height === undefined ? {} : { height: piece.height }),
+    ...(piece.scale === undefined ? {} : { scale: piece.scale }),
+    ...(piece.keep === undefined ? {} : { keep: piece.keep }),
+  });
+}
+
+/**
+ * Compares each group's normalized pieces as states of one element, and with
+ * `sharedInsets` normalizes them again with the group's shared insets,
+ * replacing their results in place. A group fails on any error finding of
+ * the comparison or, once applied, of a piece normalized again.
+ *
+ * @evidence docs/spec.md#build-groups Compares each group's normalized states, fails on a mismatch, and applies the shared insets by normalizing again.
+ * @evidenceReview docs/spec.md#build-groups #5024de0 Checked this code against the section line by line and ran buildsGroups green with pnpm test.
+ */
+export function checkGroups(
+  manifest: BuildManifest,
+  sources: readonly Raster[],
+  results: NormalizeResult[],
+): BuildGroupReport[] {
+  return (manifest.groups ?? []).map((group) => {
+    const members = group.pieces.map((member) => {
+      const index = manifest.pieces.findIndex((piece) => pieceName(piece) === member);
+      const piece = manifest.pieces[index];
+      const result = results[index];
+      const source = sources[index];
+      if (piece === undefined || result === undefined || source === undefined) {
+        throw new BuildManifestError(`Group "${group.name}" names unknown piece "${member}".`);
+      }
+      return { index, piece, result, source, name: member };
+    });
+    const first = members[0]?.piece;
+    const compared = compareSet(
+      members.map((member) => ({ name: member.name, raster: member.result.raster })),
+      {
+        kind: 'states',
+        slack: group.slack ?? 1,
+        inspect: first === undefined ? defaultInspectOptions : pieceInspectOptions(first),
+      },
+    );
+    const findings: Finding[] = [...compared.findings];
+    let ok = compared.ok;
+    const layouts = members.map((member) => ({
+      piece: member.name,
+      mode: member.result.report.mode,
+      tile: member.result.report.tile,
+    }));
+    const layoutKey = (layout: (typeof layouts)[number]): string =>
+      `${layout.mode}:${layout.tile.x},${layout.tile.y}`;
+    if (new Set(layouts.map(layoutKey)).size > 1) {
+      ok = false;
+      findings.push({
+        code: 'build.group-layout',
+        severity: 'error',
+        message: `Pieces of group "${group.name}" export different slice modes or tile axes.`,
+        details: { group: group.name, layouts },
+      });
+    }
+    // Normalization keeps the geometry it verified even when `keep` shortens
+    // the stretch spans, so shared insets come from those reports rather than
+    // from detecting again on the shortened rasters.
+    const shared: SliceInsets | null =
+      compared.sharedInsets === null
+        ? null
+        : {
+            left: Math.max(...members.map((member) => member.result.report.insets.left)),
+            right: Math.max(...members.map((member) => member.result.report.insets.right)),
+            top: Math.max(...members.map((member) => member.result.report.insets.top)),
+            bottom: Math.max(...members.map((member) => member.result.report.insets.bottom)),
+          };
+    const applied = ok && group.sharedInsets === true && shared !== null;
+    if (applied) {
+      for (const member of members) {
+        const again = normalizePiece(
+          member.piece,
+          member.source,
+          shared,
+          member.result.report.tile,
+          member.result.report.mode,
+        );
+        results[member.index] = again;
+        if (!again.report.ok) {
+          ok = false;
+          findings.push({
+            code: 'build.group-shared-insets',
+            severity: 'error',
+            message: `Piece "${member.name}" has errors with the shared insets of group "${group.name}".`,
+            details: { piece: member.name, group: group.name },
+          });
+        }
+      }
+      const sizes = members.map((member) => {
+        const raster = results[member.index]?.raster;
+        return { piece: member.name, width: raster?.width ?? 0, height: raster?.height ?? 0 };
+      });
+      if (new Set(sizes.map((size) => `${size.width}x${size.height}`)).size > 1) {
+        ok = false;
+        findings.push({
+          code: 'build.group-size',
+          severity: 'error',
+          message: `Pieces of group "${group.name}" end up different sizes with the shared insets.`,
+          details: { group: group.name, sizes },
+        });
+      }
+    }
+    return {
+      name: group.name,
+      ok,
+      pieces: [...group.pieces],
+      sharedInsets: shared,
+      applied,
+      findings,
+    };
+  });
 }
 
 /**
@@ -371,7 +605,7 @@ function pieceInspectOptions(piece: BuildPiece): InspectOptions {
  * nearest existing ancestor resolved through symlinks, then the rest, so a new
  * file under a symlinked directory names the same file as through its target.
  */
-function realPath(path: string): string {
+function realPath(path: string, depth = 0): string {
   const absolute = resolve(path);
   let base = absolute;
   const rest: string[] = [];
@@ -379,11 +613,56 @@ function realPath(path: string): string {
     try {
       return join(realpathSync(base), ...rest).toLowerCase();
     } catch {
+      // A dangling symlink still decides where a write through it lands.
+      const link = depth < maximumLinks ? linkTarget(base) : undefined;
+      if (link !== undefined) {
+        return realPath(join(link, ...rest), depth + 1);
+      }
       rest.unshift(basename(base));
       base = dirname(base);
     }
   }
   return absolute.toLowerCase();
+}
+
+/** Symlinks followed before a path is taken as it is, as the system's own loop limit. */
+const maximumLinks = 40;
+
+/** Where a symlink points, resolved against its directory, or undefined when it is not one. */
+function linkTarget(path: string): string | undefined {
+  try {
+    return resolve(dirname(path), readlinkSync(path));
+  } catch {
+    return undefined;
+  }
+}
+
+/** Device and inode of an existing file, so hard links compare equal. */
+function fileIdentity(path: string): string | undefined {
+  try {
+    const stats = statSync(path, { bigint: true });
+    // Some file systems report no inode; then only real paths compare.
+    return stats.ino === 0n ? undefined : `${stats.dev}:${stats.ino}`;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The nearest existing parent of `path` when it is not a directory. */
+function fileAncestor(path: string): string | undefined {
+  let directory = dirname(resolve(path));
+  while (dirname(directory) !== directory) {
+    try {
+      return statSync(directory).isDirectory() ? undefined : directory;
+    } catch (error) {
+      // A link in the path that leads through a file blocks it as well.
+      if ((error as NodeJS.ErrnoException).code === 'ENOTDIR') {
+        return directory;
+      }
+      directory = dirname(directory);
+    }
+  }
+  return undefined;
 }
 
 function isDirectory(path: string): boolean {

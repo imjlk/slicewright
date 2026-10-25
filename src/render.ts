@@ -1,3 +1,5 @@
+import { diagnosticMarkers, renderDiagnostics, type DiagnosticMarker } from './diagnostics.js';
+import type { Finding } from './inspect.js';
 import { createRaster, pixelOffset, type Raster, type Rect } from './raster.js';
 import {
   flexibleSegments,
@@ -15,7 +17,15 @@ export interface RenderOptions {
 }
 
 /** The cells a preview sheet can show, in sheet order. */
-export const previewCellLabels = ['guides', 'source', 'min', 'wide', 'tall', 'double'] as const;
+export const previewCellLabels = [
+  'guides',
+  'source',
+  'min',
+  'wide',
+  'tall',
+  'double',
+  'diagnostics',
+] as const;
 export type PreviewCellLabel = (typeof previewCellLabels)[number];
 
 export interface PreviewCell extends Rect {
@@ -25,6 +35,8 @@ export interface PreviewCell extends Rect {
 export interface PreviewSheet {
   readonly raster: Raster;
   readonly cells: readonly PreviewCell[];
+  /** What the diagnostics cell marks; empty when it has nothing to show. */
+  readonly markers: readonly DiagnosticMarker[];
 }
 
 export interface PreviewOptions {
@@ -34,6 +46,8 @@ export interface PreviewOptions {
   readonly zoom?: number;
   /** Width at which cells wrap to a new row; a wider cell sits alone in its row. */
   readonly maxWidth?: number;
+  /** Findings whose locations the diagnostics cell marks. */
+  readonly findings?: readonly Finding[];
 }
 
 /** Default row width: wide enough for most art, narrow enough for image viewers. */
@@ -79,7 +93,7 @@ export function renderSlices(
  * flexible keeps its source length.
  *
  * @evidence docs/spec.md#preview-sheet Keeps fixed segments unscaled, shares the rest among flexible segments, and tiles whole tiles with nearest sampling.
- * @evidenceReview docs/spec.md#preview-sheet #9cff538 Checked this code against the section line by line and ran rendersSlicesAndPreviewSheets green with pnpm test.
+ * @evidenceReview docs/spec.md#preview-sheet #c9ed895 Checked this code against the section line by line and ran rendersSlicesAndPreviewSheets green with pnpm test.
  * @evidence docs/spec.md#slice-layouts Renders any number of fixed, stretched, and tiled segments per axis.
  * @evidenceReview docs/spec.md#slice-layouts #fc52f65 Checked this code against the section line by line and ran describesSliceLayouts green with pnpm test.
  */
@@ -123,7 +137,7 @@ export function renderLayout(
  * cell by a whole number with nearest sampling.
  *
  * @evidence docs/spec.md#preview-sheet Builds the guides, source, minimum, wide, tall, and doubled cells, lets the caller pick and zoom them, and wraps rows at the maximum width.
- * @evidenceReview docs/spec.md#preview-sheet #9cff538 Checked this code against the section line by line and ran rendersSlicesAndPreviewSheets green with pnpm test.
+ * @evidenceReview docs/spec.md#preview-sheet #c9ed895 Checked this code against the section line by line and ran rendersSlicesAndPreviewSheets green with pnpm test.
  */
 export function renderPreviewSheet(
   source: Raster,
@@ -166,11 +180,18 @@ export function renderPreviewSheet(
     resizesY ? cap(source.height * 2) : source.height,
   ]);
 
+  const markers = diagnosticMarkers(source, options.findings ?? []);
+  if (markers.length > 0) {
+    available.set('diagnostics', [source.width, source.height]);
+  }
+
   const requested = options.cells ?? previewCellLabels.filter((label) => available.has(label));
   const unavailable = requested.filter((label) => !available.has(label));
   if (unavailable.length > 0) {
-    const reasons = unavailable.map(
-      (label) => `${label} (the ${label === 'wide' ? 'width' : 'height'} does not resize)`,
+    const reasons = unavailable.map((label) =>
+      label === 'diagnostics'
+        ? 'diagnostics (no finding marks a place)'
+        : `${label} (the ${label === 'wide' ? 'width' : 'height'} does not resize)`,
     );
     throw new RangeError(`This layout has no ${reasons.join(' or ')} cell.`);
   }
@@ -215,10 +236,12 @@ export function renderPreviewSheet(
     const raster =
       cell.label === 'guides'
         ? outlineContent(tintSegments(source, layout), layout.content)
-        : renderLayout(source, layout, width, height);
+        : cell.label === 'diagnostics'
+          ? renderDiagnostics(source, markers)
+          : renderLayout(source, layout, width, height);
     composite(sheet, zoomRaster(raster, zoom), cell.x, cell.y);
   }
-  return { raster: sheet, cells };
+  return { raster: sheet, cells, markers };
 }
 
 /** Scales a raster up by a whole number, repeating each pixel. */
