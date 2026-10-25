@@ -147,6 +147,9 @@ export function watchRuns(
     };
     process.once('SIGINT', stop);
     signal?.addEventListener('abort', stop, { once: true });
+    if (signal?.aborted === true) {
+      stop();
+    }
   });
 }
 
