@@ -11,6 +11,7 @@ export * from './prompt.js';
 export * from './prompt-corrections.js';
 export * from './raster.js';
 export * from './render.js';
+export * from './diagnostics.js';
 export * from './resize.js';
 export * from './slices.js';
 export * from './layout.js';

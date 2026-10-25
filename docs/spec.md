@@ -341,7 +341,8 @@ findings or any piece's inspection is an error.
 A preview sheet renders the layout at several sizes on one PNG over a
 checkerboard: the source with flexible segments tinted, the source size, the
 minimum size, wide and tall (each only when that axis can resize), and doubled
-on the axes that can resize. Cells sit in rows that wrap before a cell would
+on the axes that can resize, then a diagnostics cell when findings mark a place
+(see Preview diagnostics). Cells sit in rows that wrap before a cell would
 cross the maximum width (2048 px by default); a cell wider than that sits alone
 in its row. The caller can choose cells, which keep this order, and zoom every
 cell by a whole number from 1 to 8, repeating each pixel, so small art stays
@@ -355,6 +356,19 @@ segment length divided by the source length rounded down and at least one, each
 scaled to fill the segment, as Phaser does; the renderer can round to the
 nearest count instead, to compare with CSS `round`. A size below the fixed segments is
 raised to them; a requested size must be a whole, non-negative number of pixels.
+
+## Preview diagnostics
+
+A preview sheet given a report's findings adds a diagnostics cell at the
+source size, after the other cells, when any finding marks a place: the source
+dimmed halfway toward gray (alpha at least 96 so empty areas show), with the
+first differing pair of columns or rows of a `stretch.<axis>.nonuniform`
+finding and the first and last line of the tiled span of a `tile.<axis>.seam`
+finding drawn in red, and the partly transparent pixels (alpha above 0 and
+below 224) inside the interior region of an `alpha.interior` finding, which
+the finding reports, in yellow, each marker drawn over the ones before it. Without such a finding the cell does not
+exist, so asking for it is an error. The preview command passes its
+inspection findings and lists each marker's code, kind, and count.
 
 ## Phaser scale9Borders
 
