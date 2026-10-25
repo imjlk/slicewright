@@ -1,4 +1,11 @@
-import { mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  readFileSync,
+  readlinkSync,
+  realpathSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 
 import typia, { type tags } from 'typia';
@@ -106,7 +113,7 @@ export interface BuildReport {
  * scale or a size, and every target must exist.
  *
  * @evidence docs/spec.md#build-manifest Validates the manifest shape, unique plain piece names, size or scale, insets syntax, and known targets before anything is built.
- * @evidenceReview docs/spec.md#build-manifest #59f064c Checked this code against the section line by line and ran buildsManifests green with pnpm test.
+ * @evidenceReview docs/spec.md#build-manifest #ab44746 Checked this code against the section line by line and ran buildsManifests green with pnpm test.
  */
 export function readBuildManifest(json: unknown): BuildManifest {
   // Unknown keys are refused, so a misspelled setting is not silently ignored.
@@ -207,7 +214,20 @@ export function runBuild(
         .map((file) => join(piecesDir, file)),
     ]),
   ];
-  const overwrites = (path: string): boolean => inputs.has(realPath(path));
+  // A hard link shares its file with an input under another real path.
+  const inputFiles = [
+    ...manifest.pieces.map((piece) => resolve(baseDir, piece.input)),
+    ...protect.map((path) => resolve(path)),
+  ]
+    .map(fileIdentity)
+    .filter((identity) => identity !== undefined);
+  const overwrites = (path: string): boolean => {
+    if (inputs.has(realPath(path))) {
+      return true;
+    }
+    const identity = fileIdentity(path);
+    return identity !== undefined && inputFiles.includes(identity);
+  };
   const clash = planned.find(overwrites);
   if (clash !== undefined) {
     throw new BuildManifestError(`The build would write over its input ${clash}.`);
@@ -229,6 +249,15 @@ export function runBuild(
     if (inside !== undefined || isDirectory(path)) {
       throw new BuildManifestError(
         `The build output ${path} is ${inside === undefined ? 'a directory' : 'also a directory of another output'}; pick another out or piecesDir.`,
+      );
+    }
+  }
+  // A write needs every existing parent to be a directory.
+  for (const path of planned) {
+    const blocked = fileAncestor(path);
+    if (blocked !== undefined) {
+      throw new BuildManifestError(
+        `The build output ${path} needs ${blocked} to be a directory, but it is a file.`,
       );
     }
   }
@@ -371,7 +400,7 @@ function pieceInspectOptions(piece: BuildPiece): InspectOptions {
  * nearest existing ancestor resolved through symlinks, then the rest, so a new
  * file under a symlinked directory names the same file as through its target.
  */
-function realPath(path: string): string {
+function realPath(path: string, depth = 0): string {
   const absolute = resolve(path);
   let base = absolute;
   const rest: string[] = [];
@@ -379,11 +408,52 @@ function realPath(path: string): string {
     try {
       return join(realpathSync(base), ...rest).toLowerCase();
     } catch {
+      // A dangling symlink still decides where a write through it lands.
+      const link = depth < maximumLinks ? linkTarget(base) : undefined;
+      if (link !== undefined) {
+        return realPath(join(link, ...rest), depth + 1);
+      }
       rest.unshift(basename(base));
       base = dirname(base);
     }
   }
   return absolute.toLowerCase();
+}
+
+/** Symlinks followed before a path is taken as it is, as the system's own loop limit. */
+const maximumLinks = 40;
+
+/** Where a symlink points, resolved against its directory, or undefined when it is not one. */
+function linkTarget(path: string): string | undefined {
+  try {
+    return resolve(dirname(path), readlinkSync(path));
+  } catch {
+    return undefined;
+  }
+}
+
+/** Device and inode of an existing file, so hard links compare equal. */
+function fileIdentity(path: string): string | undefined {
+  try {
+    const stats = statSync(path, { bigint: true });
+    // Some file systems report no inode; then only real paths compare.
+    return stats.ino === 0n ? undefined : `${stats.dev}:${stats.ino}`;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The nearest existing parent of `path` when it is not a directory. */
+function fileAncestor(path: string): string | undefined {
+  let directory = dirname(resolve(path));
+  while (dirname(directory) !== directory) {
+    try {
+      return statSync(directory).isDirectory() ? undefined : directory;
+    } catch {
+      directory = dirname(directory);
+    }
+  }
+  return undefined;
 }
 
 function isDirectory(path: string): boolean {
