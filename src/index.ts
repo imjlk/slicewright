@@ -8,6 +8,7 @@ export * from './phaser.js';
 export * from './aseprite.js';
 export * from './png.js';
 export * from './prompt.js';
+export * from './prompt-corrections.js';
 export * from './raster.js';
 export * from './render.js';
 export * from './diagnostics.js';

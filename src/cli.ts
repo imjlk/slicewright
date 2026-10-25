@@ -36,6 +36,7 @@ import {
 } from './render.js';
 import { resizeRaster, targetSize } from './resize.js';
 import { parseBorders, parseInsets, scale9BordersToInsets, type SliceInsets } from './slices.js';
+import { correctPromptPlan, promptCorrections, readFindingsReport } from './prompt-corrections.js';
 import { exportForTarget, findTarget, sliceTargets } from './targets/index.js';
 
 /** Exit codes: 0 ok, 1 error findings, 2 usage or input failure. */
@@ -91,6 +92,10 @@ const sliceArgs = {
     choices: ['x', 'y', 'xy'],
     description: 'Treat these axes as tiled instead of stretched',
   },
+  'pixel-art': {
+    type: 'boolean',
+    description: 'Find the grid of upscaled pixel art; normalize snaps to it and resizes nearest',
+  },
   ...matchArgs,
 } as const;
 
@@ -120,6 +125,7 @@ interface SliceValues {
   readonly tolerance: number;
   readonly 'outlier-ratio': number;
   readonly noise: string;
+  readonly 'pixel-art'?: boolean | undefined;
 }
 
 const prompt = define({
@@ -135,10 +141,32 @@ const prompt = define({
       description: 'Background the generator should paint',
     },
     'pixel-art': { type: 'boolean', description: 'Ask for crisp pixel art' },
+    from: {
+      type: 'string',
+      description: 'Report JSON of the last attempt; adds a correction for each finding',
+    },
+    piece: { type: 'string', description: 'With a build report for --from, the piece to correct' },
   },
   run: (ctx) => {
     const { kind, style, background } = ctx.values;
-    print(buildPromptPlan({ kind, style, background, pixelArt: ctx.values['pixel-art'] === true }));
+    const plan = buildPromptPlan({
+      kind,
+      style,
+      background,
+      pixelArt: ctx.values['pixel-art'] === true,
+    });
+    if (ctx.values.from === undefined) {
+      if (ctx.values.piece !== undefined) {
+        throw new UsageError('--piece picks a piece of the --from build report.');
+      }
+      print(plan);
+      return;
+    }
+    const report = readFindingsReport(
+      JSON.parse(readFileSync(ctx.values.from, 'utf8')),
+      ctx.values.piece,
+    );
+    print(correctPromptPlan(plan, promptCorrections(report)));
   },
 });
 
@@ -492,6 +520,7 @@ const normalize = define({
       filter: ctx.values.filter,
       ...sizeRequest(ctx.values),
       ...(ctx.values.keep === undefined ? {} : { keep: ctx.values.keep }),
+      pixelArt: ctx.values['pixel-art'] === true,
     });
     writeFileSync(out, encodePng(result.raster));
     let atlasOut: string | undefined;
@@ -856,6 +885,7 @@ function inspectOptions(values: SliceValues, raster: Raster | undefined): Inspec
     tile: { x: tile.includes('x'), y: tile.includes('y') },
     ...(insets === undefined ? {} : { insets }),
     ...(values.padding === undefined ? {} : { contentPadding: parseInsets(values.padding) }),
+    ...(values['pixel-art'] === true ? { pixelArt: true } : {}),
   };
 }
 
