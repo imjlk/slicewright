@@ -14,8 +14,14 @@ import {
   type Raster,
   type Rect,
 } from './raster.js';
-import { layoutFromInsets, minimumLayoutSize } from './layout.js';
-import { renderSlices } from './render.js';
+import {
+  layoutFromInsets,
+  minimumLayoutSize,
+  type AxisLayout,
+  type Segment,
+  type SliceLayout,
+} from './layout.js';
+import { renderLayout } from './render.js';
 import { resizeRaster, targetSize, type ResizeFilter } from './resize.js';
 import { insetsToScale9Borders, type SliceInsets } from './slices.js';
 import { thinLineFindings } from './thin-lines.js';
@@ -62,7 +68,7 @@ export const defaultNormalizeOptions: NormalizeOptions = {
  * uniform stretch span.
  *
  * @evidence docs/spec.md#normalization Orders crop, resize, inspection, and rebuild, and rebuilds only uniform axes.
- * @evidenceReview docs/spec.md#normalization #e2c2c11 Checked this code against the section line by line and ran normalizesGeneratedArt green with pnpm test.
+ * @evidenceReview docs/spec.md#normalization #ca5cb61 Checked this code against the section line by line and ran normalizesGeneratedArt green with pnpm test.
  */
 export function normalizeRaster(
   source: Raster,
@@ -106,7 +112,6 @@ export function normalizeRaster(
   const keepAxis = (axis: 'x' | 'y'): number | undefined => {
     if (
       report.tile[axis] ||
-      report.mode === 'multi' ||
       (axis === 'y' && report.mode === 'three') ||
       (axis === 'x' && report.mode === 'three-vertical') ||
       report.findings.some(
@@ -117,8 +122,8 @@ export function normalizeRaster(
       return undefined;
     }
     const keep = { x: undefined, y: undefined, [axis]: options.keep };
-    const candidate = rebuildSlices(raster, report.insets, keep);
-    const back = renderSlices(candidate.raster, candidate.insets, raster.width, raster.height);
+    const candidate = rebuildLayout(raster, report.layout, keep);
+    const back = renderLayout(candidate.raster, candidate.layout, raster.width, raster.height);
     const difference = rasterDifference(back, raster);
     // The exact tolerance, not the noise-raised one: cutting a span drops every
     // line it removes, so noise the matching forgave becomes lost texture.
@@ -133,7 +138,7 @@ export function normalizeRaster(
     });
     return undefined;
   };
-  const rebuilt = rebuildSlices(raster, report.insets, { x: keepAxis('x'), y: keepAxis('y') });
+  const rebuilt = rebuildLayout(raster, report.layout, { x: keepAxis('x'), y: keepAxis('y') });
   if (rebuilt.raster.width === raster.width && rebuilt.raster.height === raster.height) {
     return { raster, steps, report: { ...report, findings: [...report.findings, ...findings] } };
   }
@@ -148,6 +153,23 @@ export function normalizeRaster(
   // The layout was verified on the full image; re-detecting on the rebuilt one
   // would judge mostly-corner pixels against the full image's noise floor.
   const { width, height } = rebuilt.raster;
+  if (report.mode === 'multi') {
+    // Several spans per axis: the rebuilt layout is the only description of them.
+    return {
+      raster: rebuilt.raster,
+      steps,
+      report: {
+        ...report,
+        width,
+        height,
+        scale9Borders: insetsToScale9Borders(report.insets, width, height),
+        layout: rebuilt.layout,
+        minSize: minimumLayoutSize({ x: rebuilt.layout.x, y: rebuilt.layout.y }),
+        contentBounds: contentBounds(rebuilt.raster) ?? null,
+        findings: [...report.findings, ...findings],
+      },
+    };
+  }
   return {
     raster: rebuilt.raster,
     steps,
@@ -157,13 +179,13 @@ export function normalizeRaster(
       height,
       scale9Borders: insetsToScale9Borders(report.insets, width, height),
       layout: layoutFromInsets(report.insets, width, height, {
-        shape: report.mode === 'multi' ? 'nine' : report.mode,
+        shape: report.mode,
         tile: report.tile,
         ...(report.layout.content === undefined ? {} : { content: report.layout.content }),
       }),
       minSize: minimumLayoutSize(
         layoutFromInsets(report.insets, width, height, {
-          shape: report.mode === 'multi' ? 'nine' : report.mode,
+          shape: report.mode,
           tile: report.tile,
         }),
       ),
@@ -178,7 +200,7 @@ export function normalizeRaster(
  * Lossless when the span is uniform: every dropped line equals a kept one.
  *
  * @evidence docs/spec.md#normalization Copies the borders and the first kept lines of each span.
- * @evidenceReview docs/spec.md#normalization #e2c2c11 Checked this code against the section line by line and ran normalizesGeneratedArt green with pnpm test.
+ * @evidenceReview docs/spec.md#normalization #ca5cb61 Checked this code against the section line by line and ran normalizesGeneratedArt green with pnpm test.
  */
 export function rebuildSlices(
   raster: Raster,
@@ -195,6 +217,55 @@ export function rebuildSlices(
     });
   });
   return { raster: out, insets };
+}
+
+/**
+ * Keeps every fixed and tiled segment and the first `keep` lines of each
+ * stretch segment on an axis with a keep length, and returns the shifted
+ * layout. Lossless when each stretch segment is uniform.
+ *
+ * @evidence docs/spec.md#normalization Copies fixed segments and the first kept lines of every stretch segment, for any number of regions.
+ * @evidenceReview docs/spec.md#normalization #ca5cb61 Checked this code against the section line by line and ran normalizesGeneratedArt green with pnpm test.
+ */
+export function rebuildLayout(
+  raster: Raster,
+  layout: SliceLayout,
+  keep: { readonly x: number | undefined; readonly y: number | undefined },
+): { raster: Raster; layout: SliceLayout } {
+  const x = keptAxis(layout.x, keep.x);
+  const y = keptAxis(layout.y, keep.y);
+  const out = createRaster(x.lines.length, y.lines.length);
+  y.lines.forEach((sourceY, row) => {
+    x.lines.forEach((sourceX, column) => {
+      const from = pixelOffset(raster, sourceX, sourceY);
+      out.data.set(raster.data.subarray(from, from + 4), pixelOffset(out, column, row));
+    });
+  });
+  return {
+    raster: out,
+    layout: {
+      x: x.axis,
+      y: y.axis,
+      ...(layout.content === undefined ? {} : { content: layout.content }),
+    },
+  };
+}
+
+function keptAxis(
+  axis: AxisLayout,
+  keep: number | undefined,
+): { lines: number[]; axis: AxisLayout } {
+  const lines: number[] = [];
+  const segments: Segment[] = [];
+  for (const segment of axis.segments) {
+    const length = segment.end - segment.start;
+    const kept = keep !== undefined && segment.kind === 'stretch' ? Math.min(keep, length) : length;
+    segments.push({ start: lines.length, end: lines.length + kept, kind: segment.kind });
+    for (let index = 0; index < kept; index += 1) {
+      lines.push(segment.start + index);
+    }
+  }
+  return { lines, axis: { length: lines.length, segments } };
 }
 
 function cropTo(raster: Raster, bounds: Rect | undefined, steps: NormalizeStep[]): Raster {

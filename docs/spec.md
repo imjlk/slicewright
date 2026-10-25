@@ -223,11 +223,12 @@ margins, resize to the target, then pick or check insets at the final size. The
 crop ignores pixels whose alpha is 8 of 255 or less, so a faint shadow does not
 hold it open; after resizing, rows and columns that averaged to full
 transparency are cropped as well. With a keep length, it rebuilds a smaller
-texture that keeps the fixed borders and the first `keep` lines of each stretch
-span. It rebuilds only an axis whose span was really found (not tiled, no
-`stretch.<axis>.none` or `stretch.<axis>.short` fallback), never an axis that
-keeps its size (the height of a three-slice, the width of a vertical
-three-slice), and never a multi-region layout. Noise tolerance accepts spans that
+texture that keeps the fixed segments and the first `keep` lines of each stretch
+segment, so a multi-region layout keeps its fixed detail between spans and
+reports the rebuilt layout, with every segment shifted. It rebuilds only an
+axis whose span was really found (not tiled, no `stretch.<axis>.none` or
+`stretch.<axis>.short` fallback), and never an axis that keeps its size (the
+height of a three-slice, the width of a vertical three-slice). Noise tolerance accepts spans that
 carry texture or shading, which stretching keeps but cutting would lose, so each
 axis is verified: rebuilt alone and rendered back at the original size, its
 99th-percentile pixel difference must stay within the exact tolerance, not the
