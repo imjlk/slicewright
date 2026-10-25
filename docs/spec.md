@@ -578,6 +578,29 @@ watched both where the link is and where it points, a dangling one (a link at
 any component of its path) where it will point, and a watched directory replaced as a whole rebuilds and is
 watched anew.
 
+## Build groups
+
+A build manifest can name groups of pieces that are states of one element
+(normal, hover, pressed). Each group has a unique name and at least two piece
+names; every name must be a piece, a piece belongs to at most one group, and a
+grouped piece gives neither insets nor padding nor multi regions, since states
+are compared by detected single-region geometry. A member of a group with
+`sharedInsets` gives neither a scale nor a size, since the shared insets are
+measured on normalized pixels that a resize would shift per state. After every piece is
+normalized, and before anything is written, each group's normalized images
+are compared as states (see Set comparison) with the group's slack (1 px by
+default) and the first member's matching settings; members whose own
+normalization exported different slice modes or tile axes add a
+`build.group-layout` error, since their frames could not swap in one slice.
+With `sharedInsets`, a group whose comparison passed normalizes each member
+again from its source with the shared insets (each side the largest of the
+members' normalized insets, which `keep` leaves as verified) and the slice
+mode and tile axes it resolved the first time, and that result is what is written and packed; a member that
+then has an error finding adds a `build.group-shared-insets` error, and
+members that then differ in size add a `build.group-size` error. The report lists each group's pieces, shared insets, whether they were
+applied, and findings. A group that fails fails the build, and nothing is
+packed, as when a piece fails.
+
 ## Command-line arguments
 
 A number option takes a negative value written either as `--tolerance=-1` or

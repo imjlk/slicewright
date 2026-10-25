@@ -304,6 +304,120 @@ export function buildsManifests(): void {
 }
 
 /**
+ * @evidence docs/spec.md#build-groups Validates group membership, compares grouped states after normalizing, applies shared insets, refuses resized members with shared insets, and fails the build without packing on a mismatch.
+ * @evidenceReview docs/spec.md#build-groups #5024de0 Checked the assertions against the section and ran this test green with pnpm test.
+ */
+export function buildsGroups(): void {
+  const dir = mkdtempSync(join(tmpdir(), 'slicewright-build-groups-'));
+  try {
+    writeFileSync(join(dir, 'normal.png'), encodePng(panel(40, 30)));
+    writeFileSync(join(dir, 'hover.png'), encodePng(panel(40, 30)));
+    writeFileSync(join(dir, 'wide.png'), encodePng(panel(44, 30)));
+    const pieces = [{ input: 'normal.png' }, { input: 'hover.png' }, { input: 'wide.png' }];
+    const shared = runBuild(
+      readBuildManifest({
+        out: 'out/ui.png',
+        pieces,
+        groups: [{ name: 'button', pieces: ['normal', 'hover'], sharedInsets: true }],
+      }),
+      dir,
+      dir,
+    );
+    ok(shared.ok);
+    strictEqual(shared.groups[0]?.applied, true);
+    deepStrictEqual(shared.groups[0]?.sharedInsets, { left: 6, right: 6, top: 6, bottom: 6 });
+    deepStrictEqual(shared.pieces[0]?.insets, { left: 6, right: 6, top: 6, bottom: 6 });
+    ok(shared.pack !== null);
+
+    const mismatch = runBuild(
+      readBuildManifest({
+        out: 'out2/ui.png',
+        pieces,
+        groups: [{ name: 'button', pieces: ['normal', 'wide'] }],
+      }),
+      dir,
+      dir,
+    );
+    strictEqual(mismatch.ok, false);
+    strictEqual(mismatch.pack, null);
+    strictEqual(mismatch.groups[0]?.ok, false);
+    ok(mismatch.groups[0]?.findings.some((finding) => finding.code === 'compare.size'));
+
+    const kept = runBuild(
+      readBuildManifest({
+        out: 'out4/ui.png',
+        pieces: [
+          { input: 'normal.png', keep: 1 },
+          { input: 'hover.png', keep: 1 },
+        ],
+        groups: [{ name: 'button', pieces: ['normal', 'hover'], sharedInsets: true }],
+      }),
+      dir,
+      dir,
+    );
+    ok(kept.ok);
+    deepStrictEqual(kept.groups[0]?.sharedInsets, { left: 6, right: 6, top: 6, bottom: 6 });
+
+    const layout = runBuild(
+      readBuildManifest({
+        out: 'out3/ui.png',
+        pieces: [
+          { input: 'normal.png', mode: 'nine' },
+          { input: 'hover.png', mode: 'three' },
+        ],
+        groups: [{ name: 'button', pieces: ['normal', 'hover'] }],
+      }),
+      dir,
+      dir,
+    );
+    strictEqual(layout.ok, false);
+    ok(layout.groups[0]?.findings.some((finding) => finding.code === 'build.group-layout'));
+
+    const manifest = (groups: unknown, extra: object = {}): unknown => ({
+      out: 'out3/ui.png',
+      pieces: [{ input: 'normal.png', ...extra }, { input: 'hover.png' }],
+      groups,
+    });
+    throws(
+      () => readBuildManifest(manifest([{ name: 'g', pieces: ['normal', 'nope'] }])),
+      /unknown piece "nope"/,
+    );
+    throws(
+      () =>
+        readBuildManifest(
+          manifest([
+            { name: 'g', pieces: ['normal', 'hover'] },
+            { name: 'h', pieces: ['normal', 'hover'] },
+          ]),
+        ),
+      /belongs to one group/,
+    );
+    throws(
+      () =>
+        readBuildManifest(manifest([{ name: 'g', pieces: ['normal', 'hover'] }], { insets: '4' })),
+      /gives insets or padding/,
+    );
+    throws(() => readBuildManifest(manifest([{ name: 'g', pieces: ['normal'] }])));
+    throws(
+      () =>
+        readBuildManifest(
+          manifest([{ name: 'g', pieces: ['normal', 'hover'], sharedInsets: true }], { scale: 2 }),
+        ),
+      /scale or a size/,
+    );
+    throws(
+      () =>
+        readBuildManifest(
+          manifest([{ name: 'g', pieces: ['normal', 'hover'], sharedInsets: true }], { width: 80 }),
+        ),
+      /scale or a size/,
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/**
  * File symlinks need privileges on Windows, so they get their own test with an explicit skip.
  *
  * @evidence docs/spec.md#build-manifest Refuses a piece written through a dangling symlink onto the packed image, and watches where dangling input links will point; skips only when Windows denies creating the link.
@@ -368,4 +482,5 @@ export function followsDanglingSymlinks(context: TestContext): void {
 }
 
 void test('build manifest', buildsManifests);
+void test('build groups', buildsGroups);
 void test('build follows dangling symlinks', followsDanglingSymlinks);
