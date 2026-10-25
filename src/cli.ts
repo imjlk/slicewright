@@ -92,6 +92,10 @@ const sliceArgs = {
     choices: ['x', 'y', 'xy'],
     description: 'Treat these axes as tiled instead of stretched',
   },
+  layout: {
+    type: 'string',
+    description: 'Verify the layout in this JSON file, such as a normalize report, instead of detecting one',
+  },
   'pixel-art': {
     type: 'boolean',
     description: 'Find the grid of upscaled pixel art; normalize snaps to it and resizes nearest',
@@ -126,14 +130,16 @@ interface SliceValues {
   readonly 'outlier-ratio': number;
   readonly noise: string;
   readonly 'pixel-art'?: boolean | undefined;
+  readonly layout?: string | undefined;
 }
 
 const prompt = define({
   name: 'prompt',
   description: 'Plan a generation prompt for stretchable UI art',
   args: {
-    kind: { type: 'enum', choices: uiKinds, required: true, description: 'UI element kind' },
-    style: { type: 'string', required: true, description: "Art direction in the user's words" },
+    // Checked in run, so a missing one gets a clear message even with --from.
+    kind: { type: 'enum', choices: uiKinds, description: `UI element kind (required): ${uiKinds.join(', ')}` },
+    style: { type: 'string', description: "Art direction in the user's words (required)" },
     background: {
       type: 'enum',
       choices: promptBackgrounds,
@@ -149,6 +155,14 @@ const prompt = define({
   },
   run: (ctx) => {
     const { kind, style, background } = ctx.values;
+    if (kind === undefined || style === undefined) {
+      const missing = [kind === undefined ? '--kind' : '', style === undefined ? '--style' : '']
+        .filter(Boolean)
+        .join(' and ');
+      throw new UsageError(
+        `prompt needs ${missing}, also with --from: the correction is added to a new plan for that kind (${uiKinds.join(', ')}) and style.`,
+      );
+    }
     const plan = buildPromptPlan({
       kind,
       style,
@@ -586,6 +600,8 @@ const normalize = define({
       ...(atlasFindings.length === 0 ? {} : { atlasFindings }),
       steps: result.steps,
       ...summary(result.report),
+      // Several regions per axis have no insets form; this is what --layout reads back.
+      ...(result.report.mode === 'multi' ? { layout: result.report.layout } : {}),
       ...(exports.length === 0 ? {} : { exports }),
     });
     failOnErrors(result.report.ok && atlasOk && exports.every((item) => item.ok));
@@ -927,6 +943,18 @@ function inspectOptions(values: SliceValues, raster: Raster | undefined): Inspec
       : values.borders !== undefined && raster !== undefined
         ? scale9BordersToInsets(parseBorders(values.borders), raster.width, raster.height)
         : undefined;
+  if (values.layout !== undefined) {
+    if (raster === undefined) {
+      throw new UsageError(
+        '--layout fits one image size; use it with inspect, preview, frame, or export.',
+      );
+    }
+    if (insets !== undefined || values.regions === 'multi' || values.mode !== 'auto' || values.tile !== undefined) {
+      throw new UsageError(
+        '--layout already holds the insets, mode, regions, and tiling; drop --insets, --borders, --mode, --regions, and --tile.',
+      );
+    }
+  }
   const tile = values.tile ?? '';
   return {
     ...matchOptions(values),
@@ -939,7 +967,31 @@ function inspectOptions(values: SliceValues, raster: Raster | undefined): Inspec
     ...(insets === undefined ? {} : { insets }),
     ...(values.padding === undefined ? {} : { contentPadding: parseInsets(values.padding) }),
     ...(values['pixel-art'] === true ? { pixelArt: true } : {}),
+    ...(values.layout === undefined ? {} : { layout: readLayout(values.layout) }),
   };
+}
+
+/** A layout from a JSON file: a report with a `layout` field, or the layout itself. */
+function readLayout(path: string): SliceLayout {
+  let json: unknown;
+  try {
+    json = JSON.parse(readFileSync(path, 'utf8'));
+  } catch (error) {
+    throw new UsageError(
+      `--layout ${path}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  const record = json as { layout?: unknown; x?: unknown; y?: unknown } | null;
+  const layout = record !== null && typeof record === 'object' && 'layout' in record
+    ? record.layout
+    : record;
+  const candidate = layout as { x?: unknown; y?: unknown } | null;
+  if (candidate === null || typeof candidate !== 'object' || typeof candidate.x !== 'object' || typeof candidate.y !== 'object') {
+    throw new UsageError(
+      `--layout ${path} has no layout with x and y axes; pass the normalize report or its layout.`,
+    );
+  }
+  return candidate as SliceLayout;
 }
 
 function matchOptions(values: {

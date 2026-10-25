@@ -112,6 +112,13 @@ together with given insets is refused. No current target can export a
 multi-region layout;
 it renders in previews and reports `target.unsupported` on export.
 
+A rebuilt multi-region texture is too small for detection to find its regions
+again, so normalization reports the full `layout` for a multi-region result.
+Given back as a layout file, a layout replaces detection and insets: each axis
+must cover the image in order (a `layout.size` error otherwise), every stretch
+segment must be uniform (a `stretch.<axis>.nonuniform` error otherwise), and the
+insets are the outermost flexible lines.
+
 ## Stretch uniformity
 
 Insets that leave no stretch span are an `insets.invalid` error reported on a
@@ -223,8 +230,9 @@ pixels, often a fractional or offset block. Along each axis, inside the
 content bounds, a boundary is a position where some pair of adjacent lines
 differs by more than 24 (premultiplied, alpha included), and a run of
 adjacent boundaries (one blurred edge) counts once, at its middle. With at
-least six boundaries, every period from the smaller of 32 and a third of the length
-down to 2 pixels is scored by how closely the boundaries' phases agree (the
+least six boundaries, the largest whole period from the smaller of 32 and a
+third of the length down to 2 scoring at least 0.99 is an exact upscale and
+wins. Failing that, every period down to 2 pixels in steps of 0.01 is scored by how closely the boundaries' phases agree (the
 length of their mean unit vector). The largest period scoring at least 0.85
 is refined to its best score within the next half pixel, and a period within
 0.03 of a whole number becomes that number; the mean phase gives the offset.
@@ -510,6 +518,9 @@ slice's pixels are inspected with them as explicit insets: a center spanning
 the full height inspects as a three-slice, as in Phaser, and one spanning the
 full width as a vertical three-slice. A slice without a
 center in any key has only its bounds checked, noted as `aseprite.no-center`.
+When no slice is named and some slice has a center, each slice left out for
+having none is listed as an `aseprite.no-center` note on the sheet, so no slice
+is dropped silently.
 
 ## Atlas packing
 

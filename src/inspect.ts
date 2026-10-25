@@ -17,6 +17,7 @@ import {
   contentLimits,
   flexibleSegments,
   layoutFromInsets,
+  layoutShape,
   minimumLayoutSize,
   type AxisLayout,
   type SliceLayout,
@@ -60,6 +61,11 @@ export interface InspectOptions extends MatchOptions {
   readonly contentPadding?: SliceInsets;
   /** Look for the grid of upscaled pixel art. */
   readonly pixelArt?: boolean;
+  /**
+   * Caller-supplied layout, such as the one normalize reports for a
+   * multi-region rebuild; verified instead of detected.
+   */
+  readonly layout?: SliceLayout;
 }
 
 /** Matching settings per axis; noise is measured separately along each. */
@@ -148,11 +154,18 @@ export function inspectRaster(
     }
   }
 
+  if (options.layout !== undefined && (options.insets !== undefined || options.regions === 'multi')) {
+    throw new RangeError(
+      'A given layout replaces insets and region detection: give only the layout.',
+    );
+  }
   const matching = noiseAdjusted(raster, bounds, options, findings);
   const resolved =
-    options.insets === undefined
-      ? detectLayout(raster, bounds ?? full, options, matching, findings)
-      : verifyLayout(raster, options.insets, options, matching, findings);
+    options.layout !== undefined
+      ? verifyGivenLayout(raster, options.layout, matching, findings)
+      : options.insets === undefined
+        ? detectLayout(raster, bounds ?? full, options, matching, findings)
+        : verifyLayout(raster, options.insets, options, matching, findings);
 
   const { insets, mode, tile, layout } = resolved;
   findings.push(...symmetryFindings(insets));
@@ -352,7 +365,7 @@ export function pickAxisSpan(
  * @evidence docs/spec.md#vertical-three-slice Keeps the width when columns never match but rows do, or when the mode asks for it.
  * @evidenceReview docs/spec.md#vertical-three-slice #072e9af Checked this code against the section line by line and ran detectsVerticalThreeSlices green with pnpm test.
  * @evidence docs/spec.md#multiple-stretch-regions Builds a multi-region layout when asked and an axis has more than one long run.
- * @evidenceReview docs/spec.md#multiple-stretch-regions #f4dd501 Checked this code against the section line by line and ran detectsMultipleRegions green with pnpm test.
+ * @evidenceReview docs/spec.md#multiple-stretch-regions #c30e26d Checked this code against the section line by line and ran detectsMultipleRegions green with pnpm test.
  */
 export function detectLayout(
   raster: Raster,
@@ -446,7 +459,7 @@ export function detectLayout(
  * only when an axis has more than one such run and does not tile.
  *
  * @evidence docs/spec.md#multiple-stretch-regions Keeps every long uniform run as a stretch segment, leaves tiled axes single, and records the counts.
- * @evidenceReview docs/spec.md#multiple-stretch-regions #f4dd501 Checked this code against the section line by line and ran detectsMultipleRegions green with pnpm test.
+ * @evidenceReview docs/spec.md#multiple-stretch-regions #c30e26d Checked this code against the section line by line and ran detectsMultipleRegions green with pnpm test.
  */
 export function multiRegionLayout(
   raster: Raster,
@@ -496,6 +509,106 @@ export function multiRegionLayout(
     details: regions,
   });
   return { insets: { left, right, top, bottom }, mode: 'multi', tile: base.tile, layout };
+}
+
+/**
+ * Verifies a caller-given layout, such as the multi-region layout normalize
+ * reports after a rebuild: its axes must match the image size, and every
+ * stretch segment must be uniform.
+ *
+ * @evidence docs/spec.md#multiple-stretch-regions Verifies a given layout against the image size and the uniformity of each stretch segment instead of detecting one.
+ * @evidenceReview docs/spec.md#multiple-stretch-regions #c30e26d Checked the layout-file paragraph against this code and ran readsBackMultiRegionLayouts green with pnpm test.
+ */
+export function verifyGivenLayout(
+  raster: Raster,
+  given: SliceLayout,
+  matching: AxisMatching,
+  findings: Finding[],
+): Layout {
+  const layout: SliceLayout = {
+    x: rebuiltAxis(given.x, 'x'),
+    y: rebuiltAxis(given.y, 'y'),
+  };
+  const tile = {
+    x: layout.x.segments.some((segment) => segment.kind === 'tile'),
+    y: layout.y.segments.some((segment) => segment.kind === 'tile'),
+  };
+  const envelope = (axis: AxisLayout): [number, number] => {
+    const flexible = flexibleSegments(axis);
+    return flexible.length === 0
+      ? [0, 0]
+      : [flexible[0]?.start ?? 0, axis.length - (flexible.at(-1)?.end ?? axis.length)];
+  };
+  const [left, right] = envelope(layout.x);
+  const [top, bottom] = envelope(layout.y);
+  const insets = { left, right, top, bottom };
+  const shape = layoutShape(layout);
+  const mode: SliceMode =
+    shape === 'multi' || shape === 'three' || shape === 'three-vertical' ? shape : 'nine';
+  if (layout.x.length !== raster.width || layout.y.length !== raster.height) {
+    findings.push({
+      code: 'layout.size',
+      severity: 'error',
+      message: `The layout is ${layout.x.length}x${layout.y.length} but the image is ${raster.width}x${raster.height}; use the layout reported for this image.`,
+    });
+    const fixed = { x: axisFromSpans(raster.width, []), y: axisFromSpans(raster.height, []) };
+    return { insets, mode, tile, layout: fixed };
+  }
+  const full: Rect = { x: 0, y: 0, width: raster.width, height: raster.height };
+  for (const axis of ['x', 'y'] as const) {
+    for (const segment of layout[axis].segments) {
+      if (segment.kind !== 'stretch') {
+        continue;
+      }
+      const mismatch = firstMismatch(raster, axis, segment, full, matching[axis]);
+      if (mismatch !== undefined) {
+        const line = axis === 'x' ? 'columns' : 'rows';
+        findings.push({
+          code: `stretch.${axis}.nonuniform`,
+          severity: 'error',
+          message: `${line} ${mismatch} and ${mismatch + 1} differ inside a stretch segment, so stretching changes the art.`,
+          details: { axis, pair: [mismatch, mismatch + 1] },
+        });
+      }
+    }
+  }
+  if (shape === 'multi') {
+    findings.push({
+      code: 'regions.multi',
+      severity: 'info',
+      message: `The layout keeps ${flexibleSegments(layout.x).length} horizontal and ${flexibleSegments(layout.y).length} vertical stretch regions; no current target can export more than one region per axis.`,
+      details: { x: flexibleSegments(layout.x).length, y: flexibleSegments(layout.y).length },
+    });
+  }
+  return { insets, mode, tile, layout };
+}
+
+/** Rebuilds an axis from its flexible segments, so a malformed one throws. */
+function rebuiltAxis(axis: AxisLayout, name: Axis): AxisLayout {
+  const kinds = new Set(['fixed', 'stretch', 'tile']);
+  if (
+    typeof axis !== 'object' ||
+    !Array.isArray(axis.segments) ||
+    axis.segments.some((segment) => !kinds.has(segment.kind))
+  ) {
+    throw new RangeError(
+      `The layout's ${name} axis needs a length and segments of fixed, stretch, or tile.`,
+    );
+  }
+  const covered = axis.segments.every(
+    (segment, index) => segment.start === (index === 0 ? 0 : axis.segments[index - 1]?.end),
+  ) && (axis.segments.at(-1)?.end ?? 0) === axis.length;
+  if (!covered) {
+    throw new RangeError(`The layout's ${name} segments must cover 0..${axis.length} in order.`);
+  }
+  return axisFromSpans(
+    axis.length,
+    flexibleSegments(axis).map((segment) => ({
+      start: segment.start,
+      end: segment.end,
+      kind: segment.kind === 'tile' ? ('tile' as const) : ('stretch' as const),
+    })),
+  );
 }
 
 /**

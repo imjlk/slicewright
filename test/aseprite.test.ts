@@ -30,7 +30,7 @@ function codes(findings: ReadonlyArray<{ readonly code: string }> | undefined): 
 
 /**
  * @evidence docs/spec.md#aseprite-slices Checks keys spanning frames, a trimmed frame, centers that cut detail or leave the bounds, a full-height center, slices without a center, and keys past the last frame.
- * @evidenceReview docs/spec.md#aseprite-slices #03f36fd Checked the assertions against the section's detection, key range, mapping, error, and three-slice rules and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#aseprite-slices #2385112 Checked the assertions against the section's detection, key range, mapping, error, and three-slice rules and ran this test green with pnpm test.
  */
 export function checksAsepriteSlices(): void {
   const image = sheetImage();
@@ -96,6 +96,28 @@ export function checksAsepriteSlices(): void {
   ok(hitbox.ok);
   deepStrictEqual(codes(hitbox.slices[0]?.findings), ['aseprite.no-center']);
   strictEqual(hitbox.slices[0]?.frames[0]?.inspection, undefined);
+
+  // Unnamed, a centerless slice beside centered ones is listed, not dropped silently.
+  const mixed = inspectAsepriteSlices(
+    {
+      frames,
+      meta: {
+        app,
+        slices: [
+          { name: 'hitbox', keys: [{ frame: 0, bounds }] },
+          { name: 'panel', keys: [{ frame: 0, bounds, center: { x: 6, y: 6, w: 28, h: 18 } }] },
+        ],
+      },
+    },
+    image,
+    defaultInspectOptions,
+  );
+  deepStrictEqual(codes(mixed.findings), ['aseprite.no-center']);
+  deepStrictEqual(mixed.findings[0]?.details, { slice: 'hitbox' });
+  deepStrictEqual(
+    mixed.slices.map((slice) => slice.name),
+    ['panel'],
+  );
 
   // Trimmed frames map canvas bounds through spriteSourceSize.
   const trimmed = {
