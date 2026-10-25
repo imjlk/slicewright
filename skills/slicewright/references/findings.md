@@ -23,6 +23,9 @@
 | `margin.transparent` | Transparent border pixels become part of the corners. | `normalize` crops them; otherwise crop unless the spacing is intended. |
 | `resize.thin-lines` | An outline drawn straight onto the fill is narrower than the downscale can keep, so it fades (area) or can drop out (nearest). | Ask for outlines at least the named thickness in the source, or normalize to a larger size. |
 | `rebuild.x.lossy`, `rebuild.y.lossy` | `--keep` would flatten texture or shading on that axis. | Informational: that axis kept its full span. |
+| `pixel.upscaled` | `--pixel-art` found a grid: each art pixel is a block of about `scale` image pixels. | `normalize --pixel-art` snaps it to `native` size and resizes with nearest sampling; or resize by `1/scale` with `--filter nearest`. |
+| `pixel.off-grid` | More than 10% of pixels differ from their grid cell (blur, anti-aliasing, or a non-pixel-art style). | Regenerate as crisp pixel art with no anti-aliasing; snapping keeps only each cell's center color. |
+| `pixel.no-grid` | `--pixel-art` found no grid coarser than one pixel. | The art is already at its native size, or not pixel art; resize with `--filter nearest` if it is. |
 | `rebuild.filtering` | A small `--keep` fades under linear texture filtering. | Use `--keep 8` or more, or nearest filtering (Phaser `pixelArt`). |
 | `padding.invalid` | Given content padding leaves no content area, is not whole and non-negative, or reaches past the fixed edge into a stretch span, where it would change with size. | Shrink `--padding` to within the insets on resizable axes. |
 | `pack.css-skipped` | A packed frame has no CSS class: it has no borders, or is only part of its image, which `border-image` cannot address. | Pack the piece's own one-frame atlas, or use Phaser for it. |

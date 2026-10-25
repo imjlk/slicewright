@@ -216,6 +216,31 @@ crop transparent margins (alpha of 8 or less), and then crops rows and columns
 that averaged to full transparency, as normalization does; cropping an image
 with nothing visible is an error.
 
+## Pixel grid
+
+Pixel art generated at a large size draws each art pixel as a block of image
+pixels, often a fractional or offset block. Along each axis, inside the
+content bounds, a boundary is a position where some pair of adjacent lines
+differs by more than 24 (premultiplied, alpha included), and a run of
+adjacent boundaries (one blurred edge) counts once, at its middle. With at
+least six boundaries, every period from the smaller of 32 and a third of the length
+down to 2 pixels is scored by how closely the boundaries' phases agree (the
+length of their mean unit vector). The largest period scoring at least 0.85
+is refined to its best score within the next half pixel, and a period within
+0.03 of a whole number becomes that number; the mean phase gives the offset.
+An axis with no such period has scale 1. A divisor of the true period also
+fits, which is why the largest one wins. When either axis has a grid, the
+share of visible pixels differing by more than 24 from the center pixels of
+their cell and its neighbors (a fractional grid rounds its boundaries) is the
+off-grid share. Inspection with pixel art reports
+`pixel.upscaled` with the scale, offset, fit, and native size, adds a
+`pixel.off-grid` warning when more than 10% of pixels are off the grid, and
+reports `pixel.no-grid` when there is none. Normalization with pixel art
+snaps the cropped image to one pixel per cell by sampling each cell's center
+(a `snap` step) before resizing, resizes with nearest sampling whatever the
+filter, reports the grid findings judged before the snap, and does not look
+for a grid again in the snapped image.
+
 ## Normalization
 
 Normalization prepares generated art for the engine in a fixed order: crop
@@ -316,7 +341,8 @@ findings or any piece's inspection is an error.
 A preview sheet renders the layout at several sizes on one PNG over a
 checkerboard: the source with flexible segments tinted, the source size, the
 minimum size, wide and tall (each only when that axis can resize), and doubled
-on the axes that can resize. Cells sit in rows that wrap before a cell would
+on the axes that can resize, then a diagnostics cell when findings mark a place
+(see Preview diagnostics). Cells sit in rows that wrap before a cell would
 cross the maximum width (2048 px by default); a cell wider than that sits alone
 in its row. The caller can choose cells, which keep this order, and zoom every
 cell by a whole number from 1 to 8, repeating each pixel, so small art stays
@@ -330,6 +356,19 @@ segment length divided by the source length rounded down and at least one, each
 scaled to fill the segment, as Phaser does; the renderer can round to the
 nearest count instead, to compare with CSS `round`. A size below the fixed segments is
 raised to them; a requested size must be a whole, non-negative number of pixels.
+
+## Preview diagnostics
+
+A preview sheet given a report's findings adds a diagnostics cell at the
+source size, after the other cells, when any finding marks a place: the source
+dimmed halfway toward gray (alpha at least 96 so empty areas show), with the
+first differing pair of columns or rows of a `stretch.<axis>.nonuniform`
+finding and the first and last line of the tiled span of a `tile.<axis>.seam`
+finding drawn in red, and the partly transparent pixels (alpha above 0 and
+below 224) inside the interior region of an `alpha.interior` finding, which
+the finding reports, in yellow, each marker drawn over the ones before it. Without such a finding the cell does not
+exist, so asking for it is an error. The preview command passes its
+inspection findings and lists each marker's code, kind, and count.
 
 ## Phaser scale9Borders
 
@@ -591,3 +630,20 @@ with a straight, unoutlined cut across its top, so it can overlap the body's
 bottom outline; its follow-up steps match its outline to the body's instead of
 inspecting it. The plan lists what to avoid and
 the follow-up steps: remove the background, inspect, and preview.
+
+## Prompt corrections
+
+A prompt plan can start from an earlier report, the JSON that inspect,
+normalize, compare, or build printed for the last attempt. The report must be
+an object whose `findings` each carry a `code` and a `severity`, or a build
+report (pieces but no top-level findings), whose piece is named or is its
+only piece; anything else is a usage error. A report with top-level findings,
+such as a compare report, is read whole, and naming a piece adds that piece's
+findings after the report's own. Codes are looked up as the table's own
+entries, so a code such as `constructor` adds nothing. Each warning or error whose code has a correction adds one
+line, once, in finding order; an axis code (`.x.` or `.y.`) names the top and
+bottom edges and columns for x, the left and right edges and rows for y. Info
+findings and codes about how the art is sliced, packed, or exported, not how
+it is drawn, add nothing. The lines are appended to the prompt under
+"Corrections from the previous attempt:" and listed as `corrections`, empty
+when nothing applies.
