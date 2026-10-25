@@ -213,7 +213,7 @@ export function detectStretchSpan(
  * long, in order.
  *
  * @evidence docs/spec.md#multiple-stretch-regions Collects every matching run that reaches the minimum length.
- * @evidenceReview docs/spec.md#multiple-stretch-regions #c30e26d Checked this code against the section line by line and ran detectsMultipleRegions green with pnpm test.
+ * @evidenceReview docs/spec.md#multiple-stretch-regions #d16fdde Checked this code against the section line by line and ran detectsMultipleRegions green with pnpm test.
  */
 export function detectStretchRuns(
   raster: Raster,

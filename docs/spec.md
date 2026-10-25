@@ -117,7 +117,9 @@ again, so normalization reports the full `layout` for a multi-region result.
 Given back as a layout file, a layout replaces detection and insets: each axis
 must cover the image in order (a `layout.size` error otherwise), every stretch
 segment must be uniform (a `stretch.<axis>.nonuniform` error otherwise), and the
-insets are the outermost flexible lines.
+insets are the outermost flexible lines. The layout's `content` padding, when
+present, is used as given padding (validated the same way) unless padding is
+given separately.
 
 ## Stretch uniformity
 

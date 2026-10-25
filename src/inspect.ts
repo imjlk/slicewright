@@ -177,7 +177,18 @@ export function inspectRaster(
     }
   }
 
-  const contentPadding = resolveContentPadding(raster, bounds, options, matching, layout, findings);
+  // A given layout's own content padding counts as given padding, checked the same way.
+  const givenContent = options.contentPadding ?? options.layout?.content;
+  const paddingOptions =
+    givenContent === undefined ? options : { ...options, contentPadding: givenContent };
+  const contentPadding = resolveContentPadding(
+    raster,
+    bounds,
+    paddingOptions,
+    matching,
+    layout,
+    findings,
+  );
   // Padding that failed validation is reported but never enters the layout, so
   // exports carry no padding rather than one that would scale with the art.
   const paddingRejected = findings.some((finding) => finding.code === 'padding.invalid');
@@ -194,7 +205,7 @@ export function inspectRaster(
     scale9Borders: insetsToScale9Borders(insets, raster.width, raster.height),
     layout: finalLayout,
     contentPadding,
-    contentPaddingSource: options.contentPadding === undefined ? 'detected' : 'given',
+    contentPaddingSource: givenContent === undefined ? 'detected' : 'given',
     minSize: minimumLayoutSize(layout),
     contentBounds: bounds ?? null,
     tile,
@@ -365,7 +376,7 @@ export function pickAxisSpan(
  * @evidence docs/spec.md#vertical-three-slice Keeps the width when columns never match but rows do, or when the mode asks for it.
  * @evidenceReview docs/spec.md#vertical-three-slice #072e9af Checked this code against the section line by line and ran detectsVerticalThreeSlices green with pnpm test.
  * @evidence docs/spec.md#multiple-stretch-regions Builds a multi-region layout when asked and an axis has more than one long run.
- * @evidenceReview docs/spec.md#multiple-stretch-regions #c30e26d Checked this code against the section line by line and ran detectsMultipleRegions green with pnpm test.
+ * @evidenceReview docs/spec.md#multiple-stretch-regions #d16fdde Checked this code against the section line by line and ran detectsMultipleRegions green with pnpm test.
  */
 export function detectLayout(
   raster: Raster,
@@ -459,7 +470,7 @@ export function detectLayout(
  * only when an axis has more than one such run and does not tile.
  *
  * @evidence docs/spec.md#multiple-stretch-regions Keeps every long uniform run as a stretch segment, leaves tiled axes single, and records the counts.
- * @evidenceReview docs/spec.md#multiple-stretch-regions #c30e26d Checked this code against the section line by line and ran detectsMultipleRegions green with pnpm test.
+ * @evidenceReview docs/spec.md#multiple-stretch-regions #d16fdde Checked this code against the section line by line and ran detectsMultipleRegions green with pnpm test.
  */
 export function multiRegionLayout(
   raster: Raster,
@@ -517,7 +528,7 @@ export function multiRegionLayout(
  * stretch segment must be uniform.
  *
  * @evidence docs/spec.md#multiple-stretch-regions Verifies a given layout against the image size and the uniformity of each stretch segment instead of detecting one.
- * @evidenceReview docs/spec.md#multiple-stretch-regions #c30e26d Checked the layout-file paragraph against this code and ran readsBackMultiRegionLayouts green with pnpm test.
+ * @evidenceReview docs/spec.md#multiple-stretch-regions #d16fdde Checked the layout-file paragraph against this code and ran readsBackMultiRegionLayouts green with pnpm test.
  */
 export function verifyGivenLayout(
   raster: Raster,
