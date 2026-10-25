@@ -762,7 +762,11 @@ export function interiorAlphaFindings(raster: Raster, bounds: Rect): Finding[] {
       code: 'alpha.interior',
       severity: 'warning',
       message: `${Math.round((partial / total) * 100)}% of the interior is partly transparent. A deliberate glass fill is fine, but generators that fake alpha leave holes like this; check the preview, or regenerate on a chroma key and run slicewright key.`,
-      details: { partial, total },
+      details: {
+        partial,
+        total,
+        region: { x: x0, y: y0, width: x1 - x0, height: y1 - y0 },
+      },
     },
   ];
 }

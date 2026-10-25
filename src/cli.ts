@@ -251,12 +251,20 @@ const preview = define({
     const settings = inspectOptions(ctx.values, raster);
     const options = previewOptions(ctx.values);
     const report = inspectRaster(raster, settings);
-    const sheet = renderPreviewSheet(raster, report.layout, options);
+    const sheet = renderPreviewSheet(raster, report.layout, {
+      ...options,
+      findings: report.findings,
+    });
     writeFileSync(ctx.values.out, encodePng(sheet.raster));
     print({
       image: ctx.values.input,
       sheet: ctx.values.out,
       cells: sheet.cells,
+      diagnostics: sheet.markers.map((marker) => ({
+        code: marker.code,
+        kind: marker.kind,
+        count: marker.rects.length,
+      })),
       ...summary(report),
     });
   },
