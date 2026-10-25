@@ -107,7 +107,7 @@ export function isAsepriteSheet(json: unknown): boolean {
  * center, or only `sliceName`, against the pixels of each frame its keys cover.
  *
  * @evidence docs/spec.md#aseprite-slices Maps each key's bounds into the sheet, turns its center into insets, and inspects every covered frame with them.
- * @evidenceReview docs/spec.md#aseprite-slices #8c1cbc8 Checked this code against the section line by line and ran checksAsepriteSlices green with pnpm test.
+ * @evidenceReview docs/spec.md#aseprite-slices #03f36fd Checked this code against the section line by line and ran checksAsepriteSlices green with pnpm test.
  */
 export function inspectAsepriteSlices(
   json: unknown,
@@ -178,6 +178,22 @@ function inspectSlice(
   const findings: Finding[] = [];
   const keys = [...slice.keys].sort((a, b) => a.frame - b.frame);
   const reports: AsepriteSliceFrameReport[] = [];
+  // Two keys at one frame leave the first an empty run, so neither can be trusted.
+  const repeated = keys.find((key, index) => index > 0 && keys[index - 1]?.frame === key.frame);
+  if (repeated !== undefined) {
+    return {
+      name: slice.name,
+      ok: false,
+      frames: [],
+      findings: [
+        {
+          code: 'aseprite.key-duplicate',
+          severity: 'error',
+          message: `Slice "${slice.name}" has more than one key at frame ${repeated.frame}.`,
+        },
+      ],
+    };
+  }
   keys.forEach((key, index) => {
     // The next key may itself be out of range; never loop past the last frame.
     const end = Math.min(keys[index + 1]?.frame ?? frames.length, frames.length);
@@ -299,6 +315,15 @@ function inspectKey(
   }
   // The kept pixels lie on the sprite canvas.
   const source = sheetFrame.sourceSize;
+  if (
+    source !== undefined &&
+    (![source.w, source.h].every(isPixel) || source.w <= 0 || source.h <= 0)
+  ) {
+    return fail(
+      'aseprite.bounds-outside-frame',
+      `sourceSize ${source.w}x${source.h} is not a whole-pixel size with a positive width and height.`,
+    );
+  }
   if (
     kept.x < 0 ||
     kept.y < 0 ||

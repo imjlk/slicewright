@@ -30,7 +30,7 @@ function codes(findings: ReadonlyArray<{ readonly code: string }> | undefined): 
 
 /**
  * @evidence docs/spec.md#aseprite-slices Checks keys spanning frames, a trimmed frame, centers that cut detail or leave the bounds, a full-height center, slices without a center, and keys past the last frame.
- * @evidenceReview docs/spec.md#aseprite-slices #8c1cbc8 Checked the assertions against the section's detection, key range, mapping, error, and three-slice rules and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#aseprite-slices #03f36fd Checked the assertions against the section's detection, key range, mapping, error, and three-slice rules and ran this test green with pnpm test.
  */
 export function checksAsepriteSlices(): void {
   const image = sheetImage();
@@ -142,6 +142,47 @@ export function checksAsepriteSlices(): void {
     ],
   );
   ok(array.slices[0]?.frames[0]?.ok);
+
+  // sourceSize must be a whole-pixel size too, and a slice may not repeat a key frame.
+  const sized = inspectAsepriteSlices(
+    {
+      frames: [
+        {
+          filename: 'huge',
+          frame: { x: 0, y: 0, w: 40, h: 30 },
+          spriteSourceSize: { x: 0, y: 0, w: 40, h: 30 },
+          sourceSize: { w: 1e20, h: 30 },
+        },
+        {
+          filename: 'half',
+          frame: { x: 40, y: 0, w: 40, h: 30 },
+          spriteSourceSize: { x: 0, y: 0, w: 40, h: 30 },
+          sourceSize: { w: 40.5, h: 30 },
+        },
+      ],
+      meta: {
+        app,
+        slices: [
+          { name: 'sized', keys: [{ frame: 0, bounds: { x: 4, y: 2, w: 36, h: 28 }, center }] },
+          {
+            name: 'twice',
+            keys: [
+              { frame: 0, bounds: { x: 4, y: 2, w: 36, h: 28 }, center },
+              { frame: 0, bounds: { x: 4, y: 2, w: 36, h: 28 } },
+            ],
+          },
+        ],
+      },
+    },
+    image,
+    defaultInspectOptions,
+  );
+  deepStrictEqual(
+    sized.slices[0]?.frames.map((frame) => codes(frame.findings)),
+    [['aseprite.bounds-outside-frame'], ['aseprite.bounds-outside-frame']],
+  );
+  deepStrictEqual(codes(sized.slices[1]?.findings ?? []), ['aseprite.key-duplicate']);
+  strictEqual(sized.ok, false);
 
   // Coordinates too large for exact sums are not whole pixels.
   const huge = inspectAsepriteSlices(
