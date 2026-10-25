@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.3.0 — 2026-10-26
+
+### Added
+
+- [6b29f13](https://github.com/imjlk/slicewright/commit/6b29f13eccc503ea00de599e73e07fc0dd813231) `preview` adds a diagnostics cell that marks where findings are: the first differing stretch lines in red, tiled-span seam ends in red, and partly transparent interior pixels in yellow. `alpha.interior` now reports the interior `region` it checked. — Thanks @imjlk!
+- [18f7d77](https://github.com/imjlk/slicewright/commit/18f7d77e4ddde7b61120c8170521a3b2aa8f0cb7) `prompt --from <report.json>` appends a correction line for each warning or error in an earlier inspect, normalize, compare, or build report, and lists them as `corrections`. — Thanks @imjlk!
+- [2c0f658](https://github.com/imjlk/slicewright/commit/2c0f658b646ba957060cf145d78f40ddc9ac6b4f) `--pixel-art` for inspect and normalize finds the grid of upscaled pixel art (scale, offset, native size), warns about off-grid pixels, and lets normalize snap the art to one pixel per cell before a nearest resize. — Thanks @imjlk!
+- [7759bda](https://github.com/imjlk/slicewright/commit/7759bdad83bfc8f474b9207ec79ecb47dcd3e902) `normalize --keep` (and build `keep`) now rebuilds multi-region layouts: every stretch segment keeps its first lines, the fixed detail between spans stays, and the report carries the rebuilt layout. — Thanks @imjlk!
+- [1d9670b](https://github.com/imjlk/slicewright/commit/1d9670be77a99b7a8be157570e910b3772150101) Build manifests take `groups` of piece states: after normalizing, each group is compared as states, a mismatch fails the build without packing, and `sharedInsets: true` normalizes the states again with their shared insets. The build report lists the groups. — Thanks @imjlk!
+- [30576eb](https://github.com/imjlk/slicewright/commit/30576ebbcd1f29bee12d4bd108d1dcfea08de975) `inspect --watch` and `preview --watch` run again whenever the image changes, printing one JSON line per run, with the same watching rules and exit status as `build --watch`. — Thanks @imjlk!
+
+### Fixed
+
+- [65c88ff](https://github.com/imjlk/slicewright/commit/65c88ff15e3c8c09ab169830ef44ad7575c25f2e) Aseprite slice checks now reject a `sourceSize` that is not a positive whole-pixel size, and a slice with two keys at one frame (`aseprite.key-duplicate`). `build` refuses, before writing anything, an output under an existing file, a piece written through a dangling symlink onto another output, and a hard link to an input. `build --watch` watches where a dangling input symlink will point, and re-arms itself when a watched directory is replaced as a whole. — Thanks @imjlk!
+
 ## 0.2.1 — 2026-10-19
 
 ### Fixed
