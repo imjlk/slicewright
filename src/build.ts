@@ -11,11 +11,13 @@ import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import typia, { type tags } from 'typia';
 
 import { defaultInspectOptions, type Finding, type InspectOptions } from './inspect.js';
-import { normalizeRaster, type NormalizeStep } from './normalize.js';
+import { compareSet } from './compare.js';
+import { normalizeRaster, type NormalizeResult, type NormalizeStep } from './normalize.js';
 import { buildPack, type PackFilesResult } from './pack-files.js';
 import { defaultPackOptions } from './pack.js';
 import { decodePng, encodePng } from './png.js';
-import { parseInsets, type SliceInsets } from './slices.js';
+import type { Raster } from './raster.js';
+import { parseInsets, type SliceInsets, type SliceMode } from './slices.js';
 import { exportForTarget, findTarget, sliceTargets } from './targets/index.js';
 
 /** One piece of a build: a PNG and how to normalize it. */
@@ -47,6 +49,17 @@ export interface BuildPiece {
   readonly targets?: readonly string[];
 }
 
+/** States of one element that swap in place, checked together after normalizing. */
+export interface BuildGroup {
+  readonly name: string;
+  /** Piece names, at least two. */
+  readonly pieces: readonly string[] & tags.MinItems<2>;
+  /** Largest inset or padding difference between states, in pixels; 1 by default. */
+  readonly slack?: number & tags.Type<'uint32'>;
+  /** Normalize every state again with the group's shared insets. */
+  readonly sharedInsets?: boolean;
+}
+
 /** A `slicewright build` manifest: pieces normalized, exported, and packed into one atlas. */
 export interface BuildManifest {
   /** The packed PNG, relative to the manifest; its atlas goes next to it. */
@@ -60,6 +73,8 @@ export interface BuildManifest {
   readonly spacing?: number & tags.Type<'uint32'> & tags.Maximum<64>;
   readonly extrude?: number & tags.Type<'uint32'> & tags.Maximum<64>;
   readonly pieces: readonly BuildPiece[] & tags.MinItems<1>;
+  /** States compared after normalizing; a mismatch fails the build. */
+  readonly groups?: readonly BuildGroup[];
 }
 
 /** A manifest that parses but cannot be built; the CLI reports it as a usage error. */
@@ -85,9 +100,21 @@ export interface BuildPieceReport {
   }>;
 }
 
+export interface BuildGroupReport {
+  readonly name: string;
+  readonly ok: boolean;
+  readonly pieces: readonly string[];
+  /** The largest inset on each side, or null when the states do not agree. */
+  readonly sharedInsets: SliceInsets | null;
+  /** Whether the pieces were normalized again with the shared insets. */
+  readonly applied: boolean;
+  readonly findings: readonly Finding[];
+}
+
 export interface BuildReport {
   readonly ok: boolean;
   readonly pieces: readonly BuildPieceReport[];
+  readonly groups: readonly BuildGroupReport[];
   /** The pack, or null when a piece failed and nothing was packed. */
   readonly pack: {
     readonly ok: boolean;
@@ -136,6 +163,47 @@ export function readBuildManifest(json: unknown): BuildManifest {
       throw new BuildManifestError(`Two pieces are named "${name}"; give one a name.`);
     }
     seen.add(name.toLowerCase());
+  }
+  const grouped = new Map<string, string>();
+  const groupNames = new Set<string>();
+  for (const group of manifest.groups ?? []) {
+    if (groupNames.has(group.name)) {
+      throw new BuildManifestError(`Two groups are named "${group.name}".`);
+    }
+    groupNames.add(group.name);
+    for (const member of group.pieces) {
+      const piece = manifest.pieces.find((item) => pieceName(item) === member);
+      if (piece === undefined) {
+        throw new BuildManifestError(`Group "${group.name}" names unknown piece "${member}".`);
+      }
+      const other = grouped.get(member);
+      if (other !== undefined) {
+        throw new BuildManifestError(
+          `Piece "${member}" is in group "${other}"${other === group.name ? ' twice' : ` and "${group.name}"`}; a piece belongs to one group.`,
+        );
+      }
+      grouped.set(member, group.name);
+      // States are compared by detected geometry on one stretch region per axis.
+      if (piece.insets !== undefined || piece.padding !== undefined) {
+        throw new BuildManifestError(
+          `Piece "${member}" in group "${group.name}" gives insets or padding; states are compared by detected ones.`,
+        );
+      }
+      // Shared insets are measured on each state's normalized pixels; a resize would shift them per state.
+      if (
+        group.sharedInsets === true &&
+        (piece.scale !== undefined || piece.width !== undefined || piece.height !== undefined)
+      ) {
+        throw new BuildManifestError(
+          `Piece "${member}" in group "${group.name}" gives a scale or a size; shared insets need unresized states.`,
+        );
+      }
+      if (piece.regions === 'multi') {
+        throw new BuildManifestError(
+          `Piece "${member}" in group "${group.name}" uses multi regions; groups compare single-region layouts.`,
+        );
+      }
+    }
   }
   manifest.pieces.forEach((piece, index) => {
     const label = names[index] ?? piece.input;
@@ -271,18 +339,21 @@ export function runBuild(
     return path;
   };
 
-  const pieces = manifest.pieces.map((piece): BuildPieceReport => {
+  const loaded = manifest.pieces.map((piece) => {
+    const source = decodePng(readFileSync(resolve(baseDir, piece.input)));
+    return { source, result: normalizePiece(piece, source) };
+  });
+  const sources = loaded.map((item) => item.source);
+  const results = loaded.map((item) => item.result);
+  const groups = checkGroups(manifest, sources, results);
+
+  const pieces = manifest.pieces.map((piece, index): BuildPieceReport => {
     const name = pieceName(piece);
     const input = resolve(baseDir, piece.input);
-    const result = normalizeRaster(decodePng(readFileSync(input)), {
-      inspect: pieceInspectOptions(piece),
-      crop: piece.crop !== false,
-      filter: piece.filter ?? 'area',
-      ...(piece.width === undefined ? {} : { width: piece.width }),
-      ...(piece.height === undefined ? {} : { height: piece.height }),
-      ...(piece.scale === undefined ? {} : { scale: piece.scale }),
-      ...(piece.keep === undefined ? {} : { keep: piece.keep }),
-    });
+    const result = results[index];
+    if (result === undefined) {
+      throw new Error(`Piece "${name}" was not normalized.`);
+    }
     const image = write(join(piecesDir, `${name}.png`), encodePng(result.raster));
     const exportInput = {
       name,
@@ -330,8 +401,8 @@ export function runBuild(
     };
   });
 
-  if (!pieces.every((piece) => piece.ok)) {
-    return { ok: false, pieces, pack: null, files };
+  if (!pieces.every((piece) => piece.ok) || !groups.every((group) => group.ok)) {
+    return { ok: false, pieces, groups, pack: null, files };
   }
   const packed = buildPack({
     inputs: pieces.flatMap((piece) => (piece.atlas === undefined ? [] : [piece.atlas])),
@@ -347,6 +418,7 @@ export function runBuild(
   return {
     ok: packed.ok,
     pieces,
+    groups,
     pack: {
       ok: packed.ok,
       files: packFiles,
@@ -363,6 +435,139 @@ export function runBuild(
     },
     files,
   };
+}
+
+function normalizePiece(
+  piece: BuildPiece,
+  source: Raster,
+  insets?: SliceInsets,
+  tile?: { readonly x: boolean; readonly y: boolean },
+  mode?: SliceMode,
+): NormalizeResult {
+  return normalizeRaster(source, {
+    inspect: {
+      ...pieceInspectOptions(piece),
+      ...(insets === undefined ? {} : { insets }),
+      ...(tile === undefined ? {} : { tile: { x: tile.x, y: tile.y } }),
+      ...(mode === undefined || mode === 'multi' ? {} : { mode }),
+    },
+    crop: piece.crop !== false,
+    filter: piece.filter ?? 'area',
+    ...(piece.width === undefined ? {} : { width: piece.width }),
+    ...(piece.height === undefined ? {} : { height: piece.height }),
+    ...(piece.scale === undefined ? {} : { scale: piece.scale }),
+    ...(piece.keep === undefined ? {} : { keep: piece.keep }),
+  });
+}
+
+/**
+ * Compares each group's normalized pieces as states of one element, and with
+ * `sharedInsets` normalizes them again with the group's shared insets,
+ * replacing their results in place. A group fails on any error finding of
+ * the comparison or, once applied, of a piece normalized again.
+ *
+ * @evidence docs/spec.md#build-groups Compares each group's normalized states, fails on a mismatch, and applies the shared insets by normalizing again.
+ * @evidenceReview docs/spec.md#build-groups #5024de0 Checked this code against the section line by line and ran buildsGroups green with pnpm test.
+ */
+export function checkGroups(
+  manifest: BuildManifest,
+  sources: readonly Raster[],
+  results: NormalizeResult[],
+): BuildGroupReport[] {
+  return (manifest.groups ?? []).map((group) => {
+    const members = group.pieces.map((member) => {
+      const index = manifest.pieces.findIndex((piece) => pieceName(piece) === member);
+      const piece = manifest.pieces[index];
+      const result = results[index];
+      const source = sources[index];
+      if (piece === undefined || result === undefined || source === undefined) {
+        throw new BuildManifestError(`Group "${group.name}" names unknown piece "${member}".`);
+      }
+      return { index, piece, result, source, name: member };
+    });
+    const first = members[0]?.piece;
+    const compared = compareSet(
+      members.map((member) => ({ name: member.name, raster: member.result.raster })),
+      {
+        kind: 'states',
+        slack: group.slack ?? 1,
+        inspect: first === undefined ? defaultInspectOptions : pieceInspectOptions(first),
+      },
+    );
+    const findings: Finding[] = [...compared.findings];
+    let ok = compared.ok;
+    const layouts = members.map((member) => ({
+      piece: member.name,
+      mode: member.result.report.mode,
+      tile: member.result.report.tile,
+    }));
+    const layoutKey = (layout: (typeof layouts)[number]): string =>
+      `${layout.mode}:${layout.tile.x},${layout.tile.y}`;
+    if (new Set(layouts.map(layoutKey)).size > 1) {
+      ok = false;
+      findings.push({
+        code: 'build.group-layout',
+        severity: 'error',
+        message: `Pieces of group "${group.name}" export different slice modes or tile axes.`,
+        details: { group: group.name, layouts },
+      });
+    }
+    // Normalization keeps the geometry it verified even when `keep` shortens
+    // the stretch spans, so shared insets come from those reports rather than
+    // from detecting again on the shortened rasters.
+    const shared: SliceInsets | null =
+      compared.sharedInsets === null
+        ? null
+        : {
+            left: Math.max(...members.map((member) => member.result.report.insets.left)),
+            right: Math.max(...members.map((member) => member.result.report.insets.right)),
+            top: Math.max(...members.map((member) => member.result.report.insets.top)),
+            bottom: Math.max(...members.map((member) => member.result.report.insets.bottom)),
+          };
+    const applied = ok && group.sharedInsets === true && shared !== null;
+    if (applied) {
+      for (const member of members) {
+        const again = normalizePiece(
+          member.piece,
+          member.source,
+          shared,
+          member.result.report.tile,
+          member.result.report.mode,
+        );
+        results[member.index] = again;
+        if (!again.report.ok) {
+          ok = false;
+          findings.push({
+            code: 'build.group-shared-insets',
+            severity: 'error',
+            message: `Piece "${member.name}" has errors with the shared insets of group "${group.name}".`,
+            details: { piece: member.name, group: group.name },
+          });
+        }
+      }
+      const sizes = members.map((member) => {
+        const raster = results[member.index]?.raster;
+        return { piece: member.name, width: raster?.width ?? 0, height: raster?.height ?? 0 };
+      });
+      if (new Set(sizes.map((size) => `${size.width}x${size.height}`)).size > 1) {
+        ok = false;
+        findings.push({
+          code: 'build.group-size',
+          severity: 'error',
+          message: `Pieces of group "${group.name}" end up different sizes with the shared insets.`,
+          details: { group: group.name, sizes },
+        });
+      }
+    }
+    return {
+      name: group.name,
+      ok,
+      pieces: [...group.pieces],
+      sharedInsets: shared,
+      applied,
+      findings,
+    };
+  });
 }
 
 /**

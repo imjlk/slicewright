@@ -248,11 +248,12 @@ margins, resize to the target, then pick or check insets at the final size. The
 crop ignores pixels whose alpha is 8 of 255 or less, so a faint shadow does not
 hold it open; after resizing, rows and columns that averaged to full
 transparency are cropped as well. With a keep length, it rebuilds a smaller
-texture that keeps the fixed borders and the first `keep` lines of each stretch
-span. It rebuilds only an axis whose span was really found (not tiled, no
-`stretch.<axis>.none` or `stretch.<axis>.short` fallback), never an axis that
-keeps its size (the height of a three-slice, the width of a vertical
-three-slice), and never a multi-region layout. Noise tolerance accepts spans that
+texture that keeps the fixed segments and the first `keep` lines of each stretch
+segment, so a multi-region layout keeps its fixed detail between spans and
+reports the rebuilt layout, with every segment shifted. It rebuilds only an
+axis whose span was really found (not tiled, no `stretch.<axis>.none` or
+`stretch.<axis>.short` fallback), and never an axis that keeps its size (the
+height of a three-slice, the width of a vertical three-slice). Noise tolerance accepts spans that
 carry texture or shading, which stretching keeps but cutting would lose, so each
 axis is verified: rebuilt alone and rendered back at the original size, its
 99th-percentile pixel difference must stay within the exact tolerance, not the
@@ -595,6 +596,29 @@ modification time changed, and changes settle for 100 ms first. When the
 watch stops, its exit status is that of the last run: 1 when inspect or build
 failed its findings, 2 when the run threw. A preview writes its sheet whatever
 the findings, so only an error fails it.
+
+## Build groups
+
+A build manifest can name groups of pieces that are states of one element
+(normal, hover, pressed). Each group has a unique name and at least two piece
+names; every name must be a piece, a piece belongs to at most one group, and a
+grouped piece gives neither insets nor padding nor multi regions, since states
+are compared by detected single-region geometry. A member of a group with
+`sharedInsets` gives neither a scale nor a size, since the shared insets are
+measured on normalized pixels that a resize would shift per state. After every piece is
+normalized, and before anything is written, each group's normalized images
+are compared as states (see Set comparison) with the group's slack (1 px by
+default) and the first member's matching settings; members whose own
+normalization exported different slice modes or tile axes add a
+`build.group-layout` error, since their frames could not swap in one slice.
+With `sharedInsets`, a group whose comparison passed normalizes each member
+again from its source with the shared insets (each side the largest of the
+members' normalized insets, which `keep` leaves as verified) and the slice
+mode and tile axes it resolved the first time, and that result is what is written and packed; a member that
+then has an error finding adds a `build.group-shared-insets` error, and
+members that then differ in size add a `build.group-size` error. The report lists each group's pieces, shared insets, whether they were
+applied, and findings. A group that fails fails the build, and nothing is
+packed, as when a piece fails.
 
 ## Command-line arguments
 

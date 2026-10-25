@@ -33,6 +33,7 @@
 | `compare.size`, `compare.mode`, `compare.tile` | States of one element differ in size, slice mode, or tiled axes, so they cannot swap in one NineSlice. | Normalize every state to the same size and regenerate the odd one out. |
 | `compare.insets`, `compare.padding` | States' detected insets or content padding differ by more than `--slack`; corners or text would jump on swap. | Use `sharedInsets` for every state, or regenerate the state that drifted. |
 | `compare.shared-insets` | The largest insets on each side do not fit every state. | Regenerate the states so their edge detail lines up. |
+| `build.group-shared-insets` | A grouped state has errors once normalized with the group's shared insets. | Make the states' frames match, or drop `sharedInsets` from the group and fix the `compare.*` findings. |
 | `compare.outline` | Pieces' outline thicknesses differ by more than 1 px and a quarter. | Regenerate the odd piece, or normalize it to a size that matches the others' line weight. |
 | `compare.outline-missing` | Some pieces have no measurable outline. | Informational; compare their line weight by eye in the preview. |
 | `atlas.padding-invalid` | An atlas frame's content padding does not fit the frame or reaches past the fixed edge its `scale9Borders` leave. | Re-export the frame. |

@@ -27,7 +27,7 @@ type Side = 'left' | 'right' | 'top' | 'bottom';
  * lines find one.
  *
  * @evidence docs/spec.md#normalization Finds outlines narrower than the downscale factor allows along five sample lines per side and warns when three agree.
- * @evidenceReview docs/spec.md#normalization #e2c2c11 Checked this code against the section line by line and ran normalizesGeneratedArt green with pnpm test.
+ * @evidenceReview docs/spec.md#normalization #ca5cb61 Checked this code against the section line by line and ran normalizesGeneratedArt green with pnpm test.
  */
 export function thinLineFindings(
   source: Raster,
