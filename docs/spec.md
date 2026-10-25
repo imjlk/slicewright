@@ -216,6 +216,31 @@ crop transparent margins (alpha of 8 or less), and then crops rows and columns
 that averaged to full transparency, as normalization does; cropping an image
 with nothing visible is an error.
 
+## Pixel grid
+
+Pixel art generated at a large size draws each art pixel as a block of image
+pixels, often a fractional or offset block. Along each axis, inside the
+content bounds, a boundary is a position where some pair of adjacent lines
+differs by more than 24 (premultiplied, alpha included), and a run of
+adjacent boundaries (one blurred edge) counts once, at its middle. With at
+least six boundaries, every period from the smaller of 32 and a third of the length
+down to 2 pixels is scored by how closely the boundaries' phases agree (the
+length of their mean unit vector). The largest period scoring at least 0.85
+is refined to its best score within the next half pixel, and a period within
+0.03 of a whole number becomes that number; the mean phase gives the offset.
+An axis with no such period has scale 1. A divisor of the true period also
+fits, which is why the largest one wins. When either axis has a grid, the
+share of visible pixels differing by more than 24 from the center pixels of
+their cell and its neighbors (a fractional grid rounds its boundaries) is the
+off-grid share. Inspection with pixel art reports
+`pixel.upscaled` with the scale, offset, fit, and native size, adds a
+`pixel.off-grid` warning when more than 10% of pixels are off the grid, and
+reports `pixel.no-grid` when there is none. Normalization with pixel art
+snaps the cropped image to one pixel per cell by sampling each cell's center
+(a `snap` step) before resizing, resizes with nearest sampling whatever the
+filter, reports the grid findings judged before the snap, and does not look
+for a grid again in the snapped image.
+
 ## Normalization
 
 Normalization prepares generated art for the engine in a fixed order: crop
