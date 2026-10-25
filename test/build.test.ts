@@ -20,7 +20,7 @@ import { panel, shadedBar } from './fixtures.js';
 
 /**
  * @evidence docs/spec.md#build-manifest Builds a dialog and a bar from a manifest into pieces, exports, and one packed atlas, skips packing when a piece fails, and refuses manifests the shape or the rules reject.
- * @evidenceReview docs/spec.md#build-manifest #ab44746 Checked the assertions against the section's validation, path, piece, failure, and watch-input rules and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#build-manifest #81ef4f6 Checked the assertions against the section's validation, path, piece, failure, and watch-input rules and ran this test green with pnpm test.
  */
 export function buildsManifests(): void {
   const dir = mkdtempSync(join(tmpdir(), 'slicewright-build-한글 경로-'));
@@ -307,7 +307,7 @@ export function buildsManifests(): void {
  * File symlinks need privileges on Windows, so they get their own test with an explicit skip.
  *
  * @evidence docs/spec.md#build-manifest Refuses a piece written through a dangling symlink onto the packed image, and watches where dangling input links will point; skips only when Windows denies creating the link.
- * @evidenceReview docs/spec.md#build-manifest #ab44746 Read the dangling-link rules in the section against realPath and watchTargets and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#build-manifest #81ef4f6 Read the dangling-link rules in the section against realPath and watchTargets and ran this test green with pnpm test.
  */
 export function followsDanglingSymlinks(context: TestContext): void {
   const dir = mkdtempSync(join(tmpdir(), 'slicewright-build-link-'));
@@ -345,6 +345,23 @@ export function followsDanglingSymlinks(context: TestContext): void {
     // A dangling input link is watched where it will point.
     symlinkSync(join(dir, 'later', 'art.png'), join(dir, 'art.png'), 'file');
     ok(watchTargets([join(dir, 'art.png')]).has(join(dir, 'later', 'art.png')));
+    // So is an input under a dangling directory link.
+    symlinkSync(join(dir, 'moved'), join(dir, 'gone'), 'junction');
+    ok(watchTargets([join(dir, 'gone', 'art.png')]).has(join(dir, 'moved', 'art.png')));
+    if (process.platform !== 'win32') {
+      // An output whose parent link leads through a file fails before any write.
+      writeFileSync(join(dir, 'blocked'), '');
+      symlinkSync(join(dir, 'blocked', 'child'), join(dir, 'through'), 'dir');
+      throws(
+        () =>
+          runBuild(
+            readBuildManifest({ out: 'through/ui.png', pieces: [{ input: 'bar.png' }] }),
+            dir,
+            dir,
+          ),
+        /to be a directory/,
+      );
+    }
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

@@ -518,7 +518,7 @@ refuses to write over any piece's input or the manifest, and refuses two
 outputs at one path (a piece named like the pack in the pack's directory),
 counting its own stylesheets when it writes them and every file a piece's
 targets declare, such as a Godot `.tres`, or an output that is also a directory another output
-goes into or an existing directory, or an output under an existing file,
+goes into or an existing directory, or an output under an existing file (also through a symlinked parent),
 comparing real paths without letter case (a new file by its directory's real
 path, and a dangling symlink by where it points) and existing files by device
 and inode, so a hard link to an input is refused too, before it writes
@@ -535,8 +535,8 @@ only when a watched file's modification time changed. A watched file that
 changed while a build ran starts another build. When the watch is interrupted,
 its exit status is that of the last build: a failed build exits 1, and a bad
 manifest or a build error exits 2. A symlinked input is
-watched both where the link is and where it points, a dangling one where it
-will point, and a watched directory replaced as a whole rebuilds and is
+watched both where the link is and where it points, a dangling one (a link at
+any component of its path) where it will point, and a watched directory replaced as a whole rebuilds and is
 watched anew.
 
 ## Command-line arguments
