@@ -6,9 +6,18 @@ import { defaultInspectOptions } from '../src/inspect.js';
 import { normalizeRaster } from '../src/normalize.js';
 import { outlineThickness } from '../src/outline.js';
 import { createRaster, pixelOffset, type Raster } from '../src/raster.js';
-import { renderSlices } from '../src/render.js';
+import { renderLayout, renderSlices } from '../src/render.js';
 import { resizeRaster, targetSize } from '../src/resize.js';
-import { fill, fillRect, outline, panel, sameRaster, setPixel, shadedBar } from './fixtures.js';
+import {
+  crestPanel,
+  fill,
+  fillRect,
+  outline,
+  panel,
+  sameRaster,
+  setPixel,
+  shadedBar,
+} from './fixtures.js';
 
 function pixel(raster: Raster, x: number, y: number): number[] {
   const offset = pixelOffset(raster, x, y);
@@ -100,8 +109,8 @@ export function resizesWithoutHalos(): void {
 }
 
 /**
- * @evidence docs/spec.md#normalization Crops and resizes before inspecting, rebuilds uniform axes losslessly, and leaves a three-slice height alone.
- * @evidenceReview docs/spec.md#normalization #e2c2c11 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidence docs/spec.md#normalization Crops and resizes before inspecting, rebuilds uniform axes losslessly, including each span of a multi-region layout, and leaves a three-slice height alone.
+ * @evidenceReview docs/spec.md#normalization #ca5cb61 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function normalizesGeneratedArt(): void {
   const target = panel(40, 30);
@@ -183,6 +192,23 @@ export function normalizesGeneratedArt(): void {
       }),
     RangeError,
   );
+
+  // A multi-region layout keeps the crest between its spans and each span's first lines.
+  const crest = crestPanel(96, 40);
+  const multi = normalizeRaster(crest, {
+    inspect: { ...defaultInspectOptions, regions: 'multi' },
+    crop: true,
+    filter: 'area',
+    keep: 2,
+  });
+  strictEqual(multi.report.mode, 'multi');
+  strictEqual(multi.steps.at(-1)?.step, 'rebuild');
+  const kept = multi.report.layout.x.segments.filter((segment) => segment.kind === 'stretch');
+  strictEqual(kept.length, 2);
+  ok(kept.every((segment) => segment.end - segment.start === 2));
+  strictEqual(multi.report.layout.x.length, multi.raster.width);
+  strictEqual(multi.report.width, multi.raster.width);
+  ok(sameRaster(renderLayout(multi.raster, multi.report.layout, 96, 40), crest));
 
   // A 2 px outline drawn straight onto the fill fades at a fifth of the size.
   const outlined = (border: number): Raster => {
