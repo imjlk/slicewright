@@ -10,7 +10,7 @@ import { buildPack, type PackFilesResult } from './pack-files.js';
 import { defaultPackOptions } from './pack.js';
 import { decodePng, encodePng } from './png.js';
 import type { Raster } from './raster.js';
-import { parseInsets, type SliceInsets } from './slices.js';
+import { parseInsets, type SliceInsets, type SliceMode } from './slices.js';
 import { exportForTarget, findTarget, sliceTargets } from './targets/index.js';
 
 /** One piece of a build: a PNG and how to normalize it. */
@@ -404,12 +404,14 @@ function normalizePiece(
   source: Raster,
   insets?: SliceInsets,
   tile?: { readonly x: boolean; readonly y: boolean },
+  mode?: SliceMode,
 ): NormalizeResult {
   return normalizeRaster(source, {
     inspect: {
       ...pieceInspectOptions(piece),
       ...(insets === undefined ? {} : { insets }),
       ...(tile === undefined ? {} : { tile: { x: tile.x, y: tile.y } }),
+      ...(mode === undefined || mode === 'multi' ? {} : { mode }),
     },
     crop: piece.crop !== false,
     filter: piece.filter ?? 'area',
@@ -427,7 +429,7 @@ function normalizePiece(
  * the comparison or, once applied, of a piece normalized again.
  *
  * @evidence docs/spec.md#build-groups Compares each group's normalized states, fails on a mismatch, and applies the shared insets by normalizing again.
- * @evidenceReview docs/spec.md#build-groups #7f1c861 Checked this code against the section line by line and ran buildsGroups green with pnpm test.
+ * @evidenceReview docs/spec.md#build-groups #04d23a5 Checked this code against the section line by line and ran buildsGroups green with pnpm test.
  */
 export function checkGroups(
   manifest: BuildManifest,
@@ -472,11 +474,28 @@ export function checkGroups(
         details: { group: group.name, layouts },
       });
     }
-    const shared = compared.sharedInsets;
+    // Normalization keeps the geometry it verified even when `keep` shortens
+    // the stretch spans, so shared insets come from those reports rather than
+    // from detecting again on the shortened rasters.
+    const shared: SliceInsets | null =
+      compared.sharedInsets === null
+        ? null
+        : {
+            left: Math.max(...members.map((member) => member.result.report.insets.left)),
+            right: Math.max(...members.map((member) => member.result.report.insets.right)),
+            top: Math.max(...members.map((member) => member.result.report.insets.top)),
+            bottom: Math.max(...members.map((member) => member.result.report.insets.bottom)),
+          };
     const applied = ok && group.sharedInsets === true && shared !== null;
     if (applied) {
       for (const member of members) {
-        const again = normalizePiece(member.piece, member.source, shared, member.result.report.tile);
+        const again = normalizePiece(
+          member.piece,
+          member.source,
+          shared,
+          member.result.report.tile,
+          member.result.report.mode,
+        );
         results[member.index] = again;
         if (!again.report.ok) {
           ok = false;

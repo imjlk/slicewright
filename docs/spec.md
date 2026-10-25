@@ -546,8 +546,9 @@ default) and the first member's matching settings; members whose own
 normalization exported different slice modes or tile axes add a
 `build.group-layout` error, since their frames could not swap in one slice.
 With `sharedInsets`, a group whose comparison passed normalizes each member
-again from its source with the shared insets and the tile axes it detected
-the first time, and that result is what is written and packed; a member that
+again from its source with the shared insets (each side the largest of the
+members' normalized insets, which `keep` leaves as verified) and the slice
+mode and tile axes it resolved the first time, and that result is what is written and packed; a member that
 then has an error finding adds a `build.group-shared-insets` error, and
 members that then differ in size add a `build.group-size` error. The report lists each group's pieces, shared insets, whether they were
 applied, and findings. A group that fails fails the build, and nothing is
