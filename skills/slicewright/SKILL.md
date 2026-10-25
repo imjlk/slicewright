@@ -16,6 +16,8 @@ reaches the game.
 
 ## Run the CLI
 
+slicewright needs Node.js 24 or newer; check with `node --version` first and
+ask the user to upgrade when it is older.
 Every `slicewright <command>` in this skill and its references means
 `npx -y slicewright <command>`. Leave the version off: npx then runs the
 project's installed copy, at whatever version the project pins, and downloads
@@ -43,6 +45,12 @@ every command exits 2 on bad input. `--help` works on each command.
    or wood grain along an edge neither stretches nor tiles cleanly. If the
    user's style invites texture (hand-painted wood, stone), keep the texture
    in the corners and fill, and ask for smooth edges.
+   When an attempt fails a check, save that command's JSON report and plan the
+   next attempt from it: `slicewright prompt --kind panel --style "<style>"
+   --from report.json` adds one correction line per warning or error that the
+   artist can fix (listed as `corrections`). `--kind` and `--style` are still
+   required. For a `build` report, pick the piece with `--piece <name>`; a
+   compare report is read whole.
 3. **Key a chroma background** when the generator could not return alpha:
    `slicewright key art.png --out keyed.png` (the key is read from the border).
 4. **Normalize.** `slicewright normalize art.png --width 480 --out ui/panel.png
@@ -66,7 +74,8 @@ every command exits 2 on bad input. `--help` works on each command.
    `minSize` with the smallest size the game uses (`insets.large` warns when
    the fixed parts take most of an axis). Pass
    `--insets l,r,t,b` to `inspect` to check insets chosen by hand, `--mode
-   three` for horizontal-only art, `--mode three-vertical` for vertical-only
+   three` for horizontal-only art (repeat it on every later `inspect`,
+   `preview`, and `export` of that image, or they detect a nine-slice again), `--mode three-vertical` for vertical-only
    art (scroll bar tracks), `--tile x` when an edge should repeat, and
    `--regions multi` when fixed detail sits in the middle of an edge (a crest
    on a title plate). A multi-region `normalize --keep` texture is too small
@@ -76,11 +85,16 @@ every command exits 2 on bad input. `--help` works on each command.
 6. **Look at the preview.** `slicewright preview ui/panel.png --out
    sheet.png`, then open `sheet.png`. Cells, in order: flexible segments
    tinted magenta with the content box outlined in cyan, source, minimum size,
-   wide (when the width resizes), tall (when the height resizes), doubled.
+   wide (when the width resizes), tall (when the height resizes), doubled,
+   and, when a finding marks a place, a diagnostics cell: the art dimmed, with
+   the first mismatching columns or rows and tile seams in red and partly
+   transparent interior pixels in yellow (listed as `diagnostics` in the JSON).
+   Repeat `--mode three` and any other slice option from normalize here.
    Corners must look identical in every cell and edges must not smear.
    Cells wrap into rows at `--max-width` (2048 px). An image viewer shrinks a
    large sheet until seams vanish, so look closer with `--cells guides,wide`
-   (any of `guides,source,min,wide,tall,double`) and add `--zoom 3` or more
+   (any of `guides,source,min,wide,tall,double,diagnostics`; asking for
+   `diagnostics` when no finding marks a place is an error) and add `--zoom 3` or more
    for small art such as bars and buttons; the printed `cells` give each
    cell's rectangle for cropping.
 7. **Hand it to the engine.** `slicewright export ui/panel.png --target
@@ -102,7 +116,8 @@ every command exits 2 on bad input. `--help` works on each command.
    with tiling flags. Add `--css` for one stylesheet with a class per piece.
    Once the settings per piece are settled, write them into a manifest
    (`{"out": "ui/ui.png", "pieces": [{"input": "art/dialog.png", "width": 320}]}`
-   with the `normalize` options per piece) and rerun the whole set with
+   with the `normalize` options per piece, and `groups` for states; see
+   [references/build.md](references/build.md)) and rerun the whole set with
    `slicewright build ui.build.json`; `--watch` rebuilds on every change.
    Packing keeps frames untrimmed and unrotated with their borders, padding,
    and tiling, extrudes each edge by 1 px and leaves 2 px between frames
@@ -134,7 +149,13 @@ ui/button-pressed.png` must exit 0: same size, mode, and tiling, and one set of 
 (`sharedInsets`) that fits every state. Also fix any `compare.insets` or
 `compare.padding` warning (insets or padding that differ by more than 1 px,
 `--slack`); warnings do not change the exit code. Use `sharedInsets` for every
-state's frame.
+state's frame. In a `build` manifest, list the states as a group
+(`"groups": [{"name": "button", "sharedInsets": true, "pieces":
+["btn-normal", "btn-hover", "btn-pressed"]}]`, where `pieces` holds piece
+names): the build compares them and, with `sharedInsets`, normalizes every
+state again with the shared insets. Members of a `sharedInsets` group take no
+`width`, `height`, or `scale`, so normalize the states to their final size
+first and point the pieces at those PNGs.
 
 ## References
 
@@ -142,6 +163,8 @@ Read these when the task reaches them:
 
 - [references/findings.md](references/findings.md): every finding code, what
   it means, and how to fix it. Read it at step 5.
+- [references/build.md](references/build.md): the `build` manifest, piece
+  options, and state groups with `sharedInsets`. Read it at step 8.
 - [references/phaser.md](references/phaser.md): loading the atlas, creating a
   NineSlice, placing text inside the content padding, and tiling flags in
   Phaser 4.

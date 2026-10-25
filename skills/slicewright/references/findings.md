@@ -27,6 +27,7 @@
 | `pixel.off-grid` | More than 10% of pixels differ from their grid cell (blur, anti-aliasing, or a non-pixel-art style). | Regenerate as crisp pixel art with no anti-aliasing; snapping keeps only each cell's center color. |
 | `pixel.no-grid` | `--pixel-art` found no grid coarser than one pixel. | The art is already at its native size, or not pixel art; resize with `--filter nearest` if it is. |
 | `rebuild.filtering` | A small `--keep` fades under linear texture filtering. | Use `--keep 8` or more, or nearest filtering (Phaser `pixelArt`). |
+| `padding.clamped` | The frame's inner edge lies inside a stretch span on some side, so the detected content padding stops at the fixed edge there; content may overlap that part of the frame. | Informational. Check text placement in the preview; regenerate with a plainer, thinner inner border, or give `--padding` within the insets. |
 | `padding.invalid` | Given content padding leaves no content area, is not whole and non-negative, or reaches past the fixed edge into a stretch span, where it would change with size. | Shrink `--padding` to within the insets on resizable axes. |
 | `pack.css-skipped` | A packed frame has no CSS class: it has no borders, or is only part of its image, which `border-image` cannot address. | Pack the piece's own one-frame atlas, or use Phaser for it. |
 | `pack.css-class-collision` | Two frame names become the same CSS class. | Rename one piece. |
@@ -34,6 +35,8 @@
 | `compare.insets`, `compare.padding` | States' detected insets or content padding differ by more than `--slack`; corners or text would jump on swap. | Use `sharedInsets` for every state, or regenerate the state that drifted. |
 | `compare.shared-insets` | The largest insets on each side do not fit every state. | Regenerate the states so their edge detail lines up. |
 | `build.group-shared-insets` | A grouped state has errors once normalized with the group's shared insets. | Make the states' frames match, or drop `sharedInsets` from the group and fix the `compare.*` findings. |
+| `build.group-layout` | Grouped states normalized to different slice modes or tiled axes, so they cannot swap in one slice. | Give every state the same `mode` and `tile`, or regenerate the odd one out. |
+| `build.group-size` | With `sharedInsets`, the states ended up different sizes. | Normalize every state to the same final size before the build. |
 | `compare.outline` | Pieces' outline thicknesses differ by more than 1 px and a quarter. | Regenerate the odd piece, or normalize it to a size that matches the others' line weight. |
 | `compare.outline-missing` | Some pieces have no measurable outline. | Informational; compare their line weight by eye in the preview. |
 | `atlas.padding-invalid` | An atlas frame's content padding does not fit the frame or reaches past the fixed edge its `scale9Borders` leave. | Re-export the frame. |
