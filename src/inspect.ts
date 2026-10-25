@@ -31,6 +31,7 @@ import {
   type SliceInsets,
   type SliceMode,
 } from './slices.js';
+import { detectPixelGrid, pixelGridFindings } from './pixel-grid.js';
 
 export type Severity = 'error' | 'warning' | 'info';
 
@@ -57,6 +58,8 @@ export interface InspectOptions extends MatchOptions {
   readonly noise: 'auto' | 'off';
   /** Caller-supplied content padding; omitted means detect it. */
   readonly contentPadding?: SliceInsets;
+  /** Look for the grid of upscaled pixel art. */
+  readonly pixelArt?: boolean;
 }
 
 /** Matching settings per axis; noise is measured separately along each. */
@@ -140,6 +143,9 @@ export function inspectRaster(
     findings.push(...marginFindings(raster, bounds));
     findings.push(...chromaSpillFindings(raster));
     findings.push(...interiorAlphaFindings(raster, bounds));
+    if (options.pixelArt === true) {
+      findings.push(...pixelGridFindings(detectPixelGrid(raster, bounds)));
+    }
   }
 
   const matching = noiseAdjusted(raster, bounds, options, findings);
