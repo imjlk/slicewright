@@ -17,7 +17,7 @@ import {
 import { contentBounds } from './detect.js';
 import { normalizeRaster } from './normalize.js';
 import { outlineThickness } from './outline.js';
-import type { SliceLayout } from './layout.js';
+import { readLayoutJson, type SliceLayout } from './layout.js';
 import { buildPack } from './pack-files.js';
 import { loadBuildManifest, runBuild, type BuildManifest } from './build.js';
 import { watchBuild, watchRuns, type WatchRun, type WatchStatus } from './watch.js';
@@ -981,17 +981,13 @@ function readLayout(path: string): SliceLayout {
       `--layout ${path}: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
-  const record = json as { layout?: unknown; x?: unknown; y?: unknown } | null;
-  const layout = record !== null && typeof record === 'object' && 'layout' in record
-    ? record.layout
-    : record;
-  const candidate = layout as { x?: unknown; y?: unknown } | null;
-  if (candidate === null || typeof candidate !== 'object' || typeof candidate.x !== 'object' || typeof candidate.y !== 'object') {
+  try {
+    return readLayoutJson(json);
+  } catch (error) {
     throw new UsageError(
-      `--layout ${path} has no layout with x and y axes; pass the normalize report or its layout.`,
+      `--layout ${path}: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
-  return candidate as SliceLayout;
 }
 
 function matchOptions(values: {

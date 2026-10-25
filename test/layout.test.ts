@@ -8,6 +8,7 @@ import {
   layoutInsets,
   layoutShape,
   minimumLayoutSize,
+  readLayoutJson,
 } from '../src/layout.js';
 import { defaultNormalizeOptions, normalizeRaster } from '../src/normalize.js';
 import { pixelOffset } from '../src/raster.js';
@@ -402,6 +403,12 @@ export function readsBackMultiRegionLayouts(): void {
     layout: { ...layout, content: chosen },
   });
   deepStrictEqual(padded.layout.content, chosen);
+
+  // Layout files are validated whole: a report or a bare layout, complete padding only.
+  deepStrictEqual(readLayoutJson({ ok: true, layout }), layout);
+  deepStrictEqual(readLayoutJson(layout), layout);
+  throws(() => readLayoutJson({ layout: { ...layout, content: { left: 0 } } }));
+  throws(() => readLayoutJson({ x: layout.x }));
 
   const wrongSize = inspectRaster(art, { ...defaultInspectOptions, layout });
   ok(codes(wrongSize.findings).includes('layout.size'));
