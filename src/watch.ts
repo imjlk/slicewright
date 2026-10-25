@@ -64,6 +64,8 @@ export function watchRuns(
   let seen = new Map<string, number>();
   let timer: NodeJS.Timeout | undefined;
   let status: WatchStatus = 'ok';
+  // Set once stopped, so a run that aborts from inside neither re-arms nor reschedules.
+  let stopped = false;
   const modified = (file: string): number => {
     try {
       return statSync(file).mtimeMs;
@@ -72,6 +74,9 @@ export function watchRuns(
     }
   };
   const schedule = (): void => {
+    if (stopped) {
+      return;
+    }
     clearTimeout(timer);
     // Editors write in bursts; run once they settle.
     timer = setTimeout(rebuild, 100);
@@ -106,6 +111,9 @@ export function watchRuns(
       watcher.close();
       watchers.delete(directory);
     }
+    if (stopped) {
+      return;
+    }
     for (const [directory, entries] of targets) {
       const identity = inode(directory);
       try {
@@ -137,6 +145,7 @@ export function watchRuns(
   rebuild();
   return new Promise((done) => {
     const stop = (): void => {
+      stopped = true;
       process.off('SIGINT', stop);
       signal?.removeEventListener('abort', stop);
       clearTimeout(timer);
