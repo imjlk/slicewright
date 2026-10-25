@@ -593,3 +593,20 @@ with a straight, unoutlined cut across its top, so it can overlap the body's
 bottom outline; its follow-up steps match its outline to the body's instead of
 inspecting it. The plan lists what to avoid and
 the follow-up steps: remove the background, inspect, and preview.
+
+## Prompt corrections
+
+A prompt plan can start from an earlier report, the JSON that inspect,
+normalize, compare, or build printed for the last attempt. The report must be
+an object whose `findings` each carry a `code` and a `severity`, or a build
+report (pieces but no top-level findings), whose piece is named or is its
+only piece; anything else is a usage error. A report with top-level findings,
+such as a compare report, is read whole, and naming a piece adds that piece's
+findings after the report's own. Codes are looked up as the table's own
+entries, so a code such as `constructor` adds nothing. Each warning or error whose code has a correction adds one
+line, once, in finding order; an axis code (`.x.` or `.y.`) names the top and
+bottom edges and columns for x, the left and right edges and rows for y. Info
+findings and codes about how the art is sliced, packed, or exported, not how
+it is drawn, add nothing. The lines are appended to the prompt under
+"Corrections from the previous attempt:" and listed as `corrections`, empty
+when nothing applies.

@@ -36,6 +36,7 @@ import {
 } from './render.js';
 import { resizeRaster, targetSize } from './resize.js';
 import { parseBorders, parseInsets, scale9BordersToInsets, type SliceInsets } from './slices.js';
+import { correctPromptPlan, promptCorrections, readFindingsReport } from './prompt-corrections.js';
 import { exportForTarget, findTarget, sliceTargets } from './targets/index.js';
 
 /** Exit codes: 0 ok, 1 error findings, 2 usage or input failure. */
@@ -140,10 +141,32 @@ const prompt = define({
       description: 'Background the generator should paint',
     },
     'pixel-art': { type: 'boolean', description: 'Ask for crisp pixel art' },
+    from: {
+      type: 'string',
+      description: 'Report JSON of the last attempt; adds a correction for each finding',
+    },
+    piece: { type: 'string', description: 'With a build report for --from, the piece to correct' },
   },
   run: (ctx) => {
     const { kind, style, background } = ctx.values;
-    print(buildPromptPlan({ kind, style, background, pixelArt: ctx.values['pixel-art'] === true }));
+    const plan = buildPromptPlan({
+      kind,
+      style,
+      background,
+      pixelArt: ctx.values['pixel-art'] === true,
+    });
+    if (ctx.values.from === undefined) {
+      if (ctx.values.piece !== undefined) {
+        throw new UsageError('--piece picks a piece of the --from build report.');
+      }
+      print(plan);
+      return;
+    }
+    const report = readFindingsReport(
+      JSON.parse(readFileSync(ctx.values.from, 'utf8')),
+      ctx.values.piece,
+    );
+    print(correctPromptPlan(plan, promptCorrections(report)));
   },
 });
 
