@@ -43,11 +43,11 @@ const corrections: Readonly<Record<string, string>> = {
     'Outlines were too thin to survive downscaling last time: draw thicker, bolder outlines and rims.',
   'image.empty': 'The last image came out fully transparent: draw the element on the requested background.',
   'compare.size':
-    'The states of this element differed in size last time: draw every state at exactly the same size and framing.',
+    'The images meant to match (states of one element, or pieces of one set) differed in size last time: draw every one at exactly the same size and framing.',
   'compare.insets':
-    'The states of this element had different borders last time: keep the frame identical across states and change only the colors.',
+    'The images meant to match (states of one element, or pieces of one set) had different borders last time: keep the frame identical across them and change only the colors.',
   'compare.outline':
-    'The states of this element had different outline thicknesses last time: keep the outline the same thickness in every state.',
+    'The images meant to match (states of one element, or pieces of one set) had different outline thicknesses last time: keep the outline the same thickness in every one.',
   'pixel.off-grid':
     'The pixel art was blurred or anti-aliased last time: draw crisp pixels on one consistent grid, every pixel a single flat color.',
 };

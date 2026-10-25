@@ -107,7 +107,7 @@ export function isAsepriteSheet(json: unknown): boolean {
  * center, or only `sliceName`, against the pixels of each frame its keys cover.
  *
  * @evidence docs/spec.md#aseprite-slices Maps each key's bounds into the sheet, turns its center into insets, and inspects every covered frame with them.
- * @evidenceReview docs/spec.md#aseprite-slices #03f36fd Checked this code against the section line by line and ran checksAsepriteSlices green with pnpm test.
+ * @evidenceReview docs/spec.md#aseprite-slices #2385112 Checked this code against the section line by line and ran checksAsepriteSlices green with pnpm test.
  */
 export function inspectAsepriteSlices(
   json: unknown,
@@ -155,6 +155,18 @@ export function inspectAsepriteSlices(
           ? 'meta.slices is empty; export with --list-slices (or "Slices" in the export dialog).'
           : 'No slice has a nine-slice center.',
     });
+  }
+
+  if (sliceName === undefined && selected.length > 0) {
+    // Slices without a center, such as hitboxes, are left out; say which.
+    for (const slice of all.filter((candidate) => !selected.includes(candidate))) {
+      findings.push({
+        code: 'aseprite.no-center',
+        severity: 'info',
+        message: `Slice "${slice.name}" has no nine-slice center, so it is not checked; pass --slice ${slice.name} to check its bounds.`,
+        details: { slice: slice.name },
+      });
+    }
   }
 
   const slices = selected.map((slice) => inspectSlice(slice, frames, image, options));

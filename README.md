@@ -151,7 +151,7 @@ stretched, and tiled segments.
 | Three-slice | Ends fixed; stretches horizontally; height fixed | `--mode three`, or rows that never repeat |
 | Vertical three-slice | Ends fixed; stretches vertically; width fixed | `--mode three-vertical`, or columns that never repeat |
 | Tiled axis | A span repeats instead of stretching | `--tile x/y/xy`, or edges that repeat a pattern |
-| Multiple regions | Several stretch spans per axis around fixed detail | `--regions multi` (preview only; no target exports it yet) |
+| Multiple regions | Several stretch spans per axis around fixed detail | `--regions multi` (preview only; no target exports it yet). After `normalize --keep`, pass the report back with `--layout report.json` |
 
 | Target | Nine | Three | Vertical three | Multi | Tiling |
 | --- | --- | --- | --- | --- | --- |
