@@ -61,4 +61,39 @@ export async function watchesInputs(): Promise<void> {
   }
 }
 
+/**
+ * A run that aborts from inside still ends the watch with that run's status.
+ */
+export async function abortsFromRun(): Promise<void> {
+  const dir = mkdtempSync(join(tmpdir(), 'slicewright-watch-abort-'));
+  const input = join(dir, 'art.txt');
+  writeFileSync(input, 'ok');
+  const controller = new AbortController();
+  let runs = 0;
+  try {
+    const done = watchRuns(
+      [input],
+      {},
+      (record) => {
+        record([input]);
+        runs += 1;
+        if (runs === 1) {
+          return { status: 'ok', value: {} };
+        }
+        controller.abort();
+        return { status: 'failed', value: {} };
+      },
+      () => undefined,
+      controller.signal,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    writeFileSync(input, 'changed');
+    strictEqual(await done, 'failed');
+  } finally {
+    controller.abort();
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 void test('watching', watchesInputs);
+void test('watch aborted from a run', abortsFromRun);

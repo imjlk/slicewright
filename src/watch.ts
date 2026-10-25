@@ -66,6 +66,9 @@ export function watchRuns(
   let status: WatchStatus = 'ok';
   // Set once stopped, so a run that aborts from inside neither re-arms nor reschedules.
   let stopped = false;
+  // While a run is in progress, an abort from inside it resolves only once its status is recorded.
+  let running = false;
+  let finish: ((value: WatchStatus) => void) | undefined;
   const modified = (file: string): number => {
     try {
       return statSync(file).mtimeMs;
@@ -86,6 +89,7 @@ export function watchRuns(
       watched = watchTargets(inputs.map((file) => resolve(file)));
       seen = new Map([...watched].map((file) => [file, modified(file)]));
     };
+    running = true;
     try {
       const result = run(record);
       status = result.status;
@@ -94,6 +98,11 @@ export function watchRuns(
       status = 'error';
       seen = new Map([...watched].map((file) => [file, modified(file)]));
       line({ ...label, ok: false, error: error instanceof Error ? error.message : String(error) });
+    }
+    running = false;
+    if (stopped) {
+      finish?.(status);
+      return;
     }
     // A missing directory is watched through its nearest existing ancestor, for
     // the one entry on the way down, until it exists.
@@ -152,7 +161,11 @@ export function watchRuns(
       for (const watcher of watchers.values()) {
         watcher.close();
       }
-      done(status);
+      if (running) {
+        finish = done;
+      } else {
+        done(status);
+      }
     };
     process.once('SIGINT', stop);
     signal?.addEventListener('abort', stop, { once: true });
