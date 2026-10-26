@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.3.1 — 2026-10-27
+
+### Patch changes
+
+- [d813268](https://github.com/imjlk/slicewright/commit/d813268930d6655185c12097a321077e74b66e98) Guide agents through layered UI made from a stretchable body, fixed ornaments, and runtime content, with explicit attachment coordinates and checked text regions for CSS and Phaser. — Thanks Neo!
+- [db3c23a](https://github.com/imjlk/slicewright/commit/db3c23a23597f265a6067ef81d3b3480b155506d) Guide agents to validate real text and controls at intended sizes, with a runnable layered CSS panel example and browser checks for clipping and overlap. — Thanks Neo!
+- [4dd6ac3](https://github.com/imjlk/slicewright/commit/4dd6ac37a3b45d5f9b2a32b46a29bedf0ef519a4) The agent skill guides matching UI sets from a shared art brief and accepted reference through separate asset generation, final-scale comparison, and state-family validation with shared insets. It distinguishes visual style review from outline checks and provides command examples that save reports for later checks. — Thanks Neo!
+
+### Changed
+
+- [a745106](https://github.com/imjlk/slicewright/commit/a745106e1b005ecab7647f8ec86b231466e1fa4b) The agent skill documents 0.3 features: build manifests with state groups and `sharedInsets` (new `references/build.md`), `prompt --from` and `--piece`, the preview diagnostics cell, `padding.clamped` and the build group findings, repeating `--mode three` on preview and inspect, and the Node.js 24 requirement. — Thanks @imjlk!
+
+### Fixed
+
+- [9ca7f74](https://github.com/imjlk/slicewright/commit/9ca7f74000d3d518b2a63afd56de39cc38b488a6) `--pixel-art` finds whole-number upscales exactly (a 6x upscale no longer reads as about 6.3x); a multi-region `normalize --keep` report includes its `layout`, which `inspect`, `preview`, `frame`, and `export` read back with `--layout`; an Aseprite sheet lists each slice skipped for having no center as `aseprite.no-center`; `prompt` explains a missing `--kind` or `--style` with `--from`; and the compare corrections no longer call set pieces "states". — Thanks @imjlk!
+
 ## 0.3.0 — 2026-10-26
 
 ### Added
