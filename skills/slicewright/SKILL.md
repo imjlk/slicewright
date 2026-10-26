@@ -34,6 +34,10 @@ every command exits 2 on bad input. `--help` works on each command.
    `bar-fill`, `tooltip`, `bubble`, `bubble-tail`, `frame`), art style in the user's words, the largest size the
    element is drawn at in the game, pixel art or not, and the background the
    generator can produce (`transparent`, `chroma-green`, `chroma-magenta`).
+   If a resizable body needs a fixed crest, ribbon, or other attached art,
+   plan the pieces and their runtime content before generating them; read
+   [Layered UI](references/layering.md). A decorative image has no implied
+   text area: text inside it needs an explicitly specified and checked region.
 2. **Plan the prompt.**
    `slicewright prompt --kind panel --style "<style>" --background transparent`
    Send `prompt` to the image generator as written. Pass the `avoid` list as a
