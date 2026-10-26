@@ -70,19 +70,33 @@ its normalization and comparisons.
 
 ## Validate states that swap in place
 
-Normalize normal/hover/pressed inputs to the same final canvas size, then run:
+Normalize normal/hover/pressed inputs to a common canvas and check both
+dimensions. Width-only normalization can leave different heights when source
+aspects differ. When the resulting sizes already match, preserve those
+proportions: a nine-slice can add height at runtime through its stretch region
+while keeping the corners intact. The source height need not equal every draw
+height; respect its `minSize` and check the rendered content. Then run:
 
 ```sh
 slicewright compare ui/button-normal.png ui/button-hover.png ui/button-pressed.png > reports/button-states.json
 ```
 
 States must have equal sizes, slice modes, and tiled axes, and pass inspection
-with the returned `sharedInsets` (the largest inset on each side). Resolve
-`compare.insets` and `compare.padding` warnings too: a difference greater than
-`--slack` (1 px by default) can make corners or content jump. Width-only
-normalization can leave different heights when source aspects differ; check
-both dimensions before grouping. Review the states in place at the intended
-draw size to catch color changes, alignment, and readable interaction cues.
+with the returned `sharedInsets` (the largest inset on each side). The
+`compare.insets` and `compare.padding` warnings describe each state's detected
+geometry before common insets are applied. Differences greater than `--slack`
+(1 px by default) need review: independently using those detections can make
+corners or content jump.
+
+If painted variation disrupts detection, inspect the source and stretched
+previews at the intended scale before choosing a different matching tolerance.
+Record the visual reason and repeat the chosen `--tolerance` on normalization,
+comparison, preview, and atlas checks, and as `tolerance` on every build piece.
+Carry other chosen settings through too: `--noise` / `noise`,
+`--outlier-ratio` / `outlierRatio`, `--mode` / `mode`, and `--tile` / `tile`
+on CLI commands that accept them and on each build piece. Repeat comparison
+`--slack` as the group's `slack` to keep inset/padding warnings consistent.
+Do not raise tolerance or comparison slack merely to silence findings.
 
 After that, a manifest can apply the shared insets and pack the family:
 
@@ -90,9 +104,9 @@ After that, a manifest can apply the shared insets and pack the family:
 {
   "out": "ui/buttons.png",
   "pieces": [
-    {"input": "ui/button-normal.png", "name": "btn-normal"},
-    {"input": "ui/button-hover.png", "name": "btn-hover"},
-    {"input": "ui/button-pressed.png", "name": "btn-pressed"}
+    {"input": "ui/button-normal.png", "name": "btn-normal", "crop": false},
+    {"input": "ui/button-hover.png", "name": "btn-hover", "crop": false},
+    {"input": "ui/button-pressed.png", "name": "btn-pressed", "crop": false}
   ],
   "groups": [{
     "name": "button", "sharedInsets": true,
@@ -105,9 +119,25 @@ Save as `buttons.build.json` beside `ui/` and `reports/`, then run
 `slicewright build buttons.build.json > reports/buttons-build.json`. Group
 members are piece names. They cannot supply `insets`, `padding`, or
 `regions: "multi"`; with `sharedInsets: true`, they also cannot supply `width`,
-`height`, or `scale`. Point them at the already normalized PNGs. Other
-components may be in the same manifest without being in this group. See
-[build.md](build.md) for the full schema and failure cases.
+`height`, or `scale`. The example's `crop: false` preserves the already
+normalized canvas. Other components may be in the same manifest without being
+in this group. See [build.md](build.md) for the full schema and failure cases.
+
+Check the group's `applied` result and the final atlas: every state must have
+the same frame size and slice borders. Validate those borders against the
+packed pixels with `slicewright atlas ui/buttons.json > reports/buttons-atlas.json`
+(repeat `--tolerance` if chosen above). The group's original `compare.insets`
+warning can remain after shared insets align the exports; verify the resulting
+metadata and atlas check before accepting that geometry.
+
+`sharedInsets` does not unify content padding. Give runtime labels one authored
+content box that fits every state, instead of moving them with each state's
+detected padding. Cycle the states in place at the smallest and largest intended
+draw sizes: inspect corner alignment, text fit, seams, and readable state cues.
+Retain any remaining warnings and their visual review in the final report;
+matching packed metadata alone does not prove the composed UI works.
+For Phaser frame swaps, use the [NineSlice state recipe](phaser.md), including
+its texture-coordinate refresh; a changed frame name alone is insufficient.
 
 Retain the brief, reference, exact commands/options, prompt plans, and latest
 reports with a short visual review of the accepted set. A failed build report

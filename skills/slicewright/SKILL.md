@@ -154,12 +154,15 @@ slices. Normalize each stretchable piece to its intended scale before
 `compare --kind set`; this checks outline weight, so also review their color
 and material together.
 
-States of one button swap in place: use the default `compare` instead, fix
-errors and inset/padding warnings, and apply the returned `sharedInsets` to
-every state. A `build` state group can do that with `sharedInsets: true` once
-its inputs are normalized to the same final size. Keep dissimilar components
-out of state groups. Save the commands, reports, and visual review with the
-accepted assets so the set can be rechecked and extended.
+States of one button swap in place: use the default `compare` instead and fix
+errors. Investigate inset/padding warnings through the state-family checks in
+the reference. A `build` group can apply `sharedInsets: true` once its inputs
+share a normalized canvas; preserve source proportions when they already do.
+Verify the final packed borders with `atlas` and cycle the states in place.
+Shared insets do not unify content padding: keep runtime labels in one
+authored content box for the family. Keep dissimilar components out of state
+groups. Save the commands, reports, and visual review with the accepted assets
+so the set can be rechecked and extended.
 
 ## References
 
