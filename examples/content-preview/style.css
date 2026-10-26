@@ -1,0 +1,35 @@
+:root { color-scheme: light; font-family: Georgia, 'Times New Roman', serif; color: #43341c; background: #f5efdf; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { max-width: 1040px; margin: auto; padding: 32px 16px; }
+.intro, .notes { max-width: 680px; margin-inline: auto; }
+.intro h1 { font-size: clamp(28px, 5vw, 44px); margin: 8px 0 12px; }
+.intro p, .notes { line-height: 1.6; }
+.eyebrow { font: 700 11px/1.5 system-ui, sans-serif; letter-spacing: .12em; }
+.controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 20px; margin: 28px 0 0; padding: 20px; border: 1px solid #d8ccb2; border-radius: 12px; background: #fffbf0; font: 14px/1.5 system-ui, sans-serif; }
+.controls label { display: grid; gap: 6px; }
+output { color: #746748; }
+select { max-width: 100%; padding: 8px; color: inherit; background: white; border: 1px solid #bcac8c; border-radius: 6px; font: inherit; }
+.controls .guide-control { display: flex; align-items: center; }
+.stage { display: flex; justify-content: center; padding: 64px 0 24px; }
+/* Author choices: the content width floor and all ornament positioning. */
+.composition { --panel-width: 480px; position: relative; isolation: isolate; width: min(var(--panel-width), 100%); min-width: 280px; }
+.guild-panel { width: 100%; }
+/* The exported CSS supplies 51/45/45/45 frame padding through border-width.
+   Extra spacing below is authored for this content, not detected from the brooch. */
+.quest-content { margin: 22px 9px 18px; overflow-wrap: anywhere; }
+.show-guides .quest-content { outline: 2px dashed #008c9b; outline-offset: 3px; }
+.quest-content .eyebrow { margin: 0 0 12px; color: #6b5631; }
+h2 { font-size: 28px; line-height: 1.16; margin: 0 0 16px; }
+#quest-copy { font-size: 17px; line-height: 1.6; margin: 0; }
+.reward { margin: 24px 0; padding-block: 14px; border-block: 1px solid #ba99604f; font: 700 13px/1.6 system-ui, sans-serif; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.actions button { flex: 1 1 150px; min-width: 0; max-width: 100%; padding: 12px 14px; border: 1px solid #867043; border-radius: 7px; color: #fff9e7; background: #466548; font: 700 14px/1.5 system-ui, sans-serif; overflow-wrap: anywhere; cursor: pointer; }
+.actions #later { color: #5e4a2b; background: #eee1bf; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #007785; outline-offset: 3px; }
+.actions button:hover { filter: brightness(1.1); }
+#quest-status { min-height: 3em; margin: 16px 0 0; color: #6b5631; font: 13px/1.5 system-ui, sans-serif; }
+/* Pure decoration: fixed 160 × 67.56 px, centered on the frame, 40 px overlap.
+   A sibling of the frame so content sizing cannot distort or crop it. */
+.brooch { position: absolute; width: 160px; height: auto; left: 50%; bottom: calc(100% - 40px); transform: translateX(-50%); z-index: 1; pointer-events: none; }
+.notes { font: 13px/1.7 system-ui, sans-serif; color: #746748; }

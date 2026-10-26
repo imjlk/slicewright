@@ -1,0 +1,46 @@
+{
+  "frames": {
+    "guild-panel": {
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 480,
+        "h": 476
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 480,
+        "h": 476
+      },
+      "sourceSize": {
+        "w": 480,
+        "h": 476
+      },
+      "scale9Borders": {
+        "x": 104,
+        "y": 108,
+        "w": 272,
+        "h": 257
+      },
+      "slicewright": {
+        "contentPadding": {
+          "left": 45,
+          "right": 45,
+          "top": 51,
+          "bottom": 45
+        }
+      }
+    }
+  },
+  "meta": {
+    "image": "guild-panel.png",
+    "size": {
+      "w": 480,
+      "h": 476
+    },
+    "scale": "1"
+  }
+}

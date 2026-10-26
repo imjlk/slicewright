@@ -97,6 +97,11 @@ every command exits 2 on bad input. `--help` works on each command.
    `diagnostics` when no finding marks a place is an error) and add `--zoom 3` or more
    for small art such as bars and buttons; the printed `cells` give each
    cell's rectangle for cropping.
+   Then test real titles, body text, and buttons at the smallest and largest
+   intended sizes; an art-only preview and `minSize` do not prove content fits.
+   For a runnable CSS example with a fixed ornament, explicit content region,
+   resize controls, and long-text browser checks, see the repository's
+   [content preview](https://github.com/imjlk/slicewright/tree/main/examples/content-preview).
 7. **Hand it to the engine.** `slicewright export ui/panel.png --target
    phaser,css --out-dir ui` writes each engine's files for a PNG that is
    already final. It detects insets and padding again, so repeat any

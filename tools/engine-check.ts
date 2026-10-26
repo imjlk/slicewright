@@ -21,6 +21,7 @@ import {
 import { renderLayout } from '../src/render.js';
 import { scale9BordersToInsets, type Scale9Borders, type SliceInsets } from '../src/slices.js';
 import { exportForTarget } from '../src/targets/index.js';
+import { checkContentPreview } from './content-preview-check.js';
 
 // Renders a manifest in real engines through headless Chrome and prints what
 // they built. Phaser: sizes, the insets NineSlice read, and rebuilt textures
@@ -116,6 +117,13 @@ try {
     const result = await checkCss(await openPage('css'));
     output['css'] = result;
     failed ||= result.failing.length > 0;
+    const content = await checkContentPreview(
+      await browser.newPage(),
+      `http://127.0.0.1:${port}`,
+      values.screenshot,
+    );
+    output['contentPreview'] = content;
+    failed ||= content.failing.length > 0;
   }
   process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
   process.exitCode = failed ? 1 : 0;

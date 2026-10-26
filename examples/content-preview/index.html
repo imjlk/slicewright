@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Slicewright · Content preview</title>
+    <link rel="stylesheet" href="./assets/guild-panel.css" />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main>
+      <header class="intro">
+        <p class="eyebrow">SLICEWRIGHT / COMPOSITION EXAMPLE</p>
+        <h1>One frame. Real content.</h1>
+        <p>Resize the panel and test its text. The brooch stays fixed; the frame and content grow.</p>
+      </header>
+      <section class="controls" aria-label="Preview controls">
+        <label>Panel width <output id="width-value" for="panel-width">480 px</output>
+          <input id="panel-width" type="range" min="280" max="720" value="480" step="1" />
+        </label>
+        <label>Content
+          <select id="scenario">
+            <option value="short">Short quest</option>
+            <option value="long">Long title and body</option>
+            <option value="unbroken">Unbroken name</option>
+          </select>
+        </label>
+        <label class="guide-control"><input id="guides" type="checkbox" /> Show content region</label>
+      </section>
+      <section class="stage" aria-label="Resizable game UI example">
+        <div class="composition">
+          <article class="guild-panel" aria-labelledby="quest-title">
+            <div class="quest-content">
+              <p class="eyebrow" data-content-text>THE OAKLEAF GUILD</p>
+              <h2 id="quest-title" data-content-text></h2>
+              <p id="quest-copy" data-content-text></p>
+              <p class="reward" data-content-text>Reward · 120 gold &amp; a warm welcome</p>
+              <div class="actions">
+                <button id="accept" type="button" data-content-text>Accept quest</button>
+                <button id="later" type="button" data-content-text>Maybe later</button>
+              </div>
+              <p id="quest-status" role="status" data-content-text>Choose your next adventure.</p>
+            </div>
+          </article>
+          <img class="brooch" src="./assets/guild-brooch.png" width="180" height="76" alt="" />
+        </div>
+      </section>
+      <p class="notes">The cyan guide is an authored content region, based on the exported frame padding plus extra spacing. The brooch has no text region. Art minimum: 208 × 219 px; this example’s content width minimum: 280 px. Height follows content.</p>
+    </main>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

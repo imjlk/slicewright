@@ -104,6 +104,11 @@
       "like": "../tiled/rope.json",
       "css": "../packed/ui.css",
       "tile": "x"
+    },
+    {
+      "label": "guild-panel",
+      "atlas": "../content-preview/assets/guild-panel.json",
+      "css": "../content-preview/assets/guild-panel.css"
     }
   ],
   "packs": [
