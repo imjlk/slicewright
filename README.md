@@ -279,10 +279,12 @@ to share Go build objects across this repository's worktrees:
 
 ```toml
 [env]
-TTSC_GO_CACHE_DIR = "{{ env.HOME }}/.cache/slicewright/go-build"
+TTSC_GO_CACHE_DIR = "{{ xdg_cache_home }}/slicewright/go-build"
 ```
 
-`TTSC_GO_CACHE_DIR` takes precedence over an inherited `GOCACHE`; absent both,
+The [mise cache-directory template](https://mise.jdx.dev/templates.html#variables)
+does not require a `HOME` environment variable. `TTSC_GO_CACHE_DIR` takes
+precedence over an inherited `GOCACHE`; absent both,
 the project-local default is used. `TTSC_CACHE_DIR` can relocate the entire
 ttsc cache root. Prefer dedicated absolute paths for either override. Explicit
 cache paths opt out of the corresponding automatic cache pruning, so manage
