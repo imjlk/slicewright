@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.2 — 2026-10-27
+
+### Patch changes
+
+- [3c6483c](https://github.com/imjlk/slicewright/commit/3c6483cef5a28b14b82b5bbbe7d6e0d0d14cdfb8) Clarify that `--layout` accepts a SliceLayout or a report containing a `layout` field. When a single-region normalize report is passed instead, explain how to reuse its insets, applicable slice mode and tiling options, and optional content padding. — Thanks Neo!
+- [b8ca761](https://github.com/imjlk/slicewright/commit/b8ca7619705606084e93266c791b7e4e34dc8d93) Clarify the agent skill's state-family validation: preserve matching source proportions, keep normalized canvases intact, verify shared insets in the final atlas, and use one runtime content box across states. Document consistent matching settings and review of detection warnings after shared insets are applied.
+  
+  Show how to swap Phaser NineSlice state frames while refreshing their rendered texture coordinates and preserving the button's draw size. — Thanks Neo!
+
 ## 0.3.1 — 2026-10-27
 
 ### Patch changes
