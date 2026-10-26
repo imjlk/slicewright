@@ -92,6 +92,10 @@ If painted variation disrupts detection, inspect the source and stretched
 previews at the intended scale before choosing a different matching tolerance.
 Record the visual reason and repeat the chosen `--tolerance` on normalization,
 comparison, preview, and atlas checks, and as `tolerance` on every build piece.
+Carry other chosen settings through too: `--noise` / `noise`,
+`--outlier-ratio` / `outlierRatio`, `--mode` / `mode`, and `--tile` / `tile`
+on CLI commands that accept them and on each build piece. Repeat comparison
+`--slack` as the group's `slack` to keep inset/padding warnings consistent.
 Do not raise tolerance or comparison slack merely to silence findings.
 
 After that, a manifest can apply the shared insets and pack the family:
