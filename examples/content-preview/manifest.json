@@ -1,0 +1,9 @@
+{
+  "entries": [
+    {
+      "label": "guild-panel",
+      "atlas": "assets/guild-panel.json",
+      "css": "assets/guild-panel.css"
+    }
+  ]
+}

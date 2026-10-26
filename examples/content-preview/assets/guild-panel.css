@@ -1,0 +1,12 @@
+/* slicewright: guild-panel, nine */
+.guild-panel {
+  box-sizing: border-box;
+  border-style: solid;
+  border-width: 51px 45px 45px 45px;
+  border-image-source: url("guild-panel.png");
+  border-image-slice: 108 104 111 104 fill;
+  border-image-width: 108px 104px 111px 104px;
+  border-image-repeat: stretch stretch;
+  min-width: 208px;
+  min-height: 219px;
+}
