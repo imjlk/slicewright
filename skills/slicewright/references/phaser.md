@@ -7,6 +7,22 @@ const panel = this.add.nineslice(400, 300, 'ui', 'panel', 320, 200);
 panel.setSize(360, 220); // never below left+right by top+bottom; scale instead.
 ```
 
+For button states in the same atlas, first validate a family with matching
+frame sizes and shared slice borders as in [matching-sets.md](matching-sets.md).
+Then change the existing NineSlice's frame:
+
+```ts
+const button = this.add.nineslice(400, 300, 'ui', 'btn-normal', 224, 64);
+button.setFrame('btn-hover', true, false);
+```
+
+Keep `updateSize` (the second argument) true. In Phaser 4, this invokes the
+NineSlice's UV refresh while preserving a nine-slice's draw width and height.
+Passing false can change the reported frame name while leaving the old pixels
+on screen. The third argument keeps the existing origin. Keep the runtime
+label in one authored content box across states, and verify that the rendered
+pixels change while the button and label bounds stay fixed.
+
 Place text inside the content padding, not the slice insets. The padding ends
 exactly where the frame does, so keep a margin of about 8 px for text, and
 more where corner ornaments reach inward:

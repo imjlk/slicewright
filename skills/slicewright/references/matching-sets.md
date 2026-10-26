@@ -132,6 +132,8 @@ detected padding. Cycle the states in place at the smallest and largest intended
 draw sizes: inspect corner alignment, text fit, seams, and readable state cues.
 Retain any remaining warnings and their visual review in the final report;
 matching packed metadata alone does not prove the composed UI works.
+For Phaser frame swaps, use the [NineSlice state recipe](phaser.md), including
+its texture-coordinate refresh; a changed frame name alone is insufficient.
 
 Retain the brief, reference, exact commands/options, prompt plans, and latest
 reports with a short visual review of the accepted set. A failed build report
