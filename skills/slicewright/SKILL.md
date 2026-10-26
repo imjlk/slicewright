@@ -133,29 +133,24 @@ every command exits 2 on bad input. `--help` works on each command.
 
 ## Making a matching set
 
-Several pieces that belong together (a dialog, a button, and a bar) need one
-style description used word for word in every `prompt` call, generated in one
-session. When the generator accepts reference images, generate the main piece
-first and pass it as a reference for the others. Normalize each piece to its
-own in-game width, then put the preview sheets side by side and regenerate a
-piece that drifts in color or wood tone before slicing further. Run
-`slicewright compare --kind set ui/dialog.png ui/button.png ui/bar.png` to catch
-a piece whose outline came out heavier or lighter than the rest. Pack the
-finished pieces into one atlas (step 8).
+For several related components or states, read
+[references/matching-sets.md](references/matching-sets.md). Keep a short shared
+art brief (materials, palette, lighting, shape language, and outline weight at
+in-game scale), plus each piece's role and intended draw sizes. Review one
+base piece first, then use the accepted result as a reference in the agent's
+image generator for separate assets. Reuse the shared style in every `prompt` call.
 
-States of one element (normal, hover, pressed, disabled) swap in place, so
-`slicewright compare ui/button-normal.png ui/button-hover.png
-ui/button-pressed.png` must exit 0: same size, mode, and tiling, and one set of insets
-(`sharedInsets`) that fits every state. Also fix any `compare.insets` or
-`compare.padding` warning (insets or padding that differ by more than 1 px,
-`--slack`); warnings do not change the exit code. Use `sharedInsets` for every
-state's frame. In a `build` manifest, list the states as a group
-(`"groups": [{"name": "button", "sharedInsets": true, "pieces":
-["btn-normal", "btn-hover", "btn-pressed"]}]`, where `pieces` holds piece
-names): the build compares them and, with `sharedInsets`, normalizes every
-state again with the shared insets. Members of a `sharedInsets` group take no
-`width`, `height`, or `scale`, so normalize the states to their final size
-first and point the pieces at those PNGs.
+A dialog, button, and bar can share a look while keeping different sizes and
+slices. Normalize each stretchable piece to its intended scale before
+`compare --kind set`; this checks outline weight, so also review their color
+and material together.
+
+States of one button swap in place: use the default `compare` instead, fix
+errors and inset/padding warnings, and apply the returned `sharedInsets` to
+every state. A `build` state group can do that with `sharedInsets: true` once
+its inputs are normalized to the same final size. Keep dissimilar components
+out of state groups. Save the commands, reports, and visual review with the
+accepted assets so the set can be rechecked and extended.
 
 ## References
 
