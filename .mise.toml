@@ -4,5 +4,8 @@ node = "24.11.0"
 
 [env]
 # ttsc bundles its own Go toolchain, but source-plugin compilation must use the
-# project toolchain so GOROOT and the compiler version stay aligned.
-TTSC_GO_BINARY = { value = "{{ env.GOROOT }}/bin/go", tools = true }
+# project toolchain on PATH so GOROOT and the compiler version stay aligned.
+# Keep this literal: GOROOT is unavailable before the first mise install.
+TTSC_GO_BINARY = "go"
+# ttsc manages its own project-local caches. Optional machine-specific cache
+# overrides belong in the gitignored .mise.local.toml; see README Development.
