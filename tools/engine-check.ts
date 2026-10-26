@@ -22,6 +22,7 @@ import { renderLayout } from '../src/render.js';
 import { scale9BordersToInsets, type Scale9Borders, type SliceInsets } from '../src/slices.js';
 import { exportForTarget } from '../src/targets/index.js';
 import { checkContentPreview } from './content-preview-check.js';
+import { checkPhaserStates } from './phaser-state-check.js';
 
 // Renders a manifest in real engines through headless Chrome and prints what
 // they built. Phaser: sizes, the insets NineSlice read, and rebuilt textures
@@ -112,6 +113,13 @@ try {
       result.sizeMismatches.length > 0 ||
       result.failing.length > 0 ||
       result.rendererFailing.length > 0;
+    const states = await checkPhaserStates(
+      await browser.newPage(),
+      `http://127.0.0.1:${port}`,
+      values.screenshot,
+    );
+    output['phaserStates'] = states;
+    failed ||= states.failing.length > 0;
   }
   if (engines.includes('css')) {
     const result = await checkCss(await openPage('css'));
@@ -178,6 +186,9 @@ async function checkPhaser(page: Page): Promise<{
   );
   // --max-mean governs every Phaser comparison; --css-max-mean only the CSS ones.
   const maxMean = Number(values['max-mean']);
+  // The large static sheet has finished; release its WebGL renderer before
+  // exercising live transitions on the separate small canvas.
+  await page.close();
   return {
     ...result,
     rendererComparisons,
