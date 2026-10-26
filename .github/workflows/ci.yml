@@ -55,3 +55,5 @@ jobs:
       # Renders examples/real as Phaser 4 NineSlices and CSS border-images in
       # the runner's Chrome and compares them with slicewright's renderer.
       - run: pnpm engine:check
+      # A separate sheet keeps the WebGL canvas below common 8192px limits.
+      - run: pnpm engine:check --manifest examples/content-preview/manifest.json

@@ -10,6 +10,8 @@ globalThis.slicewrightMeasureContent = async () => {
     }
     return { name: image.className, decoded, width: image.naturalWidth, height: image.naturalHeight };
   }));
+  // Viewport and content changes need a paint before screenshotting the result.
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
   const rect = (box) => ({
     x: box.x, y: box.y, width: box.width, height: box.height,
   });

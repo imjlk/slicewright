@@ -17,7 +17,7 @@ select { max-width: 100%; padding: 8px; color: inherit; background: white; borde
 .guild-panel { width: 100%; }
 /* The exported CSS supplies 51/45/45/45 frame padding through border-width.
    Extra spacing below is authored for this content, not detected from the brooch. */
-.quest-content { margin: 22px 9px 18px; overflow-wrap: anywhere; }
+.quest-content { margin: 57px 9px 66px; overflow-wrap: anywhere; }
 .show-guides .quest-content { outline: 2px dashed #008c9b; outline-offset: 3px; }
 .quest-content .eyebrow { margin: 0 0 12px; color: #6b5631; }
 h2 { font-size: 28px; line-height: 1.16; margin: 0 0 16px; }
