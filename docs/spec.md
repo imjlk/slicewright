@@ -4,6 +4,13 @@ This document is the contract the source and tests answer for. Every H2 section
 is a requirement: `@ttsc/evidence` fails the build until at least one source
 function and one test function cite it.
 
+The development environment must load before the pinned tools are installed,
+without an inherited `GOROOT`. After `mise install`, ttsc source-plugin builds
+use the Go selected by mise so the compiler and `GOROOT` stay aligned.
+The repository's graph MCP launcher uses that same environment and the
+lockfile-installed graph package. Cache relocation is a local opt-in; default
+ttsc cache management remains enabled.
+
 ## PNG input
 
 slicewright reads PNG files and works on straight-alpha RGBA, 8 bits per channel.

@@ -1,5 +1,6 @@
 node_modules/
 dist/
 .slicewright/
+.mise.local.toml
 *.log
 .DS_Store

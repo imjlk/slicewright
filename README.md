@@ -53,7 +53,7 @@ Run `npx slicewright --help` for every option. Install it in a project with
 `npm install --save-dev slicewright` to pin the version; the same functions are
 importable as a library (`import { inspectRaster } from 'slicewright'`).
 
-From a clone, `pnpm install && pnpm build`, then `node dist/cli.js`.
+From a clone, follow [Development](#development), then `node dist/cli.js`.
 
 ### Build manifest
 
@@ -223,6 +223,30 @@ usage passes matches what detection finds (a tiled rope sample covers it).
 
 ## Development
 
+With [mise](https://mise.jdx.dev) and pnpm available, run from the clone:
+
+```bash
+mise trust
+mise install
+mise exec -- pnpm install --frozen-lockfile
+mise exec -- pnpm check
+mise exec -- pnpm build
+```
+
+`.mise.toml` pins Node and Go. `mise exec` uses those versions without shell
+activation or a manually exported `GOROOT`; pnpm uses the version in
+`packageManager`. The config can load before Go is installed. Once installed,
+`TTSC_GO_BINARY=go` selects mise's Go from `PATH`, keeping it aligned with
+`GOROOT` for native plugin compilation.
+
+The checked-in `.mcp.json` starts `ttsc-graph` through `mise exec -- pnpm exec`,
+using the installed `@ttsc/graph` and `ttsc` versions from the lockfile. Complete
+the install above before starting the MCP client, launch it with this clone as
+its working directory, and make `mise` and pnpm available on the client's
+`PATH`. Restart an already-running graph server after changing this config.
+For clients configured separately, use the same command and arguments rather
+than an unpinned `npx` download. No `TTSC_GRAPH_BINARY` override is needed.
+
 The toolchain is [ttsc](https://ttsc.dev) on TypeScript 7:
 
 - `pnpm check`: type check, `@ttsc/lint`, formatting, and the
@@ -239,9 +263,32 @@ The repository's `.gitattributes` keeps text files at LF even when Windows Git
 uses `core.autocrlf=true`; CRLF compiler input otherwise fails the format check.
 Use Node 24 or newer in the shell running pnpm, including PowerShell.
 
-The first compiler invocation builds native plugins with ttsc's bundled Go
-toolchain and can take several minutes. Run the initial commands sequentially;
-later runs reuse `node_modules/.cache/ttsc`.
+The first compiler invocation builds native plugins and can take several
+minutes. Under mise it uses the pinned Go toolchain; otherwise ttsc defaults to
+its bundled Go SDK. Run the initial commands sequentially; later runs reuse
+`node_modules/.cache/ttsc`.
+
+With no cache overrides, ttsc keeps compiled plugins in
+`node_modules/.cache/ttsc/plugins` and Go build objects in
+`node_modules/.cache/ttsc/go-build`. The CLI and graph server use the same
+defaults. There is no need to set `GOROOT`, `GOCACHE`, or `GOMODCACHE` in this
+repository. Go manages its module cache separately.
+
+Optional overrides belong in the gitignored `.mise.local.toml`. For example,
+to share Go build objects across this repository's worktrees:
+
+```toml
+[env]
+TTSC_GO_CACHE_DIR = "{{ env.HOME }}/.cache/slicewright/go-build"
+```
+
+`TTSC_GO_CACHE_DIR` takes precedence over an inherited `GOCACHE`; absent both,
+the project-local default is used. `TTSC_CACHE_DIR` can relocate the entire
+ttsc cache root. Prefer dedicated absolute paths for either override. Explicit
+cache paths opt out of the corresponding automatic cache pruning, so manage
+their disk usage yourself. These are ttsc-owned caches: `ttsc clean` can remove
+them, including a shared `TTSC_GO_CACHE_DIR`. Leave the defaults for isolated,
+automatically managed worktrees.
 
 Filesystem tests use directory junctions on Windows, so the packing and manifest
 overwrite checks run without administrator privileges. One separate file-symlink
