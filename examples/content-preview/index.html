@@ -23,13 +23,17 @@
             <option value="short">Short quest</option>
             <option value="long">Long title and body</option>
             <option value="unbroken">Unbroken name</option>
+            <option value="korean">긴 한국어 제목과 본문</option>
           </select>
         </label>
         <label class="guide-control"><input id="guides" type="checkbox" /> Show content region</label>
+        <label class="guide-control"><input id="large-text" type="checkbox" /> 200% text</label>
       </section>
       <section class="stage" aria-label="Resizable game UI example">
-        <div class="composition">
-          <article class="guild-panel" aria-labelledby="quest-title">
+        <article class="composition" aria-labelledby="quest-title">
+          <div class="guild-panel" aria-hidden="true"></div>
+          <img class="brooch" src="./assets/guild-brooch.png" width="180" height="76" alt="" />
+          <div class="content-layer">
             <div class="quest-content">
               <p class="eyebrow" data-content-text>THE OAKLEAF GUILD</p>
               <h2 id="quest-title" data-content-text></h2>
@@ -41,11 +45,10 @@
               </div>
               <p id="quest-status" role="status" data-content-text>Choose your next adventure.</p>
             </div>
-          </article>
-          <img class="brooch" src="./assets/guild-brooch.png" width="180" height="76" alt="" />
-        </div>
+          </div>
+        </article>
       </section>
-      <p class="notes">The cyan guide is an authored content region, based on the exported frame padding plus extra spacing. The brooch has no text region. Art minimum: 208 × 219 px; this example’s content width minimum: 280 px. Height follows content.</p>
+      <p class="notes">The cyan guide uses total content insets from assembly.js, measured from the body edges and applied once. The brooch has no text region. Art minimum: 208 × 219 px; this example’s content width minimum: 280 px. Height follows content.</p>
     </main>
     <script type="module" src="./main.js"></script>
   </body>

@@ -103,8 +103,10 @@ every command exits 2 on bad input. `--help` works on each command.
    cell's rectangle for cropping.
    Then test real titles, body text, and buttons at the smallest and largest
    intended sizes; an art-only preview and `minSize` do not prove content fits.
-   For a runnable CSS example with a fixed ornament, explicit content region,
-   resize controls, and long-text browser checks, see the repository's
+   For a layered component, keep its body size, attachment placement, total
+   content insets, and responsive rules together in application code; follow
+   [Layered UI](references/layering.md). The runnable CSS example has a
+   reusable assembly configuration and Korean/English text checks at 200%:
    [content preview](https://github.com/imjlk/slicewright/tree/main/examples/content-preview).
 7. **Hand it to the engine.** `slicewright export ui/panel.png --target
    phaser,css --out-dir ui` writes each engine's files for a PNG that is
