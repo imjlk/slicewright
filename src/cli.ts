@@ -94,7 +94,7 @@ const sliceArgs = {
   },
   layout: {
     type: 'string',
-    description: 'Verify the layout in this JSON file, such as a normalize report, instead of detecting one',
+    description: 'Verify SliceLayout JSON or a report containing layout; single-region normalize reports use --insets and any --mode, --tile, or --padding options',
   },
   'pixel-art': {
     type: 'boolean',
