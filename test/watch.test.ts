@@ -42,19 +42,28 @@ export async function watchesInputs(): Promise<void> {
       controller.signal,
     );
     strictEqual(lines.length, 1);
-    await new Promise((resolve) => setTimeout(resolve, 200));
-    writeFileSync(input, 'throw');
+    // A save can produce an extra successful run before the next input change.
+    writeFileSync(input, 'ok');
     await until(() => lines.length >= 2);
-    const errored = lines.at(-1) as { image?: string; ok?: boolean; error?: string };
+    const beforeThrow = lines.length;
+    writeFileSync(input, 'throw');
+    let errorIndex = -1;
+    await until(() => {
+      errorIndex = lines.findIndex(
+        (value, index) =>
+          index >= beforeThrow && (value as { error?: string }).error === 'bad input',
+      );
+      return errorIndex !== -1;
+    });
+    const errored = lines[errorIndex] as { image?: string; ok?: boolean; error?: string };
     strictEqual(errored.image, input);
     strictEqual(errored.ok, false);
     strictEqual(errored.error, 'bad input');
-    await new Promise((resolve) => setTimeout(resolve, 200));
     writeFileSync(input, 'nope');
     await until(() => (lines.at(-1) as { text?: string }).text === 'nope');
     controller.abort();
     strictEqual(await done, 'failed');
-    ok(lines.length >= 3);
+    ok(lines.length >= 4);
   } finally {
     controller.abort();
     rmSync(dir, { recursive: true, force: true });
@@ -86,7 +95,6 @@ export async function abortsFromRun(): Promise<void> {
       () => undefined,
       controller.signal,
     );
-    await new Promise((resolve) => setTimeout(resolve, 200));
     writeFileSync(input, 'changed');
     strictEqual(await done, 'failed');
   } finally {
