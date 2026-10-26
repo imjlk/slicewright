@@ -409,6 +409,21 @@ export function readsBackMultiRegionLayouts(): void {
   deepStrictEqual(readLayoutJson(layout), layout);
   throws(() => readLayoutJson({ layout: { ...layout, content: { left: 0 } } }));
   throws(() => readLayoutJson({ x: layout.x }));
+  // A single-region CLI summary is not a layout; explain how to reuse its geometry.
+  const single = inspectRaster(panel(96, 40), defaultInspectOptions);
+  throws(
+    () =>
+      readLayoutJson({
+        ok: single.ok,
+        mode: single.mode,
+        insets: single.insets,
+        contentPadding: single.contentPadding,
+      }),
+    {
+      name: 'RangeError',
+      message: /single-region normalize report.*--insets.*--mode.*--tile.*--padding/,
+    },
+  );
 
   const wrongSize = inspectRaster(art, { ...defaultInspectOptions, layout });
   ok(codes(wrongSize.findings).includes('layout.size'));

@@ -195,9 +195,10 @@ export function contentLimits(layout: SliceLayout): SliceInsets {
 }
 
 /**
- * Reads a layout from parsed JSON: a report with a `layout` field, such as
- * the one normalize prints, or the layout itself. Validated with typia, so
- * every axis and any content padding is complete.
+ * Reads a SliceLayout or a report containing `layout` from parsed JSON.
+ * The normalize CLI includes `layout` for multi-region results; its single-region
+ * reports expose insets and content padding instead. Validated with typia, so
+ * every axis and any layout content padding is complete.
  */
 export function readLayoutJson(json: unknown): SliceLayout {
   const layout =
@@ -210,7 +211,12 @@ export function readLayoutJson(json: unknown): SliceLayout {
       .slice(0, 3)
       .map((error) => `${error.path} should be ${error.expected}`)
       .join('; ');
-    throw new RangeError(`No valid layout (pass the normalize report or its layout): ${problems}.`);
+    throw new RangeError(
+      'No valid layout: pass a SliceLayout object or a report containing "layout". ' +
+        'For a single-region normalize report, use its insets with --insets, ' +
+        'repeat --mode and --tile when applicable, and use its contentPadding ' +
+        `with --padding if needed. ${problems}.`,
+    );
   }
   return result.data;
 }
