@@ -52,6 +52,12 @@ jobs:
       - run: pnpm check
       - run: pnpm test
       - run: pnpm build
+      - name: Install Playwright browser engines with Linux dependencies
+        if: runner.os == 'Linux'
+        run: pnpm exec playwright install --with-deps chromium firefox webkit
+      - name: Install Playwright browser engines
+        if: runner.os != 'Linux'
+        run: pnpm exec playwright install chromium firefox webkit
       # Installs the packed public API in a clean project and drives the same
       # HTML/CSS and Canvas scenarios with real browser input.
       - run: pnpm browser:check

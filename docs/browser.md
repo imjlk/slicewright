@@ -15,7 +15,7 @@ Use Node 24 or newer. In a project using Playwright Test:
 
 ```sh
 npm install --save-dev slicewright @playwright/test playwright-core
-npx playwright install chromium
+npx playwright install chromium firefox webkit
 ```
 
 Browser tooling is an optional peer dependency. Importing `slicewright` or using
@@ -196,3 +196,32 @@ handlers, stale painting, shifted content, clipped text, and an input-blocking
 overlay must be caught. Artifacts are saved under `.slicewright/browser-e2e/` and
 uploaded by CI on Linux and Windows. No repository source import or private tool
 copy is required by the consumer.
+
+## Browser engines
+
+The same `domTarget`, `regionTarget`, snapshot checks, and baseline APIs are
+verified with Playwright's Chromium, Firefox, and WebKit. Keep references local
+to a browser and rendering environment; font rasterization and pixels can differ
+between engines and operating systems. WebKit verification is not a claim about
+a specific released Safari version or mobile device.
+
+For repository verification, install the locked browsers and run both consumers:
+
+```sh
+pnpm exec playwright install chromium firefox webkit
+pnpm build
+pnpm browser:check
+pnpm playwright:check
+```
+
+On Linux, use `pnpm exec playwright install --with-deps chromium firefox webkit`
+to install system dependencies too. Missing engines fail the command with
+installation guidance. `SLICEWRIGHT_CHROME_CHANNEL` selects an installed Chrome
+channel for Chromium only; Firefox and WebKit always use the locked engines.
+
+The browser consumer runs identical DOM/Canvas scenarios in all three engines,
+including scroll and DPR changes, fixed/sticky captures, persisted baselines,
+and deliberate failures. Its report records each browser's name and version;
+artifacts are separated by engine under `.slicewright/browser-e2e/`. The
+Playwright consumer also runs every assertion scenario in three named projects
+and keeps their results under `.slicewright/playwright-e2e/`.

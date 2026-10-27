@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs';
 import { cp, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
@@ -13,6 +13,8 @@ import typia from 'typia';
 const execute = promisify(execFile);
 const require = createRequire(import.meta.url);
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const browserNames = ['chromium', 'firefox', 'webkit'] as const;
+type BrowserName = (typeof browserNames)[number];
 
 interface Attachment {
   readonly name: string;
@@ -29,7 +31,10 @@ interface RunnerResult {
 
 interface RunnerSpec {
   readonly title: string;
-  readonly tests: readonly { readonly results: readonly RunnerResult[] }[];
+  readonly tests: readonly {
+    readonly projectName: BrowserName;
+    readonly results: readonly RunnerResult[];
+  }[];
 }
 
 interface RunnerSuite {
@@ -77,7 +82,18 @@ export interface PlaywrightConsumerReport {
   readonly passed: number;
   readonly negativeControls: number;
   readonly attachments: number;
-  readonly cases: readonly { readonly name: string; readonly rejected: boolean }[];
+  readonly cases: readonly {
+    readonly browser: BrowserName;
+    readonly name: string;
+    readonly rejected: boolean;
+  }[];
+  readonly browsers: readonly {
+    readonly name: BrowserName;
+    readonly version: string;
+    readonly passed: number;
+    readonly negativeControls: number;
+    readonly attachments: number;
+  }[];
   readonly output: string;
 }
 
@@ -98,6 +114,7 @@ async function run(
   cwd: string,
   env = process.env,
   expectedExit = 0,
+  timeout = 180_000,
 ): Promise<void> {
   let exitCode = 0;
   let details = '';
@@ -106,7 +123,7 @@ async function run(
       cwd,
       env,
       maxBuffer: 16 * 1024 * 1024,
-      timeout: 180_000,
+      timeout,
       windowsHide: true,
     });
     details = `${result.stdout}\n${result.stderr}`;
@@ -144,40 +161,86 @@ async function probeFor(result: RunnerResult): Promise<ConsumerProbe> {
   );
 }
 
-async function verifyRunner(report: RunnerReport): Promise<{
-  cases: { name: string; rejected: boolean }[];
+async function verifyRunner(report: RunnerReport, output: string): Promise<{
+  cases: { browser: BrowserName; name: string; rejected: boolean }[];
+  browsers: PlaywrightConsumerReport['browsers'];
   attachments: number;
 }> {
   deepStrictEqual(report.errors, [], 'Runner setup and teardown must succeed.');
-  deepStrictEqual(report.stats, {
-    ...report.stats,
-    expected: 11,
-    unexpected: 6,
-    flaky: 0,
-    skipped: 0,
-  });
   const specs = allSpecs(report.suites);
+  const failures = specs.flatMap((spec) => spec.tests.flatMap((test) => test.results
+    .filter((result) => result.status !== (spec.title.startsWith('fails:') ? 'failed' : 'passed'))
+    .map((result) => `[${test.projectName}] ${spec.title}: ${result.errors.map((error) => error.message ?? '').join('\n')}`),
+  )).join('\n');
+  deepStrictEqual(
+    report.stats,
+    {
+      ...report.stats,
+      expected: 33,
+      unexpected: 18,
+      flaky: 0,
+      skipped: 0,
+    },
+    failures,
+  );
   strictEqual(specs.length, 17, 'Every intended consumer case must actually execute.');
-  const cases: { name: string; rejected: boolean }[] = [];
+  const executions = specs.flatMap((spec) => {
+    deepStrictEqual(
+      spec.tests.map((test) => test.projectName).sort(),
+      [...browserNames].sort(),
+      `${spec.title}: every browser project must execute exactly once.`,
+    );
+    return spec.tests.map((test) => ({ title: spec.title, ...test }));
+  });
+  strictEqual(executions.length, 51);
+  const cases: { browser: BrowserName; name: string; rejected: boolean }[] = [];
+  const versions = new Map<BrowserName, string>();
+  const browserAttachments = new Map<BrowserName, number>();
   const artifactNames = new Set<string>();
   const artifactPaths = new Set<string>();
-  for (const spec of specs) {
-    strictEqual(spec.tests.length, 1, spec.title);
-    const results = spec.tests[0]?.results;
-    ok(results);
-    strictEqual(results.length, 1, `${spec.title}: runner retries must be disabled.`);
+  for (const spec of executions) {
+    const label = `[${spec.projectName}] ${spec.title}`;
+    const results = spec.results;
+    strictEqual(results.length, 1, `${label}: runner retries must be disabled.`);
     const result = results[0];
     ok(result);
     const rejected = spec.title.startsWith('fails:');
-    strictEqual(result.status, rejected ? 'failed' : 'passed', spec.title);
-    cases.push({ name: spec.title, rejected });
+    strictEqual(result.status, rejected ? 'failed' : 'passed', label);
+    cases.push({ browser: spec.projectName, name: spec.title, rejected });
+    if (spec.title.startsWith('public interaction')) {
+      const identity = result.attachments.find((entry) => entry.name === 'consumer-browser');
+      ok(identity, `${label}: actual browser identity must be reported.`);
+      const browser = typia.assert<{ name: BrowserName; version: string }>(
+        JSON.parse((await attachmentBytes(identity)).toString('utf8')),
+      );
+      strictEqual(
+        browser.name,
+        spec.projectName,
+        `${label}: project must launch the requested engine.`,
+      );
+      ok(browser.version.length > 0);
+      const prior = versions.get(browser.name);
+      if (prior !== undefined) {
+        strictEqual(browser.version, prior, `${label}: browser version must be consistent.`);
+      }
+      versions.set(browser.name, browser.version);
+    }
     const artifacts = result.attachments.filter((entry) => entry.name.startsWith('slicewright-'));
+    browserAttachments.set(
+      spec.projectName,
+      (browserAttachments.get(spec.projectName) ?? 0) + artifacts.length,
+    );
     for (const artifact of artifacts) {
-      ok(!artifactNames.has(artifact.name), `${spec.title}: duplicate attachment name.`);
+      ok(!artifactNames.has(artifact.name), `${label}: duplicate attachment name.`);
       artifactNames.add(artifact.name);
       if (artifact.path !== undefined) {
-        ok(!artifactPaths.has(artifact.path), `${spec.title}: artifact path collision.`);
+        ok(!artifactPaths.has(artifact.path), `${label}: artifact path collision.`);
         artifactPaths.add(artifact.path);
+        const path = relative(join(output, 'test-results', spec.projectName), artifact.path);
+        ok(
+          path !== '..' && !path.startsWith(`..${sep}`) && !isAbsolute(path),
+          `${label}: artifact must stay in its browser directory.`,
+        );
       }
       const bytes = await attachmentBytes(artifact);
       ok(bytes.length > 0);
@@ -323,7 +386,21 @@ async function verifyRunner(report: RunnerReport): Promise<{
       strictEqual(probe.rejected, 2);
     }
   }
-  return { cases, attachments: artifactNames.size };
+  const browsers = browserNames.map((name) => {
+    const entries = cases.filter((entry) => entry.browser === name);
+    strictEqual(entries.length, 17, `${name}: complete matcher suite required.`);
+    const passed = entries.filter((entry) => !entry.rejected).length;
+    const negativeControls = entries.filter((entry) => entry.rejected).length;
+    const attachments = browserAttachments.get(name) ?? 0;
+    strictEqual(passed, 11, name);
+    strictEqual(negativeControls, 6, name);
+    strictEqual(attachments, 49, `${name}: expected every independent assertion artifact.`);
+    const version = versions.get(name);
+    ok(version, `${name}: actual browser version required.`);
+    return { name, version, passed, negativeControls, attachments };
+  });
+  strictEqual(artifactNames.size, 147);
+  return { cases, browsers, attachments: artifactNames.size };
 }
 
 /**
@@ -332,6 +409,8 @@ async function verifyRunner(report: RunnerReport): Promise<{
  *
  * @evidence docs/spec.md#playwright-test-integration Exercises installed declarations, optional-peer isolation, retrying DOM and Canvas checks, real input exactly once, negation, soft assertions, deadlines, invalid input, and isolated runner attachments.
  * @evidenceReview docs/spec.md#playwright-test-integration #4274194 Read the contract and ran pnpm playwright:check on macOS Chrome: clean optional-peer installation and declarations passed; all 17 runner cases had their expected outcomes and 49 attachments were validated, including late rejection and attachment-failure probes.
+ * @evidence docs/spec.md#browser-engine-compatibility Runs each installed public matcher scenario in Chromium, Firefox, and WebKit projects, validates actual engine identity and independent outcomes, and checks globally unique artifacts within each engine directory.
+ * @evidenceReview docs/spec.md#browser-engine-compatibility #7f2473b Read the three-project and reporter checks; ran pnpm playwright:check on macOS Chromium 156, Firefox 157, and WebKit 27.2 with all 51 expected outcomes and 147 unique attachments validated, including each engine identity and output directory.
  */
 export async function verifiesPackedPlaywrightConsumer(): Promise<PlaywrightConsumerReport> {
   ok(existsSync(join(root, 'dist/playwright.js')), 'Run pnpm build before pnpm playwright:check.');
@@ -382,6 +461,18 @@ export async function verifiesPackedPlaywrightConsumer(): Promise<PlaywrightCons
       },
     }, null, 2)}\n`);
     await run(install, consumer);
+    await run(['--input-type=module', '-e', `
+      import { existsSync } from 'node:fs';
+      import { chromium, firefox, webkit } from '@playwright/test';
+      for (const browser of [chromium, firefox, webkit]) {
+        if (browser.name() === 'chromium' && process.env.SLICEWRIGHT_CHROME_CHANNEL) continue;
+        if (!existsSync(browser.executablePath())) {
+          throw new Error('Missing Playwright ' + browser.name() + ' executable. Run ' +
+            'pnpm exec playwright install chromium firefox webkit before pnpm playwright:check ' +
+            '(on Linux, add --with-deps to install system dependencies).');
+        }
+      }
+    `], consumer);
     await cp(join(root, 'test/playwright-consumer'), consumer, { recursive: true });
     await cp(join(root, 'examples/browser-e2e'), join(consumer, 'fixture'), { recursive: true });
     await cp(join(consumer, 'contract.ts.txt'), join(consumer, 'contract.ts'));
@@ -411,12 +502,13 @@ export async function verifiesPackedPlaywrightConsumer(): Promise<PlaywrightCons
         SLICEWRIGHT_CONSUMER_OUTPUT: join(output, 'test-results'),
       },
       1,
+      360_000,
     );
     const runnerReport = typia.assert<RunnerReport>(
       JSON.parse(await readFile(runnerReportPath, 'utf8')),
     );
-    const verified = await verifyRunner(runnerReport);
-    const report = { passed: 11, negativeControls: 6, ...verified, output };
+    const verified = await verifyRunner(runnerReport, output);
+    const report = { passed: 33, negativeControls: 18, ...verified, output };
     await writeFile(join(output, 'consumer-report.json'), `${JSON.stringify(report, null, 2)}\n`);
     return report;
   } finally {

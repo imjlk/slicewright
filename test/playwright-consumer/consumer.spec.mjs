@@ -6,7 +6,11 @@ import { expect, toMatchUI } from 'slicewright/playwright';
 import { delayedTarget, exampleTargets, observed, probe, test } from './fixtures.mjs';
 
 for (const renderer of ['dom', 'canvas']) {
-  test(`public interaction ${renderer}`, async ({ page, fixtureUrl }) => {
+  test(`public interaction ${renderer}`, async ({ page, browser, fixtureUrl }, testInfo) => {
+    await testInfo.attach('consumer-browser', {
+      body: JSON.stringify({ name: browser.browserType().name(), version: browser.version() }),
+      contentType: 'application/json',
+    });
     const { panel, action } = await exampleTargets(page, fixtureUrl, renderer);
     const before = await panel.capture();
     const actionBefore = await action.capture();

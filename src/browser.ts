@@ -116,6 +116,8 @@ interface Viewport {
  *
  * @evidence docs/spec.md#browser-ui-verification Measures fresh CSS rectangles, sends pointer input, and captures CSS-scale pixels with scroll and geometry guards through the optional browser entry point.
  * @evidenceReview docs/spec.md#browser-ui-verification #9f7e47a Read the section against the fresh-measurement, real-input and capture guards, and checked Playwright screenshot clip coordinate handling in the installed implementation.
+ * @evidence docs/spec.md#browser-engine-compatibility Uses the same page input and CSS-scale screenshot path for browser engines, checking viewport stability and decoded clip dimensions without renderer-specific state changes.
+ * @evidenceReview docs/spec.md#browser-engine-compatibility #7f2473b Read the compatibility contract and capture/input guards; ran the packed consumer on locked Chromium, Firefox, and WebKit with all 54 scenarios, six fixed/sticky probes, and six persisted baseline round-trips passing.
  */
 export function regionTarget(page: Page, source: BrowserRegionSource): BrowserTarget {
   const measure = async (): Promise<BrowserMeasurement> => {
