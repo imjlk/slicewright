@@ -145,6 +145,8 @@ async function scenario(page, bound, directory, scroll, baselineEnvironment) {
   }
 
   const normalPanel = await bound.panel.capture();
+  strictEqual(normalPanel.measurement.bounds.y, Math.round(normalPanel.measurement.bounds.y),
+    'The static baseline fixture must start on whole CSS pixels; positioned probes cover fractional clips.');
   const normal = await bound.action.capture();
   await verify('initial-panel', normalPanel, {
     contentFits: true,
