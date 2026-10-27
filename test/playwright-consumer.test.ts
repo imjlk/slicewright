@@ -15,6 +15,13 @@ const require = createRequire(import.meta.url);
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const browserNames = ['chromium', 'firefox', 'webkit'] as const;
 type BrowserName = (typeof browserNames)[number];
+const preparedSnapshotCases = new Set([
+  'artifact failures preserve the original failure',
+  'fails: project timeout keeps final observation and artifacts',
+  'fails: configured timeout respects negation',
+  'fails: soft matcher continues after two failures',
+  'fails: concurrent assertions retain distinct artifacts',
+]);
 
 interface Attachment {
   readonly name: string;
@@ -56,6 +63,8 @@ interface RunnerReport {
 interface ConsumerProbe {
   readonly captures?: number;
   readonly actions?: number;
+  readonly observationSource?: 'captured-once';
+  readonly matcherActions?: number;
   readonly elapsed?: number;
   readonly timeout?: number;
   readonly continued?: boolean;
@@ -256,6 +265,31 @@ async function verifyRunner(report: RunnerReport, output: string): Promise<{
         ok(bytes.readUInt32BE(16) > 0 && bytes.readUInt32BE(20) > 0);
       }
     }
+    if (preparedSnapshotCases.has(spec.title)) {
+      const probe = await probeFor(result);
+      strictEqual(
+        probe.observationSource,
+        'captured-once',
+        `${label}: timed callbacks must use prepared real snapshots.`,
+      );
+      strictEqual(probe.matcherActions, 0, `${label}: the matcher must only observe.`);
+      ok(
+        probe.captures !== undefined && probe.captures > 1,
+        `${label}: timed callbacks must retry.`,
+      );
+      for (const assertion of artifacts.filter((entry) => entry.name.endsWith('-assertion'))) {
+        const diagnostic = typia.assert<{
+          attempts: number;
+          observation: 'last-valid-capture';
+          lastValidAttempt: number;
+        }>(JSON.parse((await attachmentBytes(assertion)).toString('utf8')));
+        ok(diagnostic.attempts > 1, `${label}: each assertion must retry its capture callback.`);
+        ok(
+          diagnostic.lastValidAttempt > 1,
+          `${label}: each assertion must complete repeated captures.`,
+        );
+      }
+    }
     if (!rejected) {
       if (spec.title.startsWith('capture exceptions')) {
         const diagnostics = artifacts.filter((entry) => entry.name.endsWith('-assertion'));
@@ -435,7 +469,7 @@ async function verifyRunner(report: RunnerReport, output: string): Promise<{
  * semantics through public imports, including intentionally failing child tests.
  *
  * @evidence docs/spec.md#playwright-test-integration Exercises installed declarations, optional-peer isolation, retrying DOM and Canvas checks, real input exactly once, negation, soft assertions, deadlines, invalid input, and isolated runner attachments.
- * @evidenceReview docs/spec.md#playwright-test-integration #4274194 Read the contract and inspected the completed three-engine runner report: each browser started one hanging capture, the 250 ms matcher expired in 256-259 ms, and the 2000 ms test budget cut off the 5000 ms matcher in 1755-1758 ms with the corresponding native timeout reason.
+ * @evidenceReview docs/spec.md#playwright-test-integration #4274194 Read the contract and timed probes using clones of real snapshots captured before their deadlines, repeated completed callback checks and action rejection; ran the packed three-engine consumer with 51 expected outcomes and 147 artifacts, including unchanged live interaction and delayed-render checks and strict native deadline diagnostics.
  * @evidence docs/spec.md#browser-engine-compatibility Runs each installed public matcher scenario in Chromium, Firefox, and WebKit projects, validates actual engine identity and independent outcomes, and checks globally unique artifacts within each engine directory.
  * @evidenceReview docs/spec.md#browser-engine-compatibility #d7e3d78 Re-read the compatibility contract, three-project checks, strict matcher references, and the completed macOS report with 51 expected outcomes and 147 unique attachments; the separate baseline fixture allowance does not change these matcher comparisons or deadline probes.
  */

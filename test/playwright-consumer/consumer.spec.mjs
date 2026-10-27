@@ -6,6 +6,24 @@ import { expect, toMatchUI } from 'slicewright/playwright';
 import { delayedTarget, exampleTargets, observed, probe, test } from './fixtures.mjs';
 import { settleInitialPanel } from './stable-capture.mjs';
 
+// Short runner-semantics deadlines consume a real snapshot captured beforehand.
+// Each callback returns independent bytes; every attempted action is an error.
+function observedSnapshot(snapshot) {
+  const unexpectedAction = async () => { throw new Error('A snapshot probe must only observe.'); };
+  return observed({
+    measure: async () => structuredClone(snapshot.measurement),
+    capture: async () => structuredClone(snapshot),
+    hover: unexpectedAction,
+    press: unexpectedAction,
+    release: unexpectedAction,
+    click: unexpectedAction,
+  });
+}
+
+function snapshotProbe(state) {
+  return { ...state, observationSource: 'captured-once', matcherActions: state.actions };
+}
+
 for (const renderer of ['dom', 'canvas']) {
   test(`public interaction ${renderer}`, async ({ page, browser, fixtureUrl }, testInfo) => {
     const { panel, action } = await exampleTargets(page, fixtureUrl, renderer);
@@ -127,6 +145,7 @@ test('invalid options fail immediately under both polarities', async ({ page, fi
 
 test('artifact failures preserve the original failure', async ({ page, fixtureUrl }, testInfo) => {
   const target = await delayedTarget(page, fixtureUrl);
+  const timed = observedSnapshot(await target.capture());
   const originalAttach = testInfo.attach;
   let artifactFailures = 0;
   let captureErrors = 0;
@@ -162,7 +181,7 @@ test('artifact failures preserve the original failure', async ({ page, fixtureUr
     for (const annotation of annotations) {
       match(annotation.description ?? '', /consumer attachment failed/);
     }
-    await rejects(() => expect(target).toMatchUI(
+    await rejects(() => expect(timed.target).toMatchUI(
       { text: { label: 'Missing even when artifacts fail' } }, { timeout: 750, intervals: [25] },
     ), (error) => {
       match(error.message, /Expected browser UI/);
@@ -174,7 +193,7 @@ test('artifact failures preserve the original failure', async ({ page, fixtureUr
   } finally {
     testInfo.attach = originalAttach;
   }
-  await probe(testInfo, { artifactFailures, captureErrors, timeoutDiagnostic });
+  await probe(testInfo, { ...snapshotProbe(timed.state), artifactFailures, captureErrors, timeoutDiagnostic });
 });
 
 test('late capture errors cannot replace an expired assertion', async ({}, testInfo) => {
@@ -215,37 +234,36 @@ test('late capture errors cannot replace an expired assertion', async ({}, testI
 });
 
 test('fails: project timeout keeps final observation and artifacts', async ({ page, fixtureUrl }, testInfo) => {
-  const { target, state } = observed(await delayedTarget(page, fixtureUrl, 'dom', 0));
-  const reference = await target.capture();
-  await target.click();
+  const live = observed(await delayedTarget(page, fixtureUrl, 'dom', 0));
+  const reference = await live.target.capture();
+  await live.target.click();
   await page.waitForFunction(() => window.delayedFixture.state().label === 'Ready');
+  const { target, state } = observedSnapshot(await live.target.capture());
   const started = Date.now();
   try {
     await expect(target).toMatchUI({ reference, text: { label: 'Impossible final label' } }, { intervals: [25] });
   } finally {
-    await probe(testInfo, { ...state, elapsed: Date.now() - started, timeout: 1000 });
+    await probe(testInfo, { ...snapshotProbe(state), actions: live.state.actions, elapsed: Date.now() - started, timeout: 1000 });
   }
 });
 
 test('fails: configured timeout respects negation', async ({ page, fixtureUrl }, testInfo) => {
-  const { target, state } = observed(await delayedTarget(page, fixtureUrl));
-  // Complete a real screenshot before the short polling deadline starts.
-  await target.capture();
-  state.captures = 0;
+  const live = await delayedTarget(page, fixtureUrl);
+  const { target, state } = observedSnapshot(await live.capture());
   const started = Date.now();
   try {
     await expect.configure({ timeout: 750 })(target).not.toMatchUI({ text: { label: 'Waiting' } }, { intervals: [25] });
   } finally {
-    await probe(testInfo, { ...state, elapsed: Date.now() - started, timeout: 750 });
+    await probe(testInfo, { ...snapshotProbe(state), elapsed: Date.now() - started, timeout: 750 });
   }
 });
 
 test('fails: soft matcher continues after two failures', async ({ page, fixtureUrl }, testInfo) => {
-  const target = await delayedTarget(page, fixtureUrl);
-  await target.capture();
+  const live = await delayedTarget(page, fixtureUrl);
+  const { target, state } = observedSnapshot(await live.capture());
   await expect.soft(target).toMatchUI({ text: { label: 'First missing label' } }, { timeout: 750, intervals: [25] });
   await expect.soft(target).not.toMatchUI({ text: { label: 'Waiting' } }, { timeout: 750, intervals: [25] });
-  await probe(testInfo, { continued: true, errors: testInfo.errors.length });
+  await probe(testInfo, { ...snapshotProbe(state), continued: true, errors: testInfo.errors.length });
 });
 
 test('fails: concurrent assertions retain distinct artifacts', async ({ page, fixtureUrl }, testInfo) => {
@@ -253,13 +271,19 @@ test('fails: concurrent assertions retain distinct artifacts', async ({ page, fi
   const secondPage = await page.context().newPage();
   try {
     const second = await delayedTarget(secondPage, fixtureUrl, 'canvas');
-    await first.capture();
-    await second.capture();
+    const firstObservation = observedSnapshot(await first.capture());
+    const secondObservation = observedSnapshot(await second.capture());
     const results = await Promise.allSettled([
-      expect(first).toMatchUI({ text: { label: 'Parallel DOM mismatch' } }, { timeout: 1000, intervals: [25] }),
-      expect(second).toMatchUI({ text: { label: 'Parallel Canvas mismatch' } }, { timeout: 1000, intervals: [25] }),
+      expect(firstObservation.target).toMatchUI({ text: { label: 'Parallel DOM mismatch' } }, { timeout: 1000, intervals: [25] }),
+      expect(secondObservation.target).toMatchUI({ text: { label: 'Parallel Canvas mismatch' } }, { timeout: 1000, intervals: [25] }),
     ]);
-    await probe(testInfo, { rejected: results.filter((result) => result.status === 'rejected').length });
+    await probe(testInfo, {
+      ...snapshotProbe({
+        captures: firstObservation.state.captures + secondObservation.state.captures,
+        actions: firstObservation.state.actions + secondObservation.state.actions,
+      }),
+      rejected: results.filter((result) => result.status === 'rejected').length,
+    });
     const failure = results.find((result) => result.status === 'rejected');
     if (failure) { throw failure.reason; }
   } finally {

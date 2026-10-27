@@ -126,6 +126,14 @@ overridden deadlines, invalid inputs, capture errors, and separate attachment
 paths for concurrent assertions. Deliberately failing child tests are checked as
 negative controls. Their reports are kept under `.slicewright/playwright-e2e/`.
 
+Interaction and delayed-render checks capture the live UI on every attempt.
+Short deadline, soft-assertion, concurrent-attachment, and attachment-error
+probes first capture real DOM or Canvas snapshots outside the timed assertion.
+Their observation callbacks return fresh copies of those snapshots and reject
+actions, so these probes measure runner behavior independently of native
+screenshot latency. Callback counts, exact findings, images, reports, and
+deadline diagnostics remain required.
+
 Use named projects in your application's Playwright config to run the same test
 against each browser:
 
