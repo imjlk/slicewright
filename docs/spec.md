@@ -780,3 +780,40 @@ and negation, soft assertions, configured and overridden timeouts, invalid
 options, capture errors, and concurrent artifact paths are verified through the
 runner's actual results. Public declarations compile in that consumer without
 repository source imports.
+
+## Persistent browser baselines
+
+The browser entry point can save an explicitly approved `BrowserSnapshot` with
+`saveBrowserBaseline` and load it with `loadBrowserBaseline`. Saving requires
+`approved: true` and a nonempty caller-owned environment key. Loading requires
+the same environment key and returns a snapshot usable by `checkSnapshot` and
+the Playwright matcher. The key identifies the consumer's browser, platform,
+viewport, device scale, fonts, and other rendering assumptions; the library does
+not infer those assumptions or choose a baseline automatically.
+
+A baseline has a versioned JSON manifest and a content-addressed PNG beside it.
+The manifest identifies the slicewright browser-baseline format, version one,
+environment, measurement, clip, raster dimensions, and the PNG's SHA-256 digest.
+The PNG path is derived from the manifest filename and validated digest, never
+from an arbitrary path or URL in JSON. Measurements, text, text bounds, alpha,
+and raster pixels round-trip. JSON is validated with typia; unsupported formats
+or versions, empty or mismatched environments, malformed measurements, missing
+or invalid PNGs, digest mismatches, and inconsistent dimensions are rejected.
+Loading never creates or updates a baseline.
+
+Saving validates and serializes its inputs before any filesystem write. It
+stages a complete PNG before exposing its digest filename, then commits complete
+metadata through a same-directory rename. A concurrent reader sees the previous
+or new complete baseline, not metadata paired with a partial image. Existing
+digest files must match their contents, and previous digest images remain
+available to readers. Invalid or unapproved writes and failures before metadata
+replacement preserve an existing baseline. Temporary files are cleaned up.
+This is not a disk-durability guarantee or a lock between competing approvals.
+
+Neither assertions, missing references, environment variables, nor a test
+runner's snapshot-update flag implicitly approve a baseline. Creation and
+replacement both require an explicit approved save call. Tests cover round-trip
+and replacement, rejection without writes, corrupted or incompatible files,
+concurrent readers and saves, and preservation after an image-install failure.
+A clean packed consumer saves a rendered baseline, loads it in another process,
+and verifies both matching and changed rendered UI through the public APIs.

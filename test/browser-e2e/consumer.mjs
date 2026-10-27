@@ -1,15 +1,20 @@
 import { deepStrictEqual, ok, strictEqual } from 'node:assert/strict';
+import { execFile } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 
 import { chromium } from 'playwright-core';
-import { checkSnapshot, domTarget, regionTarget, writeBrowserArtifacts } from 'slicewright/browser';
+import {
+  checkSnapshot, domTarget, regionTarget, saveBrowserBaseline, writeBrowserArtifacts,
+} from 'slicewright/browser';
 
 // This file runs from a newly installed consumer project. Its only product
 // imports are public package exports, exactly as in an application's own test.
 const directory = dirname(fileURLToPath(import.meta.url));
+const execute = promisify(execFile);
 const fixture = join(directory, 'fixture');
 const output = process.argv[2];
 ok(output, 'Supply an artifact output directory.');
@@ -38,7 +43,27 @@ const address = server.address();
 ok(address && typeof address === 'object');
 const base = `http://127.0.0.1:${address.port}`;
 const cases = [];
+let baselineRoundTrips = 0;
 let browser;
+
+async function restoreBaseline(path, environment, original) {
+  await saveBrowserBaseline(path, original, { approved: true, environment });
+  const { stdout } = await execute(process.execPath, [
+    join(directory, 'baseline-loader.mjs'), path, environment,
+  ], { cwd: directory, maxBuffer: 16 * 1024 * 1024, timeout: 30_000, windowsHide: true });
+  const saved = JSON.parse(stdout);
+  const restored = {
+    measurement: saved.measurement,
+    clip: saved.clip,
+    raster: {
+      width: saved.raster.width,
+      height: saved.raster.height,
+      data: new Uint8Array(Buffer.from(saved.raster.rgba, 'base64')),
+    },
+  };
+  deepStrictEqual(restored, original, 'The public loader must restore measurements, clip, and every RGBA byte.');
+  return restored;
+}
 
 async function checkPositionedCapture(position) {
   const context = await browser.newContext({
@@ -109,7 +134,7 @@ async function settled(page) {
 
 // The same scenario is used unchanged for both renderers and every fault. It
 // only reads readiness/measurement instrumentation; no hook sets UI state.
-async function scenario(page, bound, directory, scroll) {
+async function scenario(page, bound, directory, scroll, baselineEnvironment) {
   const findings = [];
   async function verify(step, actual, options) {
     const report = checkSnapshot(actual, options);
@@ -129,6 +154,17 @@ async function scenario(page, bound, directory, scroll) {
     text: { status: 'Choose your next adventure.', action: 'Accept quest' },
   });
   await verify('initial-action', normal, { contentFits: true, text: { label: 'Accept quest' } });
+  const baseline = baselineEnvironment === undefined ? undefined : await restoreBaseline(
+    join(directory, 'baseline.json'), baselineEnvironment, normalPanel,
+  );
+  if (baseline) {
+    await verify('baseline-initial', await bound.panel.capture(), {
+      reference: baseline,
+      stableGeometry: { reference: baseline.measurement, tolerance: 0 },
+      contentFits: true,
+      text: { status: 'Choose your next adventure.', action: 'Accept quest' },
+    });
+  }
   strictEqual(normal.raster.width, normal.clip.width);
   strictEqual(normal.raster.height, normal.clip.height);
   strictEqual(normal.measurement.bounds.height, 52, 'Action geometry uses CSS pixels at both DPRs.');
@@ -180,6 +216,15 @@ async function scenario(page, bound, directory, scroll) {
   await verify('activation-action', await bound.action.capture(), {
     stableGeometry: stable, contentFits: true, text: { label: 'Accept quest' },
   });
+  if (baseline) {
+    const comparison = checkSnapshot(acceptedPanel, { reference: baseline });
+    ok(comparison.findings.some((finding) => finding.code === 'browser.pixels'),
+      'Real activation must change rendered pixels against the separately loaded baseline.');
+    await writeBrowserArtifacts(join(directory, 'baseline-activation'), {
+      actual: acceptedPanel, reference: baseline, report: comparison,
+    });
+    await verify('baseline-changed', acceptedPanel, { changedFrom: baseline });
+  }
   await bound.action.click();
   await settled(page);
   await verify('second-click', await bound.panel.capture(), {
@@ -197,7 +242,7 @@ const requiredFailure = {
   overlay: { step: 'hover', code: 'browser.pixels-unchanged' },
 };
 
-async function runCase(renderer, configuration, fault = 'none') {
+async function runCase(renderer, configuration, fault = 'none', persistBaseline = false) {
   const { width, deviceScaleFactor, scroll } = configuration;
   const name = `${renderer}-${width}-dpr${deviceScaleFactor}-${scroll ? 'scroll' : 'top'}-${fault}`;
   const context = await browser.newContext({
@@ -211,7 +256,12 @@ async function runCase(renderer, configuration, fault = 'none') {
     await page.goto(`${base}/?${query}`);
     await page.evaluate(async () => { await window.browserE2EFixture.ready; });
     await settled(page);
-    const result = await scenario(page, targets(page, renderer), join(output, name), scroll);
+    const baselineEnvironment = persistBaseline
+      ? `browser-consumer:${process.platform}:${process.arch}:${browser.version()}:${renderer}:${width}x900@${deviceScaleFactor}:fixture-v1`
+      : undefined;
+    const result = await scenario(
+      page, targets(page, renderer), join(output, name), scroll, baselineEnvironment,
+    );
     deepStrictEqual(errors, [], `${name}: page errors`);
     if (fault === 'none') {
       deepStrictEqual(result.findings, [], `${name}: expected all public assertions to pass`);
@@ -235,6 +285,7 @@ async function runCase(renderer, configuration, fault = 'none') {
       }
     }
     cases.push({ name, renderer, fault, rejected: result.findings.length > 0, findings: result.findings });
+    if (persistBaseline) baselineRoundTrips += 1;
   } finally {
     await context.close();
   }
@@ -253,7 +304,7 @@ try {
   ];
   for (const renderer of ['dom', 'canvas']) {
     for (const configuration of configurations) {
-      await runCase(renderer, configuration);
+      await runCase(renderer, configuration, 'none', configuration === configurations[0]);
     }
     for (const fault of Object.keys(requiredFailure)) {
       await runCase(renderer, { width: 960, deviceScaleFactor: 1, scroll: false }, fault);
@@ -264,6 +315,7 @@ try {
     passed: cases.filter((entry) => entry.fault === 'none').length,
     negativeControls: cases.filter((entry) => entry.fault !== 'none' && entry.rejected).length,
     captureProbes: 2,
+    baselineRoundTrips,
     output,
   };
   await writeFile(join(output, 'consumer-report.json'), `${JSON.stringify(report, null, 2)}\n`);
