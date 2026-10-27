@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Slicewright · Browser UI verification</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <p>SLICEWRIGHT / BROWSER UI VERIFICATION</p>
+        <h1>The same quest, two renderers.</h1>
+        <p id="renderer-description"></p>
+        <nav aria-label="Renderer">
+          <a href="?renderer=dom">HTML/CSS</a>
+          <a href="?renderer=canvas">Canvas</a>
+        </nav>
+      </header>
+      <div id="scroll-spacer" aria-hidden="true"></div>
+      <section id="stage" aria-label="Interactive quest panel"></section>
+      <p class="notes">Accept the quest with your pointer or keyboard. The art, authored content region,
+        application state, and painted text have separate responsibilities.</p>
+    </main>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

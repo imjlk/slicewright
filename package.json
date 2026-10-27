@@ -32,6 +32,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./browser": {
+      "types": "./dist/browser.d.ts",
+      "default": "./dist/browser.js"
     }
   },
   "files": [
@@ -51,6 +55,7 @@
     "build": "pnpm clean && ttsc -p tsconfig.build.json",
     "examples": "ttsx tools/make-examples.ts",
     "engine:check": "ttsx tools/engine-check.ts",
+    "browser:check": "ttsx tools/browser-check.ts",
     "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
     "prepublishOnly": "pnpm check && pnpm test && pnpm build",
     "sampo:add": "sampo add",
@@ -60,6 +65,14 @@
     "fast-png": "8.0.0",
     "gunshi": "0.37.3",
     "typia": "15.1.0"
+  },
+  "peerDependencies": {
+    "playwright-core": "^1.64.0"
+  },
+  "peerDependenciesMeta": {
+    "playwright-core": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@ttsc/evidence": "0.30.4",

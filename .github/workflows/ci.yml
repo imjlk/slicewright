@@ -52,6 +52,16 @@ jobs:
       - run: pnpm check
       - run: pnpm test
       - run: pnpm build
+      # Installs the packed public API in a clean project and drives the same
+      # HTML/CSS and Canvas scenarios with real browser input.
+      - run: pnpm browser:check
+      - name: Upload browser verification artifacts
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: browser-verification-${{ runner.os }}
+          path: .slicewright/browser-e2e/
+          if-no-files-found: ignore
       # Renders examples/real as Phaser 4 NineSlices and CSS border-images in
       # the runner's Chrome and compares them with slicewright's renderer.
       - run: pnpm engine:check

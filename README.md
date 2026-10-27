@@ -55,6 +55,19 @@ importable as a library (`import { inspectRaster } from 'slicewright'`).
 
 From a clone, follow [Development](#development), then `node dist/cli.js`.
 
+### Browser E2E verification
+
+The optional `slicewright/browser` entry point brings the same interaction and
+verification API to HTML/CSS elements and Canvas regions. Bind DOM locators or
+an application-provided measurement callback, drive real mouse input, then
+check rendered pixels, stable geometry, exact text, and explicit content bounds.
+It works inside your existing Playwright tests and does not require Phaser.
+
+See the [browser verification guide](docs/browser.md) for installation, both
+bindings, a shared scenario, and failure artifacts. The
+[browser example](examples/browser-e2e) demonstrates both renderers and injected
+failures. Core CLI/library installs do not need Playwright or a browser.
+
 ### Build manifest
 
 `slicewright build ui.build.json` rebuilds a whole set. Paths are relative to
@@ -256,9 +269,14 @@ The toolchain is [ttsc](https://ttsc.dev) on TypeScript 7:
 - `pnpm build`: emit `dist` with the typia transform.
 - `pnpm engine:check`: render `examples/real` in Phaser 4 and CSS (needs
   Chrome; `SLICEWRIGHT_CHROME_CHANNEL` picks another Playwright channel).
+- `pnpm browser:check`: after `pnpm build`, install the packed package in a
+  fresh consumer project and run shared HTML/CSS and Canvas interaction tests
+  in Chrome, including injected failures. Artifacts go to
+  `.slicewright/browser-e2e/`.
 - `.mcp.json` registers the `@ttsc/graph` MCP server for agents.
 
-CI runs the checks, tests, build, and engine renders on Linux and native Windows.
+CI runs the checks, tests, build, packed browser scenarios, and engine renders on
+Linux and native Windows.
 The repository's `.gitattributes` keeps text files at LF even when Windows Git
 uses `core.autocrlf=true`; CRLF compiler input otherwise fails the format check.
 Use Node 24 or newer in the shell running pnpm, including PowerShell.
