@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { link, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 
 import typia from 'typia';
 
@@ -36,7 +37,7 @@ interface BrowserBaselineManifest {
  * previous content-addressed images remain available to concurrent readers.
  *
  * @evidence docs/spec.md#persistent-browser-baselines Validates and serializes before writes, atomically installs complete immutable PNGs, and commits a versioned manifest last without implicit approval.
- * @evidenceReview docs/spec.md#persistent-browser-baselines #2479944 Read the section and inspected approval and serialization guards, PNG linking, digest verification, metadata rename ordering, and cleanup; checked the full pnpm test log with all five baseline groups passing.
+ * @evidenceReview docs/spec.md#persistent-browser-baselines #2479944 Read the section and Windows CI EPERM log; inspected approval guards, immutable image staging, bounded Windows sharing-error retries, atomic metadata replacement, and cleanup without deleting the destination.
  */
 export async function saveBrowserBaseline(
   path: string,
@@ -85,9 +86,31 @@ export async function saveBrowserBaseline(
       }
     }
     await writeFile(temporaryManifest, json, { flag: 'wx' });
-    await rename(temporaryManifest, manifestPath);
+    await replaceManifest(temporaryManifest, manifestPath);
   } finally {
     await Promise.all([rm(temporaryPng, { force: true }), rm(temporaryManifest, { force: true })]);
+  }
+}
+
+async function replaceManifest(source: string, destination: string): Promise<void> {
+  // Windows can temporarily deny replacement while a reader holds the old
+  // manifest open. Retry the rename itself; never remove the live baseline.
+  const deadline = performance.now() + 2_000;
+  let waitMs = 10;
+  for (;;) {
+    try {
+      await rename(source, destination);
+      return;
+    } catch (error) {
+      const code = error instanceof Error && 'code' in error ? error.code : undefined;
+      const remaining = deadline - performance.now();
+      if (process.platform !== 'win32' || remaining <= 0 ||
+        (code !== 'EPERM' && code !== 'EACCES' && code !== 'EBUSY')) {
+        throw error;
+      }
+      await delay(Math.min(waitMs, remaining));
+      waitMs = Math.min(waitMs * 2, 100);
+    }
   }
 }
 
