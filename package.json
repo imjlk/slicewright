@@ -36,6 +36,10 @@
     "./browser": {
       "types": "./dist/browser.d.ts",
       "default": "./dist/browser.js"
+    },
+    "./playwright": {
+      "types": "./dist/playwright.d.ts",
+      "default": "./dist/playwright.js"
     }
   },
   "files": [
@@ -56,6 +60,7 @@
     "examples": "ttsx tools/make-examples.ts",
     "engine:check": "ttsx tools/engine-check.ts",
     "browser:check": "ttsx tools/browser-check.ts",
+    "playwright:check": "ttsx tools/playwright-check.ts",
     "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
     "prepublishOnly": "pnpm check && pnpm test && pnpm build",
     "sampo:add": "sampo add",
@@ -67,14 +72,19 @@
     "typia": "15.1.0"
   },
   "peerDependencies": {
+    "@playwright/test": "^1.64.0",
     "playwright-core": "^1.64.0"
   },
   "peerDependenciesMeta": {
+    "@playwright/test": {
+      "optional": true
+    },
     "playwright-core": {
       "optional": true
     }
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.0",
     "@ttsc/evidence": "0.30.4",
     "@ttsc/graph": "0.30.4",
     "@ttsc/lint": "0.30.4",

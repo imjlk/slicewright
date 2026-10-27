@@ -1,0 +1,25 @@
+import { expect as baseExpect, type Page } from '@playwright/test';
+import { domTarget, regionTarget, type BrowserTarget } from 'slicewright/browser';
+import { expect, toMatchUI } from 'slicewright/playwright';
+
+declare const page: Page;
+
+async function scenario(target: BrowserTarget): Promise<void> {
+  const before = await target.capture();
+  await target.click();
+  await expect(target).toMatchUI({
+    changedFrom: before,
+    stableGeometry: { reference: before.measurement, tolerance: 0.1 },
+    contentFits: true,
+    text: { label: 'Ready' },
+  }, { timeout: 1000, intervals: [25, 50] });
+  await expect.soft(target).not.toMatchUI({ reference: before });
+  await expect.configure({ timeout: 1000 })(target).toMatchUI({ contentFits: true });
+  const customExpect = baseExpect.extend({ toMatchUI });
+  await customExpect(target).toMatchUI({ reference: before });
+}
+
+void scenario(domTarget(page, { root: page.locator('button') }));
+void scenario(regionTarget(page, {
+  measure: () => Promise.resolve({ bounds: { x: 0, y: 0, width: 100, height: 50 } }),
+}));
