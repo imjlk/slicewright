@@ -837,6 +837,16 @@ scenario in three named projects, checking intended failures and attachments
 separately per engine. Reports identify the browser and artifacts remain
 separate so one engine cannot overwrite another's evidence.
 
+Persisted pixels must round-trip byte-for-byte. The consumer's fresh-render
+comparison may explicitly allow small RGB differences inside measured text
+bounds (mean 0.01, p99 0, maximum 32 on the 0–255 error scale), while requiring
+identical metadata, alpha, and pixels outside those bounds. This is a test
+fixture policy, not a change to the library's zero-tolerance default. It can
+admit tiny text-rendering regressions within that budget; guards must reject
+larger peak or aggregate drift, changes outside text bounds, alpha changes,
+and the real activated UI under the same tolerance. Other interaction and
+negative-control comparisons retain their existing strict checks.
+
 The verification commands use the browsers installed for the locked Playwright
 version. A Chrome channel override applies only to Chromium. A missing browser
 is an error with installation guidance, never a silently skipped engine. CI

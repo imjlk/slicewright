@@ -12,6 +12,9 @@ import {
 } from 'slicewright/browser';
 
 import { settleInitialPanel } from './stable-capture.mjs';
+import {
+  assertFreshBaseline, compareFreshBaseline, verifyFreshBaselineControls, writeFreshBaselineArtifacts,
+} from './baseline-policy.mjs';
 
 // This file runs from a newly installed consumer project. Its only product
 // imports are public package exports, exactly as in an application's own test.
@@ -46,6 +49,7 @@ ok(address && typeof address === 'object');
 const base = `http://127.0.0.1:${address.port}`;
 
 async function restoreBaseline(path, environment, original) {
+  const approved = structuredClone(original);
   await saveBrowserBaseline(path, original, { approved: true, environment });
   const { stdout } = await execute(process.execPath, [
     join(directory, 'baseline-loader.mjs'), path, environment,
@@ -60,7 +64,8 @@ async function restoreBaseline(path, environment, original) {
       data: new Uint8Array(Buffer.from(saved.raster.rgba, 'base64')),
     },
   };
-  deepStrictEqual(restored, original, 'The public loader must restore measurements, clip, and every RGBA byte.');
+  deepStrictEqual(original, approved, 'Saving must not mutate the approved snapshot.');
+  deepStrictEqual(restored, approved, 'The public loader must restore measurements, clip, and every RGBA byte.');
   return restored;
 }
 
@@ -160,12 +165,10 @@ async function scenario(page, bound, directory, scroll, baselineEnvironment) {
     join(directory, 'baseline.json'), baselineEnvironment, normalPanel,
   );
   if (baseline) {
-    await verify('baseline-initial', await bound.panel.capture(), {
-      reference: baseline,
-      stableGeometry: { reference: baseline.measurement, tolerance: 0 },
-      contentFits: true,
-      text: { status: 'Choose your next adventure.', action: 'Accept quest' },
-    });
+    const actual = await bound.panel.capture();
+    const comparison = compareFreshBaseline(actual, baseline);
+    await writeFreshBaselineArtifacts(join(directory, 'baseline-initial'), actual, baseline, comparison);
+    assertFreshBaseline(actual, baseline, comparison);
   }
   strictEqual(normal.raster.width, normal.clip.width);
   strictEqual(normal.raster.height, normal.clip.height);
@@ -219,12 +222,10 @@ async function scenario(page, bound, directory, scroll, baselineEnvironment) {
     stableGeometry: stable, contentFits: true, text: { label: 'Accept quest' },
   });
   if (baseline) {
-    const comparison = checkSnapshot(acceptedPanel, { reference: baseline });
-    ok(comparison.findings.some((finding) => finding.code === 'browser.pixels'),
-      'Real activation must change rendered pixels against the separately loaded baseline.');
-    await writeBrowserArtifacts(join(directory, 'baseline-activation'), {
-      actual: acceptedPanel, reference: baseline, report: comparison,
-    });
+    const comparison = compareFreshBaseline(acceptedPanel, baseline);
+    await writeFreshBaselineArtifacts(join(directory, 'baseline-activation'), acceptedPanel, baseline, comparison);
+    ok(comparison.report.findings.some((finding) => finding.code === 'browser.pixels'),
+      'Real activation must exceed the same explicit fresh-render tolerance.');
     await verify('baseline-changed', acceptedPanel, { changedFrom: baseline });
   }
   await bound.action.click();
@@ -356,12 +357,14 @@ async function runEngine(browserType) {
 }
 
 try {
+  const baselinePolicyControls = await verifyFreshBaselineControls(join(output, 'baseline-policy-controls'));
   const engines = [];
   for (const browserType of [chromium, firefox, webkit]) {
     engines.push(await runEngine(browserType));
   }
   const report = {
     engines,
+    baselinePolicyControls,
     cases: engines.flatMap((engine) => engine.cases),
     passed: engines.reduce((total, engine) => total + engine.passed, 0),
     negativeControls: engines.reduce((total, engine) => total + engine.negativeControls, 0),

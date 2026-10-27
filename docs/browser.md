@@ -229,3 +229,13 @@ render preparation: later mismatches do not update that reference, and inputs
 still run once. The
 Playwright consumer also runs every assertion scenario in three named projects
 and keeps their results under `.slicewright/playwright-e2e/`.
+
+Baseline save/load remains byte-exact. For the consumer's fresh capture after
+loading, the fixture explicitly allows RGB error inside measured text bounds
+of mean `0.01`, p99 `0`, and maximum `32` on the 0–255 scale. Windows Firefox
+produced 14 differing glyph-edge pixels despite two identical setup captures;
+the saved pixels, metadata, and alpha were unchanged. The consumer still
+requires exact metadata, alpha, and pixels outside text bounds. Negative boundary
+probes and the real activation must fail under this same policy. This allowance can
+hide tiny text changes within its budget; it does not change the library's
+zero-tolerance default or the other interaction checks.

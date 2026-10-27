@@ -37,6 +37,7 @@ interface BrowserEngineConsumerReport {
 
 export interface BrowserConsumerReport {
   readonly engines: readonly BrowserEngineConsumerReport[];
+  readonly baselinePolicyControls: number;
   readonly cases: readonly BrowserConsumerCase[];
   readonly passed: number;
   readonly negativeControls: number;
@@ -95,7 +96,7 @@ async function installedVersion(name: string): Promise<string> {
  * @evidence docs/spec.md#persistent-browser-baselines Saves approved rendered DOM and Canvas baselines through the packed public API, reloads their pixels in another process, and checks initial matches and real activation differences against the restored references.
  * @evidenceReview docs/spec.md#persistent-browser-baselines #2479944 Read the persistence contract and checked the passing packed Chrome consumer: two separate-process DOM/Canvas baseline round-trips, byte equality, initial matches, and activation mismatches; inspected actual, expected, and diff PNGs.
  * @evidence docs/spec.md#browser-engine-compatibility Runs the same packed DOM and Canvas consumer scenarios on Chromium, Firefox, and WebKit, requiring each engine's interaction cases, negative controls, capture probes, and separate-process baseline round-trips with separate artifacts.
- * @evidenceReview docs/spec.md#browser-engine-compatibility #7f2473b Inspected the bounded initial setup: at most five panel captures, two consecutive exactly equal snapshots before approval or input, diagnostics on instability, and per-case attempt assertions; the interaction assertions and matrix counts remain unchanged.
+ * @evidenceReview docs/spec.md#browser-engine-compatibility #d7e3d78 Inspected the text-only fresh-capture tolerance, exact metadata, clip, alpha and outside-text guards, and pre-save clone equality; ran the packed three-engine consumer with 54 scenarios, six capture probes, six baseline round-trips, and all five policy boundary controls passing.
  */
 export async function verifiesPackedBrowserConsumer(): Promise<BrowserConsumerReport> {
   ok(existsSync(join(root, 'dist/browser.js')), 'Run pnpm build before pnpm browser:check.');
@@ -151,6 +152,10 @@ export async function verifiesPackedBrowserConsumer(): Promise<BrowserConsumerRe
       join(consumer, 'stable-capture.mjs'),
     );
     await cp(
+      join(root, 'test/browser-e2e/baseline-policy.mjs'),
+      join(consumer, 'baseline-policy.mjs'),
+    );
+    await cp(
       join(root, 'test/browser-e2e/baseline-loader.mjs'),
       join(consumer, 'baseline-loader.mjs'),
     );
@@ -174,6 +179,11 @@ export async function verifiesPackedBrowserConsumer(): Promise<BrowserConsumerRe
     await run([compiler, '-p', join(consumer, 'tsconfig.json')], consumer);
     const stdout = await run([join(consumer, 'consumer.mjs'), output], consumer, 900_000);
     const report = typia.assert<BrowserConsumerReport>(JSON.parse(stdout));
+    strictEqual(
+      report.baselinePolicyControls,
+      5,
+      'Verify the allowance and all four policy rejection guards.',
+    );
     deepStrictEqual(
       report.engines.map((engine) => engine.browser),
       ['chromium', 'firefox', 'webkit'],
