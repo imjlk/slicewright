@@ -1,0 +1,35 @@
+import type { Page } from 'playwright-core';
+import {
+  checkSnapshot,
+  domTarget,
+  regionTarget,
+  writeBrowserArtifacts,
+  type BrowserMeasurement,
+  type BrowserTarget,
+} from 'slicewright/browser';
+
+declare const page: Page;
+declare const measure: () => Promise<BrowserMeasurement>;
+
+async function scenario(target: BrowserTarget): Promise<void> {
+  const before = await target.capture();
+  await target.hover();
+  await target.press();
+  await target.release();
+  await target.click();
+  const actual = await target.capture();
+  const report = checkSnapshot(actual, {
+    changedFrom: before,
+    stableGeometry: { reference: before.measurement, tolerance: 0.1 },
+    contentFits: true,
+    text: { label: 'Accept quest' },
+  });
+  await writeBrowserArtifacts('artifacts', { actual, changedFrom: before, report });
+}
+
+void scenario(domTarget(page, {
+  root: page.locator('button'),
+  contentBox: page.locator('button .content'),
+  content: { label: page.locator('button .label') },
+}));
+void scenario(regionTarget(page, { measure }));

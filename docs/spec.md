@@ -686,3 +686,59 @@ findings and codes about how the art is sliced, packed, or exported, not how
 it is drawn, add nothing. The lines are appended to the prompt under
 "Corrections from the previous attempt:" and listed as `corrections`, empty
 when nothing applies.
+
+## Browser UI verification
+
+The optional `slicewright/browser` library entry point works with a consumer's
+Playwright page; it does not launch a browser, own the test runner, or import
+browser tooling through the core entry point. `domTarget` binds main-frame
+locators and `regionTarget` binds an asynchronous measurement callback, with an
+optional preparation callback for application readiness and scrolling. Both
+expose the same `measure`, `hover`, `press`, `release`, `click`, and `capture`
+operations. Measurements use main-page viewport CSS pixels, including Canvas
+regions; backing-store pixels and device pixel ratio are not CSS coordinates.
+Bounds are finite rectangles, and the target has positive width and height.
+
+The caller explicitly supplies a content box and named content bounds, with
+optional text and text bounds. DOM bindings read text-node Range rectangles;
+Canvas callers can supply rectangles from the text metrics used to paint.
+These describe declared regions, not inferred text areas, OCR, or proof that a
+glyph is unobscured. Nested frames require an explicit region binding expressed
+in main-page coordinates. Invalid measurements or configurations are rejected.
+
+Pointer actions measure the target afresh and use real mouse input at its
+center, rejecting centers outside the viewport. `press` moves and presses;
+`release` releases at the current pointer without recentering. Actions do not
+set application state or claim that an event was delivered. The consumer waits
+for application readiness and asserts the visible result of the interaction.
+Capture encloses the measured bounds at integer CSS-pixel edges and produces a
+straight-alpha RGBA snapshot at one pixel per CSS pixel. It accounts for page
+scroll, checks geometry and scroll again after capture, and rejects movement or
+truncated captures instead of pairing old measurements with new pixels.
+
+`checkSnapshot` returns structured findings and an `ok` result. A pixel reference
+compares premultiplied RGBA differences; mean, p99, and maximum tolerances default
+to zero, and a custom tolerance supplies all three. `changedFrom` requires an
+actual visible pixel change from a same-size snapshot. A separate
+`stableGeometry` reference compares target size and target-relative content
+geometry with a finite nonnegative tolerance, so scrolling alone is not a
+layout failure and state colors may change while geometry stays stable.
+Requested text checks compare exact text for each named content item.
+`contentFits` requires a declared content box and nonempty named content, checks
+the content box inside the target, checks content bounds inside that box, and
+checks any supplied text bounds inside both the item's bounds and the content
+box. Missing instrumentation, text mismatches, overflow, changed geometry,
+unexpected pixels, and unchanged pixels each produce error findings. Without
+text bounds, fit checks cover only the supplied boxes. Pixel comparisons with
+different raster sizes fail explicitly.
+
+The artifact writer saves actual, optional expected, and available difference
+PNGs with a JSON report and measurements. It does not approve or overwrite a
+baseline automatically. A clean consumer installed from the packed package
+must run the same interaction and verification scenario against HTML/CSS and
+Canvas, including narrow and wide viewports, scrolling, and device pixel ratios
+one and two. Real input must produce hover, pressed, and activation results;
+missing handlers, stale painting, shifted content, clipped text, and an input
+intercepting overlay must be demonstrated as failing cases. The consumer uses
+the public entry point without importing repository source or copying private
+tool implementations.
