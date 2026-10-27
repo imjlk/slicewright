@@ -147,6 +147,10 @@ export async function verifiesPackedBrowserConsumer(): Promise<BrowserConsumerRe
     // behavior resolves through the installed package's public exports.
     await cp(join(root, 'test/browser-e2e/consumer.mjs'), join(consumer, 'consumer.mjs'));
     await cp(
+      join(root, 'test/browser-e2e/stable-capture.mjs'),
+      join(consumer, 'stable-capture.mjs'),
+    );
+    await cp(
       join(root, 'test/browser-e2e/baseline-loader.mjs'),
       join(consumer, 'baseline-loader.mjs'),
     );

@@ -4,12 +4,14 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { isDeepStrictEqual, promisify } from 'node:util';
+import { promisify } from 'node:util';
 
 import { chromium, firefox, webkit } from 'playwright-core';
 import {
   checkSnapshot, domTarget, regionTarget, saveBrowserBaseline, writeBrowserArtifacts,
 } from 'slicewright/browser';
+
+import { settleInitialPanel } from './stable-capture.mjs';
 
 // This file runs from a newly installed consumer project. Its only product
 // imports are public package exports, exactly as in an application's own test.
@@ -127,34 +129,6 @@ async function settled(page) {
   await page.evaluate(() => new Promise((done) => {
     requestAnimationFrame(() => requestAnimationFrame(done));
   }));
-}
-
-// Select the static initial reference only after two consecutive observations
-// agree in every metadata field and RGBA byte. This setup runs before input or
-// baseline approval; capture failures and later mismatches are never retried.
-async function settleInitialPanel(page, target, first, directory) {
-  let previous = first;
-  let actual = first;
-  for (let attempts = 2; attempts <= 5; attempts++) {
-    previous = actual;
-    await settled(page);
-    actual = await target.capture();
-    if (isDeepStrictEqual(actual, previous)) {
-      return { snapshot: actual, attempts };
-    }
-  }
-  const artifacts = join(directory, 'initial-unstable');
-  await writeBrowserArtifacts(artifacts, {
-    actual,
-    reference: previous,
-    report: checkSnapshot(actual, {
-      reference: previous,
-      stableGeometry: { reference: previous.measurement, tolerance: 0 },
-    }),
-  });
-  throw new Error(
-    `Initial panel did not produce two consecutive identical snapshots within 5 captures. Artifacts: ${artifacts}`,
-  );
 }
 
 // The same scenario is used unchanged for both renderers and every fault. It

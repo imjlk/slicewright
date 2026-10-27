@@ -210,15 +210,22 @@ async function verifyRunner(report: RunnerReport, output: string): Promise<{
     if (spec.title.startsWith('public interaction')) {
       const identity = result.attachments.find((entry) => entry.name === 'consumer-browser');
       ok(identity, `${label}: actual browser identity must be reported.`);
-      const browser = typia.assert<{ name: BrowserName; version: string }>(
-        JSON.parse((await attachmentBytes(identity)).toString('utf8')),
-      );
+      const browser = typia.assert<{
+        name: BrowserName;
+        version: string;
+        initialCaptureAttempts: number;
+      }>(JSON.parse((await attachmentBytes(identity)).toString('utf8')));
       strictEqual(
         browser.name,
         spec.projectName,
         `${label}: project must launch the requested engine.`,
       );
       ok(browser.version.length > 0);
+      ok(
+        Number.isInteger(browser.initialCaptureAttempts) &&
+        browser.initialCaptureAttempts >= 2 && browser.initialCaptureAttempts <= 5,
+        `${label}: initial reference must settle within two to five captures.`,
+      );
       const prior = versions.get(browser.name);
       if (prior !== undefined) {
         strictEqual(browser.version, prior, `${label}: browser version must be consistent.`);
@@ -494,6 +501,10 @@ export async function verifiesPackedPlaywrightConsumer(): Promise<PlaywrightCons
       }
     `], consumer);
     await cp(join(root, 'test/playwright-consumer'), consumer, { recursive: true });
+    await cp(
+      join(root, 'test/browser-e2e/stable-capture.mjs'),
+      join(consumer, 'stable-capture.mjs'),
+    );
     await cp(join(root, 'examples/browser-e2e'), join(consumer, 'fixture'), { recursive: true });
     await cp(join(consumer, 'contract.ts.txt'), join(consumer, 'contract.ts'));
     await writeFile(join(consumer, 'tsconfig.json'), `${JSON.stringify({

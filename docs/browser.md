@@ -223,7 +223,7 @@ The browser consumer runs identical DOM/Canvas scenarios in all three engines,
 including scroll and DPR changes, fixed/sticky captures, persisted baselines,
 and deliberate failures. Its report records each browser's name and version;
 artifacts are separated by engine under `.slicewright/browser-e2e/`. Before
-choosing the static fixture's initial reference, the consumer requires two
+choosing a static initial reference, both consumers require two
 consecutive identical captures within five observations. This is read-only
 render preparation: later mismatches do not update that reference, and inputs
 still run once. The

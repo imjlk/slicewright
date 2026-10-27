@@ -4,16 +4,24 @@ import { expect as baseExpect } from '@playwright/test';
 import { expect, toMatchUI } from 'slicewright/playwright';
 
 import { delayedTarget, exampleTargets, observed, probe, test } from './fixtures.mjs';
+import { settleInitialPanel } from './stable-capture.mjs';
 
 for (const renderer of ['dom', 'canvas']) {
   test(`public interaction ${renderer}`, async ({ page, browser, fixtureUrl }, testInfo) => {
+    const { panel, action } = await exampleTargets(page, fixtureUrl, renderer);
+    const first = await panel.capture();
+    const actionBefore = await action.capture();
+    const { snapshot: before, attempts } = await settleInitialPanel(
+      page, panel, first, testInfo.outputPath('initial-reference'),
+    );
     await testInfo.attach('consumer-browser', {
-      body: JSON.stringify({ name: browser.browserType().name(), version: browser.version() }),
+      body: JSON.stringify({
+        name: browser.browserType().name(),
+        version: browser.version(),
+        initialCaptureAttempts: attempts,
+      }),
       contentType: 'application/json',
     });
-    const { panel, action } = await exampleTargets(page, fixtureUrl, renderer);
-    const before = await panel.capture();
-    const actionBefore = await action.capture();
     await expect(panel).toMatchUI({
       reference: before, contentFits: true, text: { status: 'Choose your next adventure.' },
     }, { timeout: 5000 });
