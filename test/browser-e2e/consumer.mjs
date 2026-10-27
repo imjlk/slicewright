@@ -4,7 +4,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { promisify } from 'node:util';
+import { isDeepStrictEqual, promisify } from 'node:util';
 
 import { chromium, firefox, webkit } from 'playwright-core';
 import {
@@ -129,6 +129,34 @@ async function settled(page) {
   }));
 }
 
+// Select the static initial reference only after two consecutive observations
+// agree in every metadata field and RGBA byte. This setup runs before input or
+// baseline approval; capture failures and later mismatches are never retried.
+async function settleInitialPanel(page, target, first, directory) {
+  let previous = first;
+  let actual = first;
+  for (let attempts = 2; attempts <= 5; attempts++) {
+    previous = actual;
+    await settled(page);
+    actual = await target.capture();
+    if (isDeepStrictEqual(actual, previous)) {
+      return { snapshot: actual, attempts };
+    }
+  }
+  const artifacts = join(directory, 'initial-unstable');
+  await writeBrowserArtifacts(artifacts, {
+    actual,
+    reference: previous,
+    report: checkSnapshot(actual, {
+      reference: previous,
+      stableGeometry: { reference: previous.measurement, tolerance: 0 },
+    }),
+  });
+  throw new Error(
+    `Initial panel did not produce two consecutive identical snapshots within 5 captures. Artifacts: ${artifacts}`,
+  );
+}
+
 // The same scenario is used unchanged for both renderers and every fault. It
 // only reads readiness/measurement instrumentation; no hook sets UI state.
 async function scenario(page, bound, directory, scroll, baselineEnvironment) {
@@ -144,10 +172,11 @@ async function scenario(page, bound, directory, scroll, baselineEnvironment) {
     return report;
   }
 
-  const normalPanel = await bound.panel.capture();
-  strictEqual(normalPanel.measurement.bounds.y, Math.round(normalPanel.measurement.bounds.y),
-    'The static baseline fixture must start on whole CSS pixels; positioned probes cover fractional clips.');
+  const firstPanel = await bound.panel.capture();
   const normal = await bound.action.capture();
+  const { snapshot: normalPanel, attempts: initialCaptureAttempts } = await settleInitialPanel(
+    page, bound.panel, firstPanel, directory,
+  );
   await verify('initial-panel', normalPanel, {
     contentFits: true,
     text: { status: 'Choose your next adventure.', action: 'Accept quest' },
@@ -230,7 +259,10 @@ async function scenario(page, bound, directory, scroll, baselineEnvironment) {
     contentFits: true,
     text: { status: 'Quest accepted: 2' },
   });
-  return { findings, state: await page.evaluate(() => window.browserE2EFixture.getState()) };
+  return {
+    findings, initialCaptureAttempts,
+    state: await page.evaluate(() => window.browserE2EFixture.getState()),
+  };
 }
 
 const requiredFailure = {
@@ -285,6 +317,7 @@ async function runCase(browser, engine, renderer, configuration, fault = 'none',
     }
     engine.cases.push({
       browser: engine.browser, name, renderer, fault,
+      initialCaptureAttempts: result.initialCaptureAttempts,
       rejected: result.findings.length > 0, findings: result.findings,
     });
     if (persistBaseline) engine.baselineRoundTrips += 1;

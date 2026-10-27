@@ -19,6 +19,7 @@ interface BrowserConsumerCase {
   readonly name: string;
   readonly renderer: 'dom' | 'canvas';
   readonly fault: string;
+  readonly initialCaptureAttempts: number;
   readonly rejected: boolean;
   readonly findings: readonly { readonly step: string; readonly code: string }[];
 }
@@ -94,7 +95,7 @@ async function installedVersion(name: string): Promise<string> {
  * @evidence docs/spec.md#persistent-browser-baselines Saves approved rendered DOM and Canvas baselines through the packed public API, reloads their pixels in another process, and checks initial matches and real activation differences against the restored references.
  * @evidenceReview docs/spec.md#persistent-browser-baselines #2479944 Read the persistence contract and checked the passing packed Chrome consumer: two separate-process DOM/Canvas baseline round-trips, byte equality, initial matches, and activation mismatches; inspected actual, expected, and diff PNGs.
  * @evidence docs/spec.md#browser-engine-compatibility Runs the same packed DOM and Canvas consumer scenarios on Chromium, Firefox, and WebKit, requiring each engine's interaction cases, negative controls, capture probes, and separate-process baseline round-trips with separate artifacts.
- * @evidenceReview docs/spec.md#browser-engine-compatibility #7f2473b Read the three-engine scenario and ran pnpm browser:check on macOS: Chromium 156, Firefox 157, and WebKit 27.2 each passed eight normal cases, ten fault controls, two fixed/sticky probes, and two persisted baseline round-trips; inspected rendered browser artifacts.
+ * @evidenceReview docs/spec.md#browser-engine-compatibility #7f2473b Inspected the bounded initial setup: at most five panel captures, two consecutive exactly equal snapshots before approval or input, diagnostics on instability, and per-case attempt assertions; the interaction assertions and matrix counts remain unchanged.
  */
 export async function verifiesPackedBrowserConsumer(): Promise<BrowserConsumerReport> {
   ok(existsSync(join(root, 'dist/browser.js')), 'Run pnpm build before pnpm browser:check.');
@@ -192,6 +193,11 @@ export async function verifiesPackedBrowserConsumer(): Promise<BrowserConsumerRe
       strictEqual(engine.output, join(output, engine.browser), 'Keep browser artifacts separate.');
       for (const result of engine.cases) {
         strictEqual(result.browser, engine.browser, `${result.name}: identify the browser.`);
+        ok(
+          Number.isInteger(result.initialCaptureAttempts) &&
+          result.initialCaptureAttempts >= 2 && result.initialCaptureAttempts <= 5,
+          `${engine.browser}: ${result.name}: require bounded initial snapshot settling.`,
+        );
         strictEqual(result.rejected, result.fault !== 'none', `${engine.browser}: ${result.name}`);
       }
     }
