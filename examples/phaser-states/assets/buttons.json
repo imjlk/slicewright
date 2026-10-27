@@ -1,0 +1,148 @@
+{
+  "frames": {
+    "btn-normal": {
+      "frame": {
+        "x": 1,
+        "y": 107,
+        "w": 224,
+        "h": 49
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 224,
+        "h": 49
+      },
+      "sourceSize": {
+        "w": 224,
+        "h": 49
+      },
+      "scale9Borders": {
+        "x": 20,
+        "y": 20,
+        "w": 183,
+        "h": 10
+      },
+      "slicewright": {
+        "contentPadding": {
+          "left": 9,
+          "right": 9,
+          "top": 10,
+          "bottom": 10
+        }
+      }
+    },
+    "btn-hover": {
+      "frame": {
+        "x": 1,
+        "y": 54,
+        "w": 224,
+        "h": 49
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 224,
+        "h": 49
+      },
+      "sourceSize": {
+        "w": 224,
+        "h": 49
+      },
+      "scale9Borders": {
+        "x": 20,
+        "y": 20,
+        "w": 183,
+        "h": 10
+      },
+      "slicewright": {
+        "contentPadding": {
+          "left": 10,
+          "right": 10,
+          "top": 10,
+          "bottom": 10
+        }
+      }
+    },
+    "btn-pressed": {
+      "frame": {
+        "x": 1,
+        "y": 160,
+        "w": 224,
+        "h": 49
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 224,
+        "h": 49
+      },
+      "sourceSize": {
+        "w": 224,
+        "h": 49
+      },
+      "scale9Borders": {
+        "x": 20,
+        "y": 20,
+        "w": 183,
+        "h": 10
+      },
+      "slicewright": {
+        "contentPadding": {
+          "left": 9,
+          "right": 9,
+          "top": 10,
+          "bottom": 9
+        }
+      }
+    },
+    "btn-disabled": {
+      "frame": {
+        "x": 1,
+        "y": 1,
+        "w": 224,
+        "h": 49
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 224,
+        "h": 49
+      },
+      "sourceSize": {
+        "w": 224,
+        "h": 49
+      },
+      "scale9Borders": {
+        "x": 20,
+        "y": 20,
+        "w": 183,
+        "h": 10
+      },
+      "slicewright": {
+        "contentPadding": {
+          "left": 10,
+          "right": 9,
+          "top": 10,
+          "bottom": 10
+        }
+      }
+    }
+  },
+  "meta": {
+    "image": "buttons.png",
+    "size": {
+      "w": 226,
+      "h": 210
+    },
+    "scale": "1"
+  }
+}
