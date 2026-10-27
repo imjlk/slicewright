@@ -16,16 +16,16 @@ for (const renderer of ['dom', 'canvas']) {
     const actionBefore = await action.capture();
     await expect(panel).toMatchUI({
       reference: before, contentFits: true, text: { status: 'Choose your next adventure.' },
-    });
+    }, { timeout: 5000 });
     await action.click();
     await expect(panel).toMatchUI({
       changedFrom: before,
       contentFits: true,
       text: { status: 'Quest accepted: 1' },
-    });
+    }, { timeout: 5000 });
     await expect(action).toMatchUI({
       stableGeometry: { reference: actionBefore.measurement, tolerance: 0 },
-    });
+    }, { timeout: 5000 });
     const state = await page.evaluate(() => window.browserE2EFixture.getState());
     expect(state.accepted).toBe(1);
     expect(state.paintedAccepted).toBe(1);
@@ -37,7 +37,7 @@ for (const renderer of ['dom', 'canvas']) {
     await target.click();
     await expect(target).toMatchUI({
       changedFrom: before, contentFits: true, text: { label: 'Ready' },
-    }, { timeout: 3000, intervals: [800, 1000] });
+    }, { timeout: 5000, intervals: [800, 1000] });
     expect(state.captures).toBeGreaterThan(2);
     expect(state.actions).toBe(1);
     expect(await page.evaluate(() => window.delayedFixture.state())).toEqual({ clicks: 1, label: 'Ready' });
@@ -48,7 +48,7 @@ for (const renderer of ['dom', 'canvas']) {
 test('negated retry waits for mismatch', async ({ page, fixtureUrl }) => {
   const { target, state } = observed(await delayedTarget(page, fixtureUrl));
   await target.click();
-  await expect(target).not.toMatchUI({ text: { label: 'Waiting' } }, { timeout: 3000, intervals: [800] });
+  await expect(target).not.toMatchUI({ text: { label: 'Waiting' } }, { timeout: 5000, intervals: [800] });
   expect(state.captures).toBeGreaterThan(1);
   expect(state.actions).toBe(1);
 });
@@ -56,14 +56,14 @@ test('negated retry waits for mismatch', async ({ page, fixtureUrl }) => {
 test('exported matcher extends consumer expect', async ({ page, fixtureUrl }) => {
   const customExpect = baseExpect.extend({ toMatchUI });
   const target = await delayedTarget(page, fixtureUrl);
-  await customExpect(target).toMatchUI({ text: { label: 'Waiting' } });
+  await customExpect(target).toMatchUI({ text: { label: 'Waiting' } }, { timeout: 5000 });
 });
 
 test('per-call timeout overrides configured timeout', async ({ page, fixtureUrl }) => {
   const target = await delayedTarget(page, fixtureUrl);
   await target.click();
   await expect.configure({ timeout: 20 })(target).toMatchUI(
-    { text: { label: 'Ready' } }, { timeout: 3000, intervals: [800] },
+    { text: { label: 'Ready' } }, { timeout: 5000, intervals: [800] },
   );
 });
 
@@ -221,6 +221,9 @@ test('fails: project timeout keeps final observation and artifacts', async ({ pa
 
 test('fails: configured timeout respects negation', async ({ page, fixtureUrl }, testInfo) => {
   const { target, state } = observed(await delayedTarget(page, fixtureUrl));
+  // Complete a real screenshot before the short polling deadline starts.
+  await target.capture();
+  state.captures = 0;
   const started = Date.now();
   try {
     await expect.configure({ timeout: 750 })(target).not.toMatchUI({ text: { label: 'Waiting' } }, { intervals: [25] });
@@ -231,6 +234,7 @@ test('fails: configured timeout respects negation', async ({ page, fixtureUrl },
 
 test('fails: soft matcher continues after two failures', async ({ page, fixtureUrl }, testInfo) => {
   const target = await delayedTarget(page, fixtureUrl);
+  await target.capture();
   await expect.soft(target).toMatchUI({ text: { label: 'First missing label' } }, { timeout: 750, intervals: [25] });
   await expect.soft(target).not.toMatchUI({ text: { label: 'Waiting' } }, { timeout: 750, intervals: [25] });
   await probe(testInfo, { continued: true, errors: testInfo.errors.length });
@@ -241,6 +245,8 @@ test('fails: concurrent assertions retain distinct artifacts', async ({ page, fi
   const secondPage = await page.context().newPage();
   try {
     const second = await delayedTarget(secondPage, fixtureUrl, 'canvas');
+    await first.capture();
+    await second.capture();
     const results = await Promise.allSettled([
       expect(first).toMatchUI({ text: { label: 'Parallel DOM mismatch' } }, { timeout: 1000, intervals: [25] }),
       expect(second).toMatchUI({ text: { label: 'Parallel Canvas mismatch' } }, { timeout: 1000, intervals: [25] }),
@@ -253,11 +259,23 @@ test('fails: concurrent assertions retain distinct artifacts', async ({ page, fi
   }
 });
 
-test('fails: hanging capture obeys matcher deadline without fake pixels', async ({ page, fixtureUrl }, testInfo) => {
-  const target = await delayedTarget(page, fixtureUrl);
+function hangingTarget() {
+  const unexpectedAction = async () => { throw new Error('A deadline probe must only capture.'); };
+  return {
+    measure: async () => ({ bounds: { x: 0, y: 0, width: 100, height: 50 } }),
+    hover: unexpectedAction,
+    press: unexpectedAction,
+    release: unexpectedAction,
+    click: unexpectedAction,
+    capture: () => new Promise(() => {}),
+  };
+}
+
+test('fails: hanging capture obeys matcher deadline without fake pixels', async ({}, testInfo) => {
+  const target = hangingTarget();
   const started = Date.now();
   try {
-    await expect({ ...target, capture: () => new Promise(() => {}) }).not.toMatchUI(
+    await expect(target).not.toMatchUI(
       { text: { label: 'Missing' } }, { timeout: 250, intervals: [25] },
     );
   } finally {
@@ -265,12 +283,12 @@ test('fails: hanging capture obeys matcher deadline without fake pixels', async 
   }
 });
 
-test('fails: hanging capture respects remaining test budget', async ({ page, fixtureUrl }, testInfo) => {
+test('fails: hanging capture respects remaining test budget', async ({}, testInfo) => {
   test.setTimeout(2000);
-  const target = await delayedTarget(page, fixtureUrl);
+  const target = hangingTarget();
   const started = Date.now();
   try {
-    await expect({ ...target, capture: () => new Promise(() => {}) }).toMatchUI(
+    await expect(target).toMatchUI(
       { text: { label: 'Missing' } }, { timeout: 5000, intervals: [25] },
     );
   } finally {

@@ -314,16 +314,36 @@ async function verifyRunner(report: RunnerReport, output: string): Promise<{
       const details = typia.assert<{
         ok: false;
         matcher: 'toMatchUI';
+        attempts: number;
+        timeout: number;
         observation: 'unavailable';
         lastValidAttempt: null;
         error: string;
       }>(JSON.parse((await attachmentBytes(diagnostic)).toString('utf8')));
-      match(details.error, /[Tt]imeout|[Tt]imed out/);
-      match(messages, /[Tt]imeout|[Tt]imed out/);
-      ok(
-        probe.elapsed !== undefined && probe.elapsed < 3500,
-        'A hung capture must respect its deadline.',
+      strictEqual(details.attempts, 1, 'The deadline must interrupt an in-flight capture.');
+      const remainingBudget = spec.title.includes('remaining test budget');
+      const timeout = remainingBudget ? 5000 : 250;
+      strictEqual(
+        details.timeout,
+        timeout,
+        'Diagnostics must retain the requested matcher timeout.',
       );
+      strictEqual(probe.timeout, timeout, 'The probe must identify the tested matcher timeout.');
+      const reason = remainingBudget ? /Test timeout of 2000ms exceeded/ : /Timeout 250ms exceeded/;
+      match(details.error, reason);
+      match(messages, reason);
+      ok(probe.elapsed !== undefined);
+      if (remainingBudget) {
+        ok(
+          probe.elapsed >= 1250 && probe.elapsed < 3000,
+          'The test budget must cut off the 5000 ms matcher after capture has started.',
+        );
+      } else {
+        ok(
+          probe.elapsed >= 175 && probe.elapsed < 1000,
+          'The 250 ms matcher deadline must interrupt the pending capture.',
+        );
+      }
       continue;
     }
     const count = spec.title.includes('soft matcher') || spec.title.includes('concurrent') ? 2 : 1;
@@ -408,9 +428,9 @@ async function verifyRunner(report: RunnerReport, output: string): Promise<{
  * semantics through public imports, including intentionally failing child tests.
  *
  * @evidence docs/spec.md#playwright-test-integration Exercises installed declarations, optional-peer isolation, retrying DOM and Canvas checks, real input exactly once, negation, soft assertions, deadlines, invalid input, and isolated runner attachments.
- * @evidenceReview docs/spec.md#playwright-test-integration #4274194 Read the contract and ran pnpm playwright:check on macOS Chrome: clean optional-peer installation and declarations passed; all 17 runner cases had their expected outcomes and 49 attachments were validated, including late rejection and attachment-failure probes.
+ * @evidenceReview docs/spec.md#playwright-test-integration #4274194 Read the contract and inspected the completed three-engine runner report: each browser started one hanging capture, the 250 ms matcher expired in 256-259 ms, and the 2000 ms test budget cut off the 5000 ms matcher in 1755-1758 ms with the corresponding native timeout reason.
  * @evidence docs/spec.md#browser-engine-compatibility Runs each installed public matcher scenario in Chromium, Firefox, and WebKit projects, validates actual engine identity and independent outcomes, and checks globally unique artifacts within each engine directory.
- * @evidenceReview docs/spec.md#browser-engine-compatibility #7f2473b Read the three-project and reporter checks; ran pnpm playwright:check on macOS Chromium 156, Firefox 157, and WebKit 27.2 with all 51 expected outcomes and 147 unique attachments validated, including each engine identity and output directory.
+ * @evidenceReview docs/spec.md#browser-engine-compatibility #7f2473b Read the three-project and reporter checks and the completed macOS Chromium 156, Firefox 157, and WebKit 27.2 report with 51 expected outcomes and 147 unique attachments; inspected matching single-attempt deadline diagnostics and elapsed bounds on all three engines after isolating browser startup from timing probes.
  */
 export async function verifiesPackedPlaywrightConsumer(): Promise<PlaywrightConsumerReport> {
   ok(existsSync(join(root, 'dist/playwright.js')), 'Run pnpm build before pnpm playwright:check.');

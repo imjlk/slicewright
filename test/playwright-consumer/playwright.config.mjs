@@ -9,7 +9,9 @@ export default defineConfig({
   testDir: '.',
   testMatch: '*.spec.mjs',
   fullyParallel: true,
-  workers: 2,
+  // The dedicated concurrent-assertion case still runs two assertions together.
+  // Serial workers keep native browser startup outside other tests' short deadlines.
+  workers: 1,
   retries: 0,
   timeout: 15_000,
   expect: { timeout: 1000 },
