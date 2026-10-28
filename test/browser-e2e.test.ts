@@ -27,6 +27,7 @@ export interface BrowserConsumerReport {
   readonly passed: number;
   readonly negativeControls: number;
   readonly captureProbes: number;
+  readonly baselineRoundTrips: number;
   readonly output: string;
 }
 
@@ -77,6 +78,8 @@ async function installedVersion(name: string): Promise<string> {
  *
  * @evidence docs/spec.md#browser-ui-verification Installs the tarball into a clean consumer, type-checks its public declarations, and verifies real browser transitions, explicit content bounds, CSS-scale scroll/DPR captures, and five injected failures on both renderers.
  * @evidenceReview docs/spec.md#browser-ui-verification #9f7e47a Reviewed the public-import scenario and checked the successful macOS Chrome browser:check result: clean core installation without Playwright, installed public declarations, eight DOM/Canvas interaction cases, ten intended fault rejections, and two fractional DPR2 fixed/sticky capture probes.
+ * @evidence docs/spec.md#persistent-browser-baselines Saves approved rendered DOM and Canvas baselines through the packed public API, reloads their pixels in another process, and checks initial matches and real activation differences against the restored references.
+ * @evidenceReview docs/spec.md#persistent-browser-baselines #2479944 Read the persistence contract and checked the passing packed Chrome consumer: two separate-process DOM/Canvas baseline round-trips, byte equality, initial matches, and activation mismatches; inspected actual, expected, and diff PNGs.
  */
 export async function verifiesPackedBrowserConsumer(): Promise<BrowserConsumerReport> {
   ok(existsSync(join(root, 'dist/browser.js')), 'Run pnpm build before pnpm browser:check.');
@@ -127,6 +130,10 @@ export async function verifiesPackedBrowserConsumer(): Promise<BrowserConsumerRe
     // Only the consumer's own test and example app are copied. All product
     // behavior resolves through the installed package's public exports.
     await cp(join(root, 'test/browser-e2e/consumer.mjs'), join(consumer, 'consumer.mjs'));
+    await cp(
+      join(root, 'test/browser-e2e/baseline-loader.mjs'),
+      join(consumer, 'baseline-loader.mjs'),
+    );
     await cp(join(root, 'test/browser-e2e/contract.ts.txt'), join(consumer, 'contract.ts'));
     await writeFile(join(consumer, 'tsconfig.json'), `${JSON.stringify({
       compilerOptions: {
@@ -158,6 +165,11 @@ export async function verifiesPackedBrowserConsumer(): Promise<BrowserConsumerRe
       report.captureProbes,
       2,
       'Fixed and sticky captures must preserve fractional CSS geometry.',
+    );
+    strictEqual(
+      report.baselineRoundTrips,
+      2,
+      'DOM and Canvas baselines must survive a separate-process load and detect rendered activation.',
     );
     for (const result of report.cases) {
       strictEqual(result.rejected, result.fault !== 'none', result.name);

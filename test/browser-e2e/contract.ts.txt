@@ -2,7 +2,9 @@ import type { Page } from 'playwright-core';
 import {
   checkSnapshot,
   domTarget,
+  loadBrowserBaseline,
   regionTarget,
+  saveBrowserBaseline,
   writeBrowserArtifacts,
   type BrowserMeasurement,
   type BrowserTarget,
@@ -13,18 +15,26 @@ declare const measure: () => Promise<BrowserMeasurement>;
 
 async function scenario(target: BrowserTarget): Promise<void> {
   const before = await target.capture();
+  await saveBrowserBaseline('baseline.json', before, {
+    approved: true,
+    environment: 'consumer-type-contract',
+  });
+  const baseline = await loadBrowserBaseline('baseline.json', {
+    environment: 'consumer-type-contract',
+  });
+  checkSnapshot(before, { reference: baseline });
   await target.hover();
   await target.press();
   await target.release();
   await target.click();
   const actual = await target.capture();
   const report = checkSnapshot(actual, {
-    changedFrom: before,
-    stableGeometry: { reference: before.measurement, tolerance: 0.1 },
+    changedFrom: baseline,
+    stableGeometry: { reference: baseline.measurement, tolerance: 0.1 },
     contentFits: true,
     text: { label: 'Accept quest' },
   });
-  await writeBrowserArtifacts('artifacts', { actual, changedFrom: before, report });
+  await writeBrowserArtifacts('artifacts', { actual, changedFrom: baseline, report });
 }
 
 void scenario(domTarget(page, {

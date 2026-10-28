@@ -14,3 +14,4 @@ import './diagnostics.test.js';
 import './prompt-corrections.test.js';
 import './pixel-grid.test.js';
 import './browser.test.js';
+import './browser-baseline.test.js';

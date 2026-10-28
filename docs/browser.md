@@ -167,8 +167,8 @@ result; a blinking caret alone can change pixels. Pixel references should use th
 same browser, fonts, viewport, and rendering environment.
 
 A reference is a `BrowserSnapshot` from `capture()`, or a saved snapshot loaded
-by your test. When persisting a baseline, keep its measurement and clip metadata
-along with the PNG; the artifact report includes that metadata. Pixel comparison
+with `loadBrowserBaseline`. The [baseline guide](baselines.md) covers explicit
+approval, versioned metadata, and environment matching. Pixel comparison
 does not require equal text or geometry unless you request those checks too.
 
 ```ts

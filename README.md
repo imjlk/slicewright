@@ -73,6 +73,10 @@ For Playwright Test, import `expect` from `slicewright/playwright` and use
 shows bounded observation retries, negation, soft assertions, and automatic
 failure attachments for either renderer.
 
+The [baseline guide](docs/baselines.md) shows how to save an explicitly approved
+rendered snapshot, reload it in a later run, and reject incompatible rendering
+environments or damaged baseline files.
+
 ### Build manifest
 
 `slicewright build ui.build.json` rebuilds a whole set. Paths are relative to
