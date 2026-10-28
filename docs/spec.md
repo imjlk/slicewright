@@ -879,3 +879,29 @@ three browser engines. It checks disabled-control skipping, visible focus
 pixels, and exactly one activation per key. Deliberate broken focus order,
 missing focus painting, and duplicate activation must be rejected. The same
 focus assertions work through the Playwright matcher.
+
+## Browser HTML reports
+
+`writeBrowserReportHtml(directory, output)` reads one artifact directory produced
+by `writeBrowserArtifacts` and writes a new, standalone, read-only HTML file.
+The `browser-report <directory> --out <file.html>` CLI prints JSON with its path
+and report outcome: exit 0 for a passing report, 1 for findings, 2 for invalid
+input or output. An existing output is refused, including artifact files; the
+viewer never approves, replaces, or edits baselines or source artifacts.
+
+The viewer embeds actual, available reference/previous, and corresponding
+difference PNGs, with image tabs, a comparison opacity control, and optional
+measurement overlays. It displays findings and their details, named content and
+text bounds, clip, dimensions, and supplied focus metadata. Missing browser,
+font, or platform identity is displayed as unrecorded, never inferred. Images
+with different dimensions remain inspectable at their own size; overlays use
+each snapshot's viewport clip, and a difference image has no measured overlay.
+
+Input JSON is validated with typia and measurement geometry is checked. PNGs
+must decode and match recorded dimensions (difference images use the maximum
+pair dimensions). Only fixed artifact filenames in the supplied directory are
+read; JSON paths are ignored so downloaded artifacts remain portable. Source
+symlinks are refused. Untrusted text is displayed as text, never HTML or script.
+The HTML uses embedded assets and no network, CDN, server, or package runtime.
+Unit and clean packed-consumer checks cover relocation, corrupt input, existing
+output preservation, hostile text, browser interaction, and offline viewing.

@@ -32,6 +32,7 @@ interface KeyboardConsumerCase {
 }
 
 interface BrowserEngineConsumerReport {
+  readonly htmlReport: boolean;
   readonly keyboardCases: readonly KeyboardConsumerCase[];
   readonly browser: 'chromium' | 'firefox' | 'webkit';
   readonly version: string;
@@ -102,6 +103,8 @@ async function installedVersion(name: string): Promise<string> {
  * Packs the built package, installs it outside the repository, and runs one
  * public-API scenario against DOM and Canvas renderers with real mouse input.
  *
+ * @evidence docs/spec.md#browser-html-reports Opens standalone reports from the clean installed package and verifies tabs, blending, overlays, literal hostile text, no external requests and public CLI status.
+ * @evidenceReview docs/spec.md#browser-html-reports #549a1e2 Ran the packed consumer successfully in Chromium, Firefox and WebKit; inspected the rendered report screenshot and checked original artifact preservation.
  * @evidence docs/spec.md#browser-ui-verification Installs the tarball into a clean consumer, type-checks its public declarations, and verifies real browser transitions, explicit content bounds, CSS-scale scroll/DPR captures, and five injected failures on both renderers.
  * @evidenceReview docs/spec.md#browser-ui-verification #9f7e47a Reviewed the public-import scenario and checked the successful macOS Chrome browser:check result: clean core installation without Playwright, installed public declarations, eight DOM/Canvas interaction cases, ten intended fault rejections, and two fractional DPR2 fixed/sticky capture probes.
  * @evidence docs/spec.md#persistent-browser-baselines Saves approved rendered DOM and Canvas baselines through the packed public API, reloads their pixels in another process, and checks initial matches and real activation differences against the restored references.
@@ -158,7 +161,7 @@ export async function verifiesPackedBrowserConsumer(): Promise<BrowserConsumerRe
     // Only the consumer's own test and example app are copied. All product
     // behavior resolves through the installed package's public exports.
     await cp(join(root, 'test/browser-e2e/consumer.mjs'), join(consumer, 'consumer.mjs'));
-    for (const name of ['focus-consumer.mjs', 'focus.html']) {
+    for (const name of ['focus-consumer.mjs', 'focus.html', 'report-consumer.mjs']) {
       await cp(join(root, 'test/browser-e2e', name), join(consumer, name));
     }
     await cp(
@@ -204,6 +207,7 @@ export async function verifiesPackedBrowserConsumer(): Promise<BrowserConsumerRe
       'Every required browser engine must run without skips.',
     );
     for (const engine of report.engines) {
+      strictEqual(engine.htmlReport, true);
       strictEqual(engine.keyboardCases.length, 8);
       for (const renderer of ['dom', 'canvas']) {
         const cases = engine.keyboardCases.filter((entry) => entry.renderer === renderer);
