@@ -11,6 +11,7 @@ import {
   checkSnapshot, domTarget, regionTarget, saveBrowserBaseline, writeBrowserArtifacts,
 } from 'slicewright/browser';
 
+import { verifyPixelRegions } from './regions-consumer.mjs';
 import { verifyHtmlReport } from './report-consumer.mjs';
 import { runKeyboardScenario } from './focus-consumer.mjs';
 import { settleInitialPanel } from './stable-capture.mjs';
@@ -323,6 +324,7 @@ async function runEngine(browserType) {
     cases: [],
     keyboardCases: [],
     htmlReport: false,
+    regionCases: [],
     captureProbes: 0,
     baselineRoundTrips: 0,
     output: join(output, browserName),
@@ -336,6 +338,11 @@ async function runEngine(browserType) {
             join(engine.output, `keyboard-${renderer}-${fault}`)));
         } finally { await context.close(); }
       }
+    }
+    for (const renderer of ['dom', 'canvas']) {
+      const context = await browser.newContext({ viewport: { width:640,height:480 }, deviceScaleFactor:2 });
+      try { engine.regionCases.push(await verifyPixelRegions(await context.newPage(), renderer, join(engine.output, `regions-${renderer}`))); }
+      finally { await context.close(); }
     }
     engine.htmlReport = await verifyHtmlReport(browser, join(engine.output, 'html-report'));
     for (const position of ['fixed', 'sticky']) {

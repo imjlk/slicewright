@@ -4,6 +4,7 @@ import { expect as baseExpect } from '@playwright/test';
 import { expect, toMatchUI } from 'slicewright/playwright';
 
 import { delayedTarget, exampleTargets, observed, probe, test } from './fixtures.mjs';
+import { verifyPixelRegions } from './regions-consumer.mjs';
 import { runKeyboardScenario } from './focus-consumer.mjs';
 import { settleInitialPanel } from './stable-capture.mjs';
 
@@ -333,5 +334,12 @@ for (const renderer of ['dom', 'canvas']) {
   test(`keyboard focus ${renderer}`, async ({ page }, testInfo) => {
     await runKeyboardScenario(page, renderer, 'none', testInfo.outputPath('keyboard'),
       (target, checks) => expect(target).toMatchUI(checks, { timeout: 5000 }));
+  });
+}
+
+for (const renderer of ['dom', 'canvas']) {
+  test(`regional pixel policy ${renderer}`, async ({ page }, testInfo) => {
+    await verifyPixelRegions(page, renderer, testInfo.outputPath('regions'),
+      (target, options) => expect(target).toMatchUI(options, { timeout:5000 }));
   });
 }
