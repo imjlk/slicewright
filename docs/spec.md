@@ -742,3 +742,41 @@ missing handlers, stale painting, shifted content, clipped text, and an input
 intercepting overlay must be demonstrated as failing cases. The consumer uses
 the public entry point without importing repository source or copying private
 tool implementations.
+
+## Playwright Test integration
+
+The optional `slicewright/playwright` entry point exports an extended Playwright
+`expect` and the `toMatchUI` matcher for consumers extending their own expect.
+The matcher accepts a `BrowserTarget`, `BrowserCheckOptions`, and optional
+`timeout` and `intervals`. It runs inside an active Playwright Test and uses only
+the target's capture operation and the existing snapshot checker. It never
+performs or repeats pointer or keyboard actions. Core and browser entry points
+remain usable without `@playwright/test` installed.
+
+A valid mismatching observation is captured and checked again until the
+expectation succeeds or Playwright exhausts its polling budget. An interval
+that cannot fit before the deadline can end polling early. The default timeout is the active
+expect configuration, with 5000 ms as fallback, and Playwright's remaining test
+budget still applies. An explicit timeout overrides that default. Timeout and
+polling intervals must be finite and positive; an interval list is nonempty.
+Zero timeout is rejected instead of disabling the assertion deadline. Capture
+and validation exceptions fail immediately, retain their diagnostic cause, and
+cannot satisfy a negated assertion. A negated matcher succeeds only after a
+valid observation fails the supplied UI checks. Native soft assertions record
+the failure and allow the test to continue.
+
+An assertion failure with a valid final observation writes and attaches its
+actual image, any expected or previous image and available differences, and a
+JSON report containing measurements and findings to the Playwright result.
+Each invocation has its own output location, including concurrent assertions
+within one test. Errors without an observation must not fabricate screenshots;
+diagnostics identify the error. Artifact failures must not replace the original
+assertion or capture failure. Passing assertions do not write failure artifacts.
+
+A clean packed consumer must run real Playwright Test cases against HTML/CSS
+and Canvas using the same matcher API. Delayed successful rendering is observed
+without replaying the input, permanent mismatches fail with useful attachments,
+and negation, soft assertions, configured and overridden timeouts, invalid
+options, capture errors, and concurrent artifact paths are verified through the
+runner's actual results. Public declarations compile in that consumer without
+repository source imports.

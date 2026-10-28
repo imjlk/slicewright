@@ -68,6 +68,11 @@ bindings, a shared scenario, and failure artifacts. The
 [browser example](examples/browser-e2e) demonstrates both renderers and injected
 failures. Core CLI/library installs do not need Playwright or a browser.
 
+For Playwright Test, import `expect` from `slicewright/playwright` and use
+`await expect(target).toMatchUI(checks)`. The [Playwright Test guide](docs/playwright.md)
+shows bounded observation retries, negation, soft assertions, and automatic
+failure attachments for either renderer.
+
 ### Build manifest
 
 `slicewright build ui.build.json` rebuilds a whole set. Paths are relative to
@@ -273,6 +278,9 @@ The toolchain is [ttsc](https://ttsc.dev) on TypeScript 7:
   fresh consumer project and run shared HTML/CSS and Canvas interaction tests
   in Chrome, including injected failures. Artifacts go to
   `.slicewright/browser-e2e/`.
+- `pnpm playwright:check`: after `pnpm build`, verify the optional matcher in a
+  clean consumer using the real Playwright Test runner. Expected failures and
+  their attachments are checked under `.slicewright/playwright-e2e/`.
 - `.mcp.json` registers the `@ttsc/graph` MCP server for agents.
 
 CI runs the checks, tests, build, packed browser scenarios, and engine renders on

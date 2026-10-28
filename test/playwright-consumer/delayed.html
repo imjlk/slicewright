@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" />
+  <title>Consumer-owned delayed render</title>
+  <style>
+    body { margin: 0; }
+    #target { position: absolute; left: 30px; top: 30px; width: 240px; height: 80px;
+      box-sizing: border-box; border: 0; padding: 0; background: #263c67; color: white;
+      font: 20px Arial, sans-serif; text-align: left; }
+    #label { position: absolute; left: 20px; top: 25px; width: 200px; height: 30px; }
+  </style>
+  <body>
+  <script>
+    const query = new URLSearchParams(location.search);
+    const canvas = query.get('renderer') === 'canvas';
+    const delay = Number(query.get('delay') ?? 650);
+    let label = 'Waiting';
+    let clicks = 0;
+    const target = document.createElement(canvas ? 'canvas' : 'button');
+    target.id = 'target';
+    document.body.append(target);
+    let context;
+    let textBounds;
+    if (canvas) {
+      target.width = 240;
+      target.height = 80;
+      context = target.getContext('2d');
+    } else {
+      target.innerHTML = '<span id="label"></span>';
+    }
+    function paint() {
+      if (!canvas) {
+        target.querySelector('#label').textContent = label;
+        return;
+      }
+      context.fillStyle = '#263c67';
+      context.fillRect(0, 0, 240, 80);
+      context.fillStyle = 'white';
+      context.font = '20px Arial, sans-serif';
+      context.textBaseline = 'alphabetic';
+      context.fillText(label, 20, 47);
+      const metrics = context.measureText(label);
+      textBounds = { x: 50 - metrics.actualBoundingBoxLeft,
+        y: 77 - metrics.actualBoundingBoxAscent,
+        width: metrics.actualBoundingBoxLeft + metrics.actualBoundingBoxRight,
+        height: metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent };
+    }
+    target.addEventListener('click', () => {
+      clicks++;
+      setTimeout(() => { label = 'Ready'; paint(); }, delay);
+    });
+    paint();
+    window.delayedFixture = {
+      state: () => ({ clicks, label }),
+      measure: () => ({
+        bounds: { x: 30, y: 30, width: 240, height: 80 },
+        contentBox: { x: 50, y: 55, width: 200, height: 30 },
+        content: { label: {
+          bounds: { x: 50, y: 55, width: 200, height: 30 },
+          text: label,
+          textBounds: [textBounds],
+        } },
+      }),
+    };
+  </script>
+  </body>
+</html>

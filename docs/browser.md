@@ -5,6 +5,10 @@ HTML/CSS and Canvas use the same target interface. The binding supplies geometry
 the scenario drives actual mouse input and checks the resulting pixels and text.
 No engine or application state setters are involved.
 
+When using Playwright Test, the optional [matcher integration](playwright.md)
+handles repeated observations and failure attachments for you. The lower-level
+API below remains available to other runners and scripts.
+
 ## Install
 
 Use Node 24 or newer. In a project using Playwright Test:
