@@ -4,24 +4,54 @@ import { expect as baseExpect } from '@playwright/test';
 import { expect, toMatchUI } from 'slicewright/playwright';
 
 import { delayedTarget, exampleTargets, observed, probe, test } from './fixtures.mjs';
+import { settleInitialPanel } from './stable-capture.mjs';
+
+// Short runner-semantics deadlines consume a real snapshot captured beforehand.
+// Each callback returns independent bytes; every attempted action is an error.
+function observedSnapshot(snapshot) {
+  const unexpectedAction = async () => { throw new Error('A snapshot probe must only observe.'); };
+  return observed({
+    measure: async () => structuredClone(snapshot.measurement),
+    capture: async () => structuredClone(snapshot),
+    hover: unexpectedAction,
+    press: unexpectedAction,
+    release: unexpectedAction,
+    click: unexpectedAction,
+  });
+}
+
+function snapshotProbe(state) {
+  return { ...state, observationSource: 'captured-once', matcherActions: state.actions };
+}
 
 for (const renderer of ['dom', 'canvas']) {
-  test(`public interaction ${renderer}`, async ({ page, fixtureUrl }) => {
+  test(`public interaction ${renderer}`, async ({ page, browser, fixtureUrl }, testInfo) => {
     const { panel, action } = await exampleTargets(page, fixtureUrl, renderer);
-    const before = await panel.capture();
+    const first = await panel.capture();
     const actionBefore = await action.capture();
+    const { snapshot: before, attempts } = await settleInitialPanel(
+      page, panel, first, testInfo.outputPath('initial-reference'),
+    );
+    await testInfo.attach('consumer-browser', {
+      body: JSON.stringify({
+        name: browser.browserType().name(),
+        version: browser.version(),
+        initialCaptureAttempts: attempts,
+      }),
+      contentType: 'application/json',
+    });
     await expect(panel).toMatchUI({
       reference: before, contentFits: true, text: { status: 'Choose your next adventure.' },
-    });
+    }, { timeout: 5000 });
     await action.click();
     await expect(panel).toMatchUI({
       changedFrom: before,
       contentFits: true,
       text: { status: 'Quest accepted: 1' },
-    });
+    }, { timeout: 5000 });
     await expect(action).toMatchUI({
       stableGeometry: { reference: actionBefore.measurement, tolerance: 0 },
-    });
+    }, { timeout: 5000 });
     const state = await page.evaluate(() => window.browserE2EFixture.getState());
     expect(state.accepted).toBe(1);
     expect(state.paintedAccepted).toBe(1);
@@ -33,7 +63,7 @@ for (const renderer of ['dom', 'canvas']) {
     await target.click();
     await expect(target).toMatchUI({
       changedFrom: before, contentFits: true, text: { label: 'Ready' },
-    }, { timeout: 3000, intervals: [800, 1000] });
+    }, { timeout: 5000, intervals: [800, 1000] });
     expect(state.captures).toBeGreaterThan(2);
     expect(state.actions).toBe(1);
     expect(await page.evaluate(() => window.delayedFixture.state())).toEqual({ clicks: 1, label: 'Ready' });
@@ -44,7 +74,7 @@ for (const renderer of ['dom', 'canvas']) {
 test('negated retry waits for mismatch', async ({ page, fixtureUrl }) => {
   const { target, state } = observed(await delayedTarget(page, fixtureUrl));
   await target.click();
-  await expect(target).not.toMatchUI({ text: { label: 'Waiting' } }, { timeout: 3000, intervals: [800] });
+  await expect(target).not.toMatchUI({ text: { label: 'Waiting' } }, { timeout: 5000, intervals: [800] });
   expect(state.captures).toBeGreaterThan(1);
   expect(state.actions).toBe(1);
 });
@@ -52,14 +82,14 @@ test('negated retry waits for mismatch', async ({ page, fixtureUrl }) => {
 test('exported matcher extends consumer expect', async ({ page, fixtureUrl }) => {
   const customExpect = baseExpect.extend({ toMatchUI });
   const target = await delayedTarget(page, fixtureUrl);
-  await customExpect(target).toMatchUI({ text: { label: 'Waiting' } });
+  await customExpect(target).toMatchUI({ text: { label: 'Waiting' } }, { timeout: 5000 });
 });
 
 test('per-call timeout overrides configured timeout', async ({ page, fixtureUrl }) => {
   const target = await delayedTarget(page, fixtureUrl);
   await target.click();
   await expect.configure({ timeout: 20 })(target).toMatchUI(
-    { text: { label: 'Ready' } }, { timeout: 3000, intervals: [800] },
+    { text: { label: 'Ready' } }, { timeout: 5000, intervals: [800] },
   );
 });
 
@@ -115,6 +145,7 @@ test('invalid options fail immediately under both polarities', async ({ page, fi
 
 test('artifact failures preserve the original failure', async ({ page, fixtureUrl }, testInfo) => {
   const target = await delayedTarget(page, fixtureUrl);
+  const timed = observedSnapshot(await target.capture());
   const originalAttach = testInfo.attach;
   let artifactFailures = 0;
   let captureErrors = 0;
@@ -150,7 +181,7 @@ test('artifact failures preserve the original failure', async ({ page, fixtureUr
     for (const annotation of annotations) {
       match(annotation.description ?? '', /consumer attachment failed/);
     }
-    await rejects(() => expect(target).toMatchUI(
+    await rejects(() => expect(timed.target).toMatchUI(
       { text: { label: 'Missing even when artifacts fail' } }, { timeout: 750, intervals: [25] },
     ), (error) => {
       match(error.message, /Expected browser UI/);
@@ -162,7 +193,7 @@ test('artifact failures preserve the original failure', async ({ page, fixtureUr
   } finally {
     testInfo.attach = originalAttach;
   }
-  await probe(testInfo, { artifactFailures, captureErrors, timeoutDiagnostic });
+  await probe(testInfo, { ...snapshotProbe(timed.state), artifactFailures, captureErrors, timeoutDiagnostic });
 });
 
 test('late capture errors cannot replace an expired assertion', async ({}, testInfo) => {
@@ -203,33 +234,36 @@ test('late capture errors cannot replace an expired assertion', async ({}, testI
 });
 
 test('fails: project timeout keeps final observation and artifacts', async ({ page, fixtureUrl }, testInfo) => {
-  const { target, state } = observed(await delayedTarget(page, fixtureUrl, 'dom', 0));
-  const reference = await target.capture();
-  await target.click();
+  const live = observed(await delayedTarget(page, fixtureUrl, 'dom', 0));
+  const reference = await live.target.capture();
+  await live.target.click();
   await page.waitForFunction(() => window.delayedFixture.state().label === 'Ready');
+  const { target, state } = observedSnapshot(await live.target.capture());
   const started = Date.now();
   try {
     await expect(target).toMatchUI({ reference, text: { label: 'Impossible final label' } }, { intervals: [25] });
   } finally {
-    await probe(testInfo, { ...state, elapsed: Date.now() - started, timeout: 1000 });
+    await probe(testInfo, { ...snapshotProbe(state), actions: live.state.actions, elapsed: Date.now() - started, timeout: 1000 });
   }
 });
 
 test('fails: configured timeout respects negation', async ({ page, fixtureUrl }, testInfo) => {
-  const { target, state } = observed(await delayedTarget(page, fixtureUrl));
+  const live = await delayedTarget(page, fixtureUrl);
+  const { target, state } = observedSnapshot(await live.capture());
   const started = Date.now();
   try {
     await expect.configure({ timeout: 750 })(target).not.toMatchUI({ text: { label: 'Waiting' } }, { intervals: [25] });
   } finally {
-    await probe(testInfo, { ...state, elapsed: Date.now() - started, timeout: 750 });
+    await probe(testInfo, { ...snapshotProbe(state), elapsed: Date.now() - started, timeout: 750 });
   }
 });
 
 test('fails: soft matcher continues after two failures', async ({ page, fixtureUrl }, testInfo) => {
-  const target = await delayedTarget(page, fixtureUrl);
+  const live = await delayedTarget(page, fixtureUrl);
+  const { target, state } = observedSnapshot(await live.capture());
   await expect.soft(target).toMatchUI({ text: { label: 'First missing label' } }, { timeout: 750, intervals: [25] });
   await expect.soft(target).not.toMatchUI({ text: { label: 'Waiting' } }, { timeout: 750, intervals: [25] });
-  await probe(testInfo, { continued: true, errors: testInfo.errors.length });
+  await probe(testInfo, { ...snapshotProbe(state), continued: true, errors: testInfo.errors.length });
 });
 
 test('fails: concurrent assertions retain distinct artifacts', async ({ page, fixtureUrl }, testInfo) => {
@@ -237,11 +271,19 @@ test('fails: concurrent assertions retain distinct artifacts', async ({ page, fi
   const secondPage = await page.context().newPage();
   try {
     const second = await delayedTarget(secondPage, fixtureUrl, 'canvas');
+    const firstObservation = observedSnapshot(await first.capture());
+    const secondObservation = observedSnapshot(await second.capture());
     const results = await Promise.allSettled([
-      expect(first).toMatchUI({ text: { label: 'Parallel DOM mismatch' } }, { timeout: 1000, intervals: [25] }),
-      expect(second).toMatchUI({ text: { label: 'Parallel Canvas mismatch' } }, { timeout: 1000, intervals: [25] }),
+      expect(firstObservation.target).toMatchUI({ text: { label: 'Parallel DOM mismatch' } }, { timeout: 1000, intervals: [25] }),
+      expect(secondObservation.target).toMatchUI({ text: { label: 'Parallel Canvas mismatch' } }, { timeout: 1000, intervals: [25] }),
     ]);
-    await probe(testInfo, { rejected: results.filter((result) => result.status === 'rejected').length });
+    await probe(testInfo, {
+      ...snapshotProbe({
+        captures: firstObservation.state.captures + secondObservation.state.captures,
+        actions: firstObservation.state.actions + secondObservation.state.actions,
+      }),
+      rejected: results.filter((result) => result.status === 'rejected').length,
+    });
     const failure = results.find((result) => result.status === 'rejected');
     if (failure) { throw failure.reason; }
   } finally {
@@ -249,11 +291,23 @@ test('fails: concurrent assertions retain distinct artifacts', async ({ page, fi
   }
 });
 
-test('fails: hanging capture obeys matcher deadline without fake pixels', async ({ page, fixtureUrl }, testInfo) => {
-  const target = await delayedTarget(page, fixtureUrl);
+function hangingTarget() {
+  const unexpectedAction = async () => { throw new Error('A deadline probe must only capture.'); };
+  return {
+    measure: async () => ({ bounds: { x: 0, y: 0, width: 100, height: 50 } }),
+    hover: unexpectedAction,
+    press: unexpectedAction,
+    release: unexpectedAction,
+    click: unexpectedAction,
+    capture: () => new Promise(() => {}),
+  };
+}
+
+test('fails: hanging capture obeys matcher deadline without fake pixels', async ({}, testInfo) => {
+  const target = hangingTarget();
   const started = Date.now();
   try {
-    await expect({ ...target, capture: () => new Promise(() => {}) }).not.toMatchUI(
+    await expect(target).not.toMatchUI(
       { text: { label: 'Missing' } }, { timeout: 250, intervals: [25] },
     );
   } finally {
@@ -261,12 +315,12 @@ test('fails: hanging capture obeys matcher deadline without fake pixels', async 
   }
 });
 
-test('fails: hanging capture respects remaining test budget', async ({ page, fixtureUrl }, testInfo) => {
+test('fails: hanging capture respects remaining test budget', async ({}, testInfo) => {
   test.setTimeout(2000);
-  const target = await delayedTarget(page, fixtureUrl);
+  const target = hangingTarget();
   const started = Date.now();
   try {
-    await expect({ ...target, capture: () => new Promise(() => {}) }).toMatchUI(
+    await expect(target).toMatchUI(
       { text: { label: 'Missing' } }, { timeout: 5000, intervals: [25] },
     );
   } finally {

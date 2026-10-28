@@ -8,7 +8,7 @@ UI checks to pass, and attaches failure evidence to the test result.
 
 ```sh
 npm install --save-dev slicewright @playwright/test playwright-core
-npx playwright install chromium
+npx playwright install chromium firefox webkit
 ```
 
 Use Node 24 or newer. `@playwright/test` is optional: the core CLI/library and
@@ -119,8 +119,37 @@ retains the original value; ordinary extensible errors keep their identity.
 
 After `pnpm build`, run `pnpm playwright:check`. It installs the tarball outside
 the repository, validates public declarations and optional-peer isolation, and
-executes real Playwright Test cases for DOM and Canvas. It checks delayed success,
+executes the same real Playwright Test cases for DOM and Canvas in Chromium,
+Firefox, and WebKit projects. It checks delayed success,
 one-time input, permanent mismatch, negation, soft continuation, configured and
 overridden deadlines, invalid inputs, capture errors, and separate attachment
 paths for concurrent assertions. Deliberately failing child tests are checked as
 negative controls. Their reports are kept under `.slicewright/playwright-e2e/`.
+
+Interaction and delayed-render checks capture the live UI on every attempt.
+Short deadline, soft-assertion, concurrent-attachment, and attachment-error
+probes first capture real DOM or Canvas snapshots outside the timed assertion.
+Their observation callbacks return fresh copies of those snapshots and reject
+actions, so these probes measure runner behavior independently of native
+screenshot latency. Callback counts, exact findings, images, reports, and
+deadline diagnostics remain required.
+
+Use named projects in your application's Playwright config to run the same test
+against each browser:
+
+```ts
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  projects: [
+    { name: 'chromium', use: { browserName: 'chromium' } },
+    { name: 'firefox', use: { browserName: 'firefox' } },
+    { name: 'webkit', use: { browserName: 'webkit' } },
+  ],
+});
+```
+
+Use separate [persistent baselines](baselines.md) and rendering-environment keys
+per project/platform. The matcher API stays the same; cross-browser pixel
+identity is not assumed. See [browser engine verification](browser.md#browser-engines)
+for repository setup and report locations.

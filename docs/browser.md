@@ -15,7 +15,7 @@ Use Node 24 or newer. In a project using Playwright Test:
 
 ```sh
 npm install --save-dev slicewright @playwright/test playwright-core
-npx playwright install chromium
+npx playwright install chromium firefox webkit
 ```
 
 Browser tooling is an optional peer dependency. Importing `slicewright` or using
@@ -196,3 +196,46 @@ handlers, stale painting, shifted content, clipped text, and an input-blocking
 overlay must be caught. Artifacts are saved under `.slicewright/browser-e2e/` and
 uploaded by CI on Linux and Windows. No repository source import or private tool
 copy is required by the consumer.
+
+## Browser engines
+
+The same `domTarget`, `regionTarget`, snapshot checks, and baseline APIs are
+verified with Playwright's Chromium, Firefox, and WebKit. Keep references local
+to a browser and rendering environment; font rasterization and pixels can differ
+between engines and operating systems. WebKit verification is not a claim about
+a specific released Safari version or mobile device.
+
+For repository verification, install the locked browsers and run both consumers:
+
+```sh
+pnpm exec playwright install chromium firefox webkit
+pnpm build
+pnpm browser:check
+pnpm playwright:check
+```
+
+On Linux, use `pnpm exec playwright install --with-deps chromium firefox webkit`
+to install system dependencies too. Missing engines fail the command with
+installation guidance. `SLICEWRIGHT_CHROME_CHANNEL` selects an installed Chrome
+channel for Chromium only; Firefox and WebKit always use the locked engines.
+
+The browser consumer runs identical DOM/Canvas scenarios in all three engines,
+including scroll and DPR changes, fixed/sticky captures, persisted baselines,
+and deliberate failures. Its report records each browser's name and version;
+artifacts are separated by engine under `.slicewright/browser-e2e/`. Before
+choosing a static initial reference, both consumers require two
+consecutive identical captures within five observations. This is read-only
+render preparation: later mismatches do not update that reference, and inputs
+still run once. The
+Playwright consumer also runs every assertion scenario in three named projects
+and keeps their results under `.slicewright/playwright-e2e/`.
+
+Baseline save/load remains byte-exact. For the consumer's fresh capture after
+loading, the fixture explicitly allows RGB error inside measured text bounds
+of mean `0.01`, p99 `0`, and maximum `32` on the 0–255 scale. Windows Firefox
+produced 14 differing glyph-edge pixels despite two identical setup captures;
+the saved pixels, metadata, and alpha were unchanged. The consumer still
+requires exact metadata, alpha, and pixels outside text bounds. Negative boundary
+probes and the real activation must fail under this same policy. This allowance can
+hide tiny text changes within its budget; it does not change the library's
+zero-tolerance default or the other interaction checks.

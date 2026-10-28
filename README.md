@@ -280,12 +280,15 @@ The toolchain is [ttsc](https://ttsc.dev) on TypeScript 7:
   Chrome; `SLICEWRIGHT_CHROME_CHANNEL` picks another Playwright channel).
 - `pnpm browser:check`: after `pnpm build`, install the packed package in a
   fresh consumer project and run shared HTML/CSS and Canvas interaction tests
-  in Chrome, including injected failures. Artifacts go to
+  in Chromium, Firefox, and WebKit, including injected failures. Artifacts go to
   `.slicewright/browser-e2e/`.
 - `pnpm playwright:check`: after `pnpm build`, verify the optional matcher in a
-  clean consumer using the real Playwright Test runner. Expected failures and
+  clean consumer using three browser projects in the real Playwright Test runner. Expected failures and
   their attachments are checked under `.slicewright/playwright-e2e/`.
 - `.mcp.json` registers the `@ttsc/graph` MCP server for agents.
+
+Install the locked browser engines before either consumer check with
+`pnpm exec playwright install chromium firefox webkit` (add `--with-deps` on Linux).
 
 CI runs the checks, tests, build, packed browser scenarios, and engine renders on
 Linux and native Windows.

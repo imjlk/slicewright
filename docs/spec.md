@@ -817,3 +817,37 @@ and replacement, rejection without writes, corrupted or incompatible files,
 concurrent readers and saves, and preservation after an image-install failure.
 A clean packed consumer saves a rendered baseline, loads it in another process,
 and verifies both matching and changed rendered UI through the public APIs.
+
+## Browser engine compatibility
+
+The browser targets, snapshot checks, persisted references, and Playwright Test
+matcher use the same public APIs with Playwright's Chromium, Firefox, and WebKit.
+Viewport CSS-pixel geometry, content measurements, real pointer input, capture
+clipping, and observation-only matcher retries retain the same contract on each
+engine. References are captured and compared within the same explicit rendering
+environment; pixel equality between different browsers or platforms is not
+promised. Playwright WebKit coverage does not assert compatibility with a
+particular released Safari or mobile browser.
+
+Packed-consumer verification runs the same DOM and Canvas scenarios on all
+three engines, including viewport and DPR variation, scroll, fixed and sticky
+captures, persisted baseline round-trips, and deliberate visual, layout, text,
+and hit-target failures. The real Playwright Test suite runs each matcher
+scenario in three named projects, checking intended failures and attachments
+separately per engine. Reports identify the browser and artifacts remain
+separate so one engine cannot overwrite another's evidence.
+
+Persisted pixels must round-trip byte-for-byte. The consumer's fresh-render
+comparison may explicitly allow small RGB differences inside measured text
+bounds (mean 0.01, p99 0, maximum 32 on the 0–255 error scale), while requiring
+identical metadata, alpha, and pixels outside those bounds. This is a test
+fixture policy, not a change to the library's zero-tolerance default. It can
+admit tiny text-rendering regressions within that budget; guards must reject
+larger peak or aggregate drift, changes outside text bounds, alpha changes,
+and the real activated UI under the same tolerance. Other interaction and
+negative-control comparisons retain their existing strict checks.
+
+The verification commands use the browsers installed for the locked Playwright
+version. A Chrome channel override applies only to Chromium. A missing browser
+is an error with installation guidance, never a silently skipped engine. CI
+installs the required engines and runs both packed-consumer suites.

@@ -6,10 +6,15 @@ import { dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
-import { chromium } from 'playwright-core';
+import { chromium, firefox, webkit } from 'playwright-core';
 import {
   checkSnapshot, domTarget, regionTarget, saveBrowserBaseline, writeBrowserArtifacts,
 } from 'slicewright/browser';
+
+import { settleInitialPanel } from './stable-capture.mjs';
+import {
+  assertFreshBaseline, compareFreshBaseline, verifyFreshBaselineControls, writeFreshBaselineArtifacts,
+} from './baseline-policy.mjs';
 
 // This file runs from a newly installed consumer project. Its only product
 // imports are public package exports, exactly as in an application's own test.
@@ -42,11 +47,9 @@ await new Promise((done) => server.listen(0, '127.0.0.1', done));
 const address = server.address();
 ok(address && typeof address === 'object');
 const base = `http://127.0.0.1:${address.port}`;
-const cases = [];
-let baselineRoundTrips = 0;
-let browser;
 
 async function restoreBaseline(path, environment, original) {
+  const approved = structuredClone(original);
   await saveBrowserBaseline(path, original, { approved: true, environment });
   const { stdout } = await execute(process.execPath, [
     join(directory, 'baseline-loader.mjs'), path, environment,
@@ -61,11 +64,12 @@ async function restoreBaseline(path, environment, original) {
       data: new Uint8Array(Buffer.from(saved.raster.rgba, 'base64')),
     },
   };
-  deepStrictEqual(restored, original, 'The public loader must restore measurements, clip, and every RGBA byte.');
+  deepStrictEqual(original, approved, 'Saving must not mutate the approved snapshot.');
+  deepStrictEqual(restored, approved, 'The public loader must restore measurements, clip, and every RGBA byte.');
   return restored;
 }
 
-async function checkPositionedCapture(position) {
+async function checkPositionedCapture(browser, engineOutput, position) {
   const context = await browser.newContext({
     viewport: { width: 640, height: 480 }, deviceScaleFactor: 2,
   });
@@ -93,7 +97,7 @@ async function checkPositionedCapture(position) {
     const report = checkSnapshot(actual, {
       reference: before, stableGeometry: { reference: before.measurement, tolerance: 0 },
     });
-    await writeBrowserArtifacts(join(output, `capture-${position}`), {
+    await writeBrowserArtifacts(join(engineOutput, `capture-${position}`), {
       actual, reference: before, report,
     });
     deepStrictEqual(report.findings, [], `${position}: viewport-bound pixels must survive page scrolling`);
@@ -147,8 +151,11 @@ async function scenario(page, bound, directory, scroll, baselineEnvironment) {
     return report;
   }
 
-  const normalPanel = await bound.panel.capture();
+  const firstPanel = await bound.panel.capture();
   const normal = await bound.action.capture();
+  const { snapshot: normalPanel, attempts: initialCaptureAttempts } = await settleInitialPanel(
+    page, bound.panel, firstPanel, directory,
+  );
   await verify('initial-panel', normalPanel, {
     contentFits: true,
     text: { status: 'Choose your next adventure.', action: 'Accept quest' },
@@ -158,12 +165,10 @@ async function scenario(page, bound, directory, scroll, baselineEnvironment) {
     join(directory, 'baseline.json'), baselineEnvironment, normalPanel,
   );
   if (baseline) {
-    await verify('baseline-initial', await bound.panel.capture(), {
-      reference: baseline,
-      stableGeometry: { reference: baseline.measurement, tolerance: 0 },
-      contentFits: true,
-      text: { status: 'Choose your next adventure.', action: 'Accept quest' },
-    });
+    const actual = await bound.panel.capture();
+    const comparison = compareFreshBaseline(actual, baseline);
+    await writeFreshBaselineArtifacts(join(directory, 'baseline-initial'), actual, baseline, comparison);
+    assertFreshBaseline(actual, baseline, comparison);
   }
   strictEqual(normal.raster.width, normal.clip.width);
   strictEqual(normal.raster.height, normal.clip.height);
@@ -217,12 +222,10 @@ async function scenario(page, bound, directory, scroll, baselineEnvironment) {
     stableGeometry: stable, contentFits: true, text: { label: 'Accept quest' },
   });
   if (baseline) {
-    const comparison = checkSnapshot(acceptedPanel, { reference: baseline });
-    ok(comparison.findings.some((finding) => finding.code === 'browser.pixels'),
-      'Real activation must change rendered pixels against the separately loaded baseline.');
-    await writeBrowserArtifacts(join(directory, 'baseline-activation'), {
-      actual: acceptedPanel, reference: baseline, report: comparison,
-    });
+    const comparison = compareFreshBaseline(acceptedPanel, baseline);
+    await writeFreshBaselineArtifacts(join(directory, 'baseline-activation'), acceptedPanel, baseline, comparison);
+    ok(comparison.report.findings.some((finding) => finding.code === 'browser.pixels'),
+      'Real activation must exceed the same explicit fresh-render tolerance.');
     await verify('baseline-changed', acceptedPanel, { changedFrom: baseline });
   }
   await bound.action.click();
@@ -231,7 +234,10 @@ async function scenario(page, bound, directory, scroll, baselineEnvironment) {
     contentFits: true,
     text: { status: 'Quest accepted: 2' },
   });
-  return { findings, state: await page.evaluate(() => window.browserE2EFixture.getState()) };
+  return {
+    findings, initialCaptureAttempts,
+    state: await page.evaluate(() => window.browserE2EFixture.getState()),
+  };
 }
 
 const requiredFailure = {
@@ -242,7 +248,7 @@ const requiredFailure = {
   overlay: { step: 'hover', code: 'browser.pixels-unchanged' },
 };
 
-async function runCase(renderer, configuration, fault = 'none', persistBaseline = false) {
+async function runCase(browser, engine, renderer, configuration, fault = 'none', persistBaseline = false) {
   const { width, deviceScaleFactor, scroll } = configuration;
   const name = `${renderer}-${width}-dpr${deviceScaleFactor}-${scroll ? 'scroll' : 'top'}-${fault}`;
   const context = await browser.newContext({
@@ -257,10 +263,10 @@ async function runCase(renderer, configuration, fault = 'none', persistBaseline 
     await page.evaluate(async () => { await window.browserE2EFixture.ready; });
     await settled(page);
     const baselineEnvironment = persistBaseline
-      ? `browser-consumer:${process.platform}:${process.arch}:${browser.version()}:${renderer}:${width}x900@${deviceScaleFactor}:fixture-v1`
+      ? `browser-consumer:${process.platform}:${process.arch}:${engine.browser}:${engine.version}:${renderer}:${width}x900@${deviceScaleFactor}:fixture-v1`
       : undefined;
     const result = await scenario(
-      page, targets(page, renderer), join(output, name), scroll, baselineEnvironment,
+      page, targets(page, renderer), join(engine.output, name), scroll, baselineEnvironment,
     );
     deepStrictEqual(errors, [], `${name}: page errors`);
     if (fault === 'none') {
@@ -284,43 +290,90 @@ async function runCase(renderer, configuration, fault = 'none', persistBaseline 
         strictEqual(result.state.accepted, 0, 'Fault must prevent real activation.');
       }
     }
-    cases.push({ name, renderer, fault, rejected: result.findings.length > 0, findings: result.findings });
-    if (persistBaseline) baselineRoundTrips += 1;
+    engine.cases.push({
+      browser: engine.browser, name, renderer, fault,
+      initialCaptureAttempts: result.initialCaptureAttempts,
+      rejected: result.findings.length > 0, findings: result.findings,
+    });
+    if (persistBaseline) engine.baselineRoundTrips += 1;
   } finally {
     await context.close();
   }
 }
 
-try {
-  browser = await chromium.launch({ channel: process.env.SLICEWRIGHT_CHROME_CHANNEL ?? 'chrome' });
-  for (const position of ['fixed', 'sticky']) {
-    await checkPositionedCapture(position);
+async function runEngine(browserType) {
+  const browserName = browserType.name();
+  const channel = browserName === 'chromium' ? process.env.SLICEWRIGHT_CHROME_CHANNEL : undefined;
+  let browser;
+  try {
+    browser = await browserType.launch(channel === undefined ? {} : { channel });
+  } catch (cause) {
+    throw new Error(
+      `${browserName}: browser launch failed. Install the locked browsers with ` +
+      '`pnpm exec playwright install chromium firefox webkit`.' +
+      (channel === undefined ? '' : ' Install the configured Chrome channel or unset SLICEWRIGHT_CHROME_CHANNEL to use bundled Chromium.'),
+      { cause },
+    );
   }
-  const configurations = [
-    { width: 320, deviceScaleFactor: 1, scroll: false },
-    { width: 320, deviceScaleFactor: 2, scroll: true },
-    { width: 960, deviceScaleFactor: 1, scroll: true },
-    { width: 960, deviceScaleFactor: 2, scroll: false },
-  ];
-  for (const renderer of ['dom', 'canvas']) {
-    for (const configuration of configurations) {
-      await runCase(renderer, configuration, 'none', configuration === configurations[0]);
+  const engine = {
+    browser: browserName,
+    version: browser.version(),
+    cases: [],
+    captureProbes: 0,
+    baselineRoundTrips: 0,
+    output: join(output, browserName),
+  };
+  try {
+    for (const position of ['fixed', 'sticky']) {
+      await checkPositionedCapture(browser, engine.output, position);
+      engine.captureProbes += 1;
     }
-    for (const fault of Object.keys(requiredFailure)) {
-      await runCase(renderer, { width: 960, deviceScaleFactor: 1, scroll: false }, fault);
+    const configurations = [
+      { width: 320, deviceScaleFactor: 1, scroll: false },
+      { width: 320, deviceScaleFactor: 2, scroll: true },
+      { width: 960, deviceScaleFactor: 1, scroll: true },
+      { width: 960, deviceScaleFactor: 2, scroll: false },
+    ];
+    for (const renderer of ['dom', 'canvas']) {
+      for (const configuration of configurations) {
+        await runCase(browser, engine, renderer, configuration, 'none', configuration === configurations[0]);
+      }
+      for (const fault of Object.keys(requiredFailure)) {
+        await runCase(browser, engine, renderer, { width: 960, deviceScaleFactor: 1, scroll: false }, fault);
+      }
     }
+    const report = {
+      ...engine,
+      passed: engine.cases.filter((entry) => entry.fault === 'none').length,
+      negativeControls: engine.cases.filter((entry) => entry.fault !== 'none' && entry.rejected).length,
+    };
+    await writeFile(join(engine.output, 'consumer-report.json'), `${JSON.stringify(report, null, 2)}\n`);
+    return report;
+  } catch (cause) {
+    throw new Error(`${browserName} ${engine.version}: consumer verification failed. Artifacts: ${engine.output}`, { cause });
+  } finally {
+    await browser.close();
+  }
+}
+
+try {
+  const baselinePolicyControls = await verifyFreshBaselineControls(join(output, 'baseline-policy-controls'));
+  const engines = [];
+  for (const browserType of [chromium, firefox, webkit]) {
+    engines.push(await runEngine(browserType));
   }
   const report = {
-    cases,
-    passed: cases.filter((entry) => entry.fault === 'none').length,
-    negativeControls: cases.filter((entry) => entry.fault !== 'none' && entry.rejected).length,
-    captureProbes: 2,
-    baselineRoundTrips,
+    engines,
+    baselinePolicyControls,
+    cases: engines.flatMap((engine) => engine.cases),
+    passed: engines.reduce((total, engine) => total + engine.passed, 0),
+    negativeControls: engines.reduce((total, engine) => total + engine.negativeControls, 0),
+    captureProbes: engines.reduce((total, engine) => total + engine.captureProbes, 0),
+    baselineRoundTrips: engines.reduce((total, engine) => total + engine.baselineRoundTrips, 0),
     output,
   };
   await writeFile(join(output, 'consumer-report.json'), `${JSON.stringify(report, null, 2)}\n`);
   process.stdout.write(`${JSON.stringify(report)}\n`);
 } finally {
-  await browser?.close();
   await new Promise((done) => server.close(done));
 }
