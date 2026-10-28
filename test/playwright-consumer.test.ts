@@ -185,14 +185,14 @@ async function verifyRunner(report: RunnerReport, output: string): Promise<{
     report.stats,
     {
       ...report.stats,
-      expected: 33,
+      expected: 39,
       unexpected: 18,
       flaky: 0,
       skipped: 0,
     },
     failures,
   );
-  strictEqual(specs.length, 17, 'Every intended consumer case must actually execute.');
+  strictEqual(specs.length, 19, 'Every intended consumer case must actually execute.');
   const executions = specs.flatMap((spec) => {
     deepStrictEqual(
       spec.tests.map((test) => test.projectName).sort(),
@@ -201,7 +201,7 @@ async function verifyRunner(report: RunnerReport, output: string): Promise<{
     );
     return spec.tests.map((test) => ({ title: spec.title, ...test }));
   });
-  strictEqual(executions.length, 51);
+  strictEqual(executions.length, 57);
   const cases: { browser: BrowserName; name: string; rejected: boolean }[] = [];
   const versions = new Map<BrowserName, string>();
   const browserAttachments = new Map<BrowserName, number>();
@@ -449,11 +449,11 @@ async function verifyRunner(report: RunnerReport, output: string): Promise<{
   }
   const browsers = browserNames.map((name) => {
     const entries = cases.filter((entry) => entry.browser === name);
-    strictEqual(entries.length, 17, `${name}: complete matcher suite required.`);
+    strictEqual(entries.length, 19, `${name}: complete matcher suite required.`);
     const passed = entries.filter((entry) => !entry.rejected).length;
     const negativeControls = entries.filter((entry) => entry.rejected).length;
     const attachments = browserAttachments.get(name) ?? 0;
-    strictEqual(passed, 11, name);
+    strictEqual(passed, 13, name);
     strictEqual(negativeControls, 6, name);
     strictEqual(attachments, 49, `${name}: expected every independent assertion artifact.`);
     const version = versions.get(name);
@@ -539,6 +539,9 @@ export async function verifiesPackedPlaywrightConsumer(): Promise<PlaywrightCons
       join(root, 'test/browser-e2e/stable-capture.mjs'),
       join(consumer, 'stable-capture.mjs'),
     );
+    for (const name of ['focus-consumer.mjs', 'focus.html']) {
+      await cp(join(root, 'test/browser-e2e', name), join(consumer, name));
+    }
     await cp(join(root, 'examples/browser-e2e'), join(consumer, 'fixture'), { recursive: true });
     await cp(join(consumer, 'contract.ts.txt'), join(consumer, 'contract.ts'));
     await writeFile(join(consumer, 'tsconfig.json'), `${JSON.stringify({
@@ -573,7 +576,7 @@ export async function verifiesPackedPlaywrightConsumer(): Promise<PlaywrightCons
       JSON.parse(await readFile(runnerReportPath, 'utf8')),
     );
     const verified = await verifyRunner(runnerReport, output);
-    const report = { passed: 33, negativeControls: 18, ...verified, output };
+    const report = { passed: 39, negativeControls: 18, ...verified, output };
     await writeFile(join(output, 'consumer-report.json'), `${JSON.stringify(report, null, 2)}\n`);
     return report;
   } finally {

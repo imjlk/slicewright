@@ -30,6 +30,7 @@ async function scenario(target: BrowserTarget): Promise<void> {
   const actual = await target.capture();
   const report = checkSnapshot(actual, {
     changedFrom: baseline,
+    focus: { focused: true, visible: true },
     stableGeometry: { reference: baseline.measurement, tolerance: 0.1 },
     contentFits: true,
     text: { label: 'Accept quest' },

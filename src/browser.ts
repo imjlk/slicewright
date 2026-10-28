@@ -31,7 +31,14 @@ export interface BrowserContent {
   readonly textBounds?: readonly Rect[];
 }
 
+/** Renderer-reported focus state; visible does not prove a painted indicator. */
+export interface BrowserFocusState {
+  readonly focused: boolean;
+  readonly visible: boolean;
+}
+
 export interface BrowserMeasurement {
+  readonly focus?: BrowserFocusState;
   readonly bounds: Rect;
   readonly contentBox?: Rect;
   readonly content?: Readonly<Record<string, BrowserContent>>;
@@ -68,6 +75,7 @@ export interface BrowserTarget {
 }
 
 export interface BrowserCheckOptions {
+  readonly focus?: { readonly focused: boolean; readonly visible?: boolean };
   readonly reference?: BrowserSnapshot;
   /** All three tolerances must be supplied; the default is exact equality. */
   readonly pixels?: RasterDifference;
@@ -216,6 +224,10 @@ export function domTarget(page: Page, source: BrowserDomSource): BrowserTarget {
       }
       return {
         bounds: root.bounds,
+        focus: await source.root.evaluate((element) => ({
+          focused: element.matches(':focus'),
+          visible: element.matches(':focus-visible'),
+        })),
         ...(contentBox === undefined ? {} : { contentBox }),
         ...(source.content === undefined ? {} : { content: Object.fromEntries(entries) }),
       };
@@ -225,6 +237,9 @@ export function domTarget(page: Page, source: BrowserDomSource): BrowserTarget {
 
 /**
  * Checks observations against explicit, independent content and image contracts.
+ *
+ * @evidence docs/spec.md#browser-keyboard-focus Checks explicit focus observations without input, rejects missing instrumentation and contradictory expectations, and leaves painted-indicator proof to pixel checks.
+ * @evidenceReview docs/spec.md#browser-keyboard-focus #cdf74d0 Read the focus contract and checked DOM pseudo-class observations, missing-state findings, contradiction validation, and the capture stability comparison; painted focus remains an independent pixel assertion.
  *
  * @evidence docs/spec.md#browser-ui-verification Returns error findings for missing content instrumentation, exact text mismatch, overflow, relative geometry drift, unexpected pixels and absent visible transitions.
  * @evidenceReview docs/spec.md#browser-ui-verification #9f7e47a Read the section against each finding branch, independent geometry and pixel references, premultiplied comparisons and configuration validation.
@@ -242,7 +257,26 @@ export function checkSnapshot(
   for (const value of Object.values(thresholds)) {
     nonnegative(value, 'Pixel tolerance');
   }
+  if (options.focus?.visible === true && !options.focus.focused) {
+    throw new TypeError('Visible focus requires focused state.');
+  }
   const findings: Finding[] = [];
+  if (options.focus !== undefined) {
+    const observed = actual.measurement.focus;
+    if (observed === undefined) {
+      findings.push(
+        finding('browser.focus-missing', 'Focus assertions require explicit focus instrumentation.'),
+      );
+    } else if (observed.focused !== options.focus.focused ||
+      (options.focus.visible !== undefined && observed.visible !== options.focus.visible)) {
+      findings.push(
+        finding('browser.focus', 'The target has unexpected focus state.', {
+          actual: observed,
+          expected: options.focus,
+        }),
+      );
+    }
+  }
   const pixels = options.reference === undefined
     ? undefined
     : comparePixels(actual, options.reference, findings, 'reference');
@@ -461,7 +495,8 @@ function sameRelativeGeometry(a: BrowserMeasurement, b: BrowserMeasurement, tole
 }
 
 function sameMeasurement(a: BrowserMeasurement, b: BrowserMeasurement): boolean {
-  return nearRect(a.bounds, b.bounds, 0) && sameRelativeGeometry(a, b, 0) &&
+  return a.focus?.focused === b.focus?.focused && a.focus?.visible === b.focus?.visible &&
+    nearRect(a.bounds, b.bounds, 0) && sameRelativeGeometry(a, b, 0) &&
     Object.entries(a.content ?? {}).every(([name, content]) => content.text === ownContent(b, name)?.text);
 }
 

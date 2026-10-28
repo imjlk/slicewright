@@ -851,3 +851,31 @@ The verification commands use the browsers installed for the locked Playwright
 version. A Chrome channel override applies only to Chromium. A missing browser
 is an error with installation guidance, never a silently skipped engine. CI
 installs the required engines and runs both packed-consumer suites.
+
+## Browser keyboard focus
+
+Browser measurements may include a `focus` object with boolean `focused` and
+`visible` states. `domTarget` observes the root element's native `:focus` and
+`:focus-visible` states; descendants do not implicitly focus their parent.
+`regionTarget` accepts the same explicit instrumentation from Canvas or other
+renderers. Visible focus requires focused state. Missing instrumentation is
+unknown, never equivalent to false. Existing measurements without focus remain
+valid, and baseline save/load preserves supplied focus metadata.
+
+`checkSnapshot` and `toMatchUI` accept `focus: { focused, visible? }`. A missing
+observation returns `browser.focus-missing`; an observed mismatch returns
+`browser.focus`. Malformed or contradictory states and expectations are input
+errors. Capture rejects focus changes during its observation just as it rejects
+geometry or text changes. Geometry-only comparisons do not compare focus.
+
+Focus-visible metadata describes the renderer's state, not proof that a focus
+indicator was painted. Consumers pair it with pixel/reference assertions to
+verify the actual indicator. Keyboard input remains the test runner's job;
+assertions never press keys, move focus, or retry activation.
+
+A clean installed-package scenario runs native Tab/Shift+Tab navigation and
+Enter/Space activation on HTML controls and an instrumented Canvas UI in all
+three browser engines. It checks disabled-control skipping, visible focus
+pixels, and exactly one activation per key. Deliberate broken focus order,
+missing focus painting, and duplicate activation must be rejected. The same
+focus assertions work through the Playwright matcher.

@@ -5,6 +5,9 @@ import type { Rect } from './raster.js';
 
 export function checkedMeasurement(value: BrowserMeasurement): BrowserMeasurement {
   typia.assert<BrowserMeasurement>(value);
+  if (value.focus?.visible === true && !value.focus.focused) {
+    throw new TypeError('Visible focus requires focused state.');
+  }
   checkedRect(value.bounds, 'Target bounds', true);
   if (value.contentBox !== undefined) {
     checkedRect(value.contentBox, 'Content box');

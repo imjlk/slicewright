@@ -72,6 +72,8 @@ For Playwright Test, import `expect` from `slicewright/playwright` and use
 `await expect(target).toMatchUI(checks)`. The [Playwright Test guide](docs/playwright.md)
 shows bounded observation retries, negation, soft assertions, and automatic
 failure attachments for either renderer.
+[Keyboard focus checks](docs/browser.md#keyboard-focus) share the same API for
+DOM and Canvas, with explicit focus-visible state and separate pixel assertions.
 
 The [baseline guide](docs/baselines.md) shows how to save an explicitly approved
 rendered snapshot, reload it in a later run, and reject incompatible rendering

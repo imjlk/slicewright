@@ -24,7 +24,15 @@ interface BrowserConsumerCase {
   readonly findings: readonly { readonly step: string; readonly code: string }[];
 }
 
+interface KeyboardConsumerCase {
+  readonly renderer: 'dom' | 'canvas';
+  readonly fault: 'none' | 'order' | 'paint' | 'duplicate';
+  readonly rejected: boolean;
+  readonly findings: readonly { readonly step: string; readonly code: string }[];
+}
+
 interface BrowserEngineConsumerReport {
+  readonly keyboardCases: readonly KeyboardConsumerCase[];
   readonly browser: 'chromium' | 'firefox' | 'webkit';
   readonly version: string;
   readonly cases: readonly BrowserConsumerCase[];
@@ -88,6 +96,9 @@ async function installedVersion(name: string): Promise<string> {
 }
 
 /**
+ * @evidence docs/spec.md#browser-keyboard-focus Runs the shared real-keyboard DOM and Canvas scenario on three engines with focus order, disabled skipping, reverse traversal, rendered indicators, activation counts, and three injected failures per renderer.
+ * @evidenceReview docs/spec.md#browser-keyboard-focus #cdf74d0 Read the focus contract and shared native-keyboard fixture; ran all 24 DOM/Canvas keyboard cases across Chromium, Firefox and WebKit, including order, paint and duplicate-activation rejections, and inspected the focused DOM/Canvas images.
+ *
  * Packs the built package, installs it outside the repository, and runs one
  * public-API scenario against DOM and Canvas renderers with real mouse input.
  *
@@ -147,6 +158,9 @@ export async function verifiesPackedBrowserConsumer(): Promise<BrowserConsumerRe
     // Only the consumer's own test and example app are copied. All product
     // behavior resolves through the installed package's public exports.
     await cp(join(root, 'test/browser-e2e/consumer.mjs'), join(consumer, 'consumer.mjs'));
+    for (const name of ['focus-consumer.mjs', 'focus.html']) {
+      await cp(join(root, 'test/browser-e2e', name), join(consumer, name));
+    }
     await cp(
       join(root, 'test/browser-e2e/stable-capture.mjs'),
       join(consumer, 'stable-capture.mjs'),
@@ -190,6 +204,17 @@ export async function verifiesPackedBrowserConsumer(): Promise<BrowserConsumerRe
       'Every required browser engine must run without skips.',
     );
     for (const engine of report.engines) {
+      strictEqual(engine.keyboardCases.length, 8);
+      for (const renderer of ['dom', 'canvas']) {
+        const cases = engine.keyboardCases.filter((entry) => entry.renderer === renderer);
+        deepStrictEqual(
+          cases.map((entry) => entry.fault),
+          ['none', 'order', 'paint', 'duplicate'],
+        );
+        for (const entry of cases) {
+          strictEqual(entry.rejected, entry.fault !== 'none');
+        }
+      }
       ok(engine.version.trim().length > 0, `${engine.browser}: report the browser version.`);
       strictEqual(engine.passed, 8, `${engine.browser}: every normal DOM/Canvas case must pass.`);
       strictEqual(
