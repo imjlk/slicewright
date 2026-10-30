@@ -1,10 +1,11 @@
 import { deepStrictEqual, match, ok, strictEqual } from 'node:assert/strict';
 import { execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { cp, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
@@ -88,6 +89,7 @@ interface ObservationReport {
 }
 
 export interface PlaywrightConsumerReport {
+  readonly baselineWorkflow: { readonly approved: number; readonly compared: number; readonly rejected: number };
   readonly passed: number;
   readonly negativeControls: number;
   readonly attachments: number;
@@ -168,6 +170,98 @@ async function probeFor(result: RunnerResult): Promise<ConsumerProbe> {
   return typia.assert<ConsumerProbe>(
     JSON.parse((await attachmentBytes(attachment)).toString('utf8')),
   );
+}
+
+async function verifiesBaselineWorkflow(consumer: string, output: string): Promise<PlaywrightConsumerReport['baselineWorkflow']> {
+  const example = join(consumer, 'baseline-workflow');
+  await cp(join(root, 'examples/baseline-workflow'), example, {
+    recursive: true,
+    filter: (path) => !['node_modules', 'baselines', 'test-results', 'playwright-report'].includes(basename(path)),
+  });
+  const baselineDirectory = join(example, 'baselines');
+  const exampleOutput = join(output, 'baseline-workflow');
+  await mkdir(exampleOutput, { recursive: true });
+  async function phase(name: string, mode: string, failures: number, total: number, args: string[] = []): Promise<RunnerReport> {
+    const reportPath = join(exampleOutput, `${name}.json`);
+    await run(
+      [join(example, 'run.mjs'), mode, ...args],
+      example,
+      {
+        ...process.env,
+        SLICEWRIGHT_EXAMPLE_REPORT: reportPath,
+        SLICEWRIGHT_EXAMPLE_OUTPUT: join(exampleOutput, name),
+        SLICEWRIGHT_EXAMPLE_FAULT: name === 'regression' ? 'paint' : '',
+      },
+      failures ? 1 : 0,
+      360_000,
+    );
+    const report = typia.assert<RunnerReport>(JSON.parse(await readFile(reportPath, 'utf8')));
+    deepStrictEqual(report.errors, []);
+    strictEqual(report.stats.expected, total - failures);
+    strictEqual(report.stats.unexpected, failures);
+    strictEqual(report.stats.skipped, 0);
+    strictEqual(report.stats.flaky, 0);
+    const specs = allSpecs(report.suites);
+    strictEqual(specs.length * browserNames.length, total);
+    for (const spec of specs) {
+      deepStrictEqual(
+        spec.tests.map((entry) => entry.projectName).sort(),
+        [...browserNames].sort(),
+      );
+      for (const entry of spec.tests) {
+        strictEqual(entry.results.length, 1);
+        strictEqual(entry.results[0]?.status, failures ? 'failed' : 'passed');
+      }
+    }
+    return report;
+  }
+  async function fingerprints(): Promise<Record<string, string>> {
+    const paths = (await readdir(baselineDirectory, { recursive: true })).sort();
+    const result: Record<string, string> = {};
+    for (const path of paths) {
+      if (path.endsWith('.json') || path.endsWith('.png')) {
+        result[path] = createHash('sha256').update(await readFile(join(baselineDirectory, path))).digest('hex');
+      }
+    }
+    return result;
+  }
+  await phase('missing', 'test', 3, 3, ['--grep', 'dom wide-en approved', '--update-snapshots']);
+  strictEqual(
+    existsSync(baselineDirectory),
+    false,
+    'Update mode must not create missing baselines.',
+  );
+  await phase('approval', 'approve', 0, 24);
+  const approved = await fingerprints();
+  strictEqual(Object.keys(approved).filter((path) => path.endsWith('.json')).length, 48);
+  strictEqual(Object.keys(approved).filter((path) => path.endsWith('.png')).length, 48);
+  await phase('comparison', 'test', 0, 24, ['--update-snapshots']);
+  deepStrictEqual(await fingerprints(), approved);
+  const negative = await phase('regression', 'test', 3, 3, [
+    '--grep',
+    'canvas narrow-ko-large approved',
+  ]);
+  deepStrictEqual(
+    await fingerprints(),
+    approved,
+    'A real painted regression must not update references.',
+  );
+  for (const spec of allSpecs(negative.suites)) {
+    for (const entry of spec.tests) {
+      const result = entry.results[0];
+      ok(result);
+      const attachment = result.attachments.find((item) => item.name.endsWith('-report'));
+      ok(attachment);
+      const report = typia.assert<ObservationReport>(
+        JSON.parse((await attachmentBytes(attachment)).toString('utf8')),
+      );
+      ok(report.findings.some((finding) => finding.code === 'browser.pixels'));
+      ok(result.attachments.some((item) => item.name.endsWith('-html')));
+    }
+  }
+  // Keep the approved images as inspectable evidence after removing the consumer.
+  await cp(baselineDirectory, join(exampleOutput, 'baselines'), { recursive: true });
+  return { approved: 24, compared: 24, rejected: 6 };
 }
 
 async function verifyRunner(report: RunnerReport, output: string): Promise<{
@@ -549,7 +643,7 @@ async function verifyRunner(report: RunnerReport, output: string): Promise<{
  * semantics through public imports, including intentionally failing child tests.
  *
  * @evidence docs/spec.md#playwright-baseline-assertions Runs installed DOM and Canvas baselines, custom snapshot paths, update-mode immutability, invalid inputs, bounded loading, polling, negation and soft failures with real runner artifacts.
- * @evidenceReview docs/spec.md#playwright-baseline-assertions #528d222 Ran the clean installed three-engine suite: 105 expected outcomes, 363 unique attachments and 42 HTML reports; checked baseline paths, update-mode immutability, both error polarities, load deadlines, negation and soft failures.
+ * @evidenceReview docs/spec.md#playwright-baseline-assertions #528d222 Ran 105 installed matcher outcomes with 363 attachments and 42 HTML reports, then the clean installed example: 24 approvals, 24 comparisons and six expected failures with unchanged baseline fingerprints; inspected narrow Korean 200-percent DOM and Canvas images.
  * @evidence docs/spec.md#browser-sustained-stability Checks live DOM and Canvas settling, observed drift, pending negation, validation, native deadlines and compared-anchor failure artifacts in all engines.
  * @evidenceReview docs/spec.md#browser-sustained-stability #e0157b2 Ran the installed three-engine suite with null-prototype pending-negation metadata: all 84 expected outcomes, 249 attachments and 30 offline HTML reports passed, preserving deadline and pending-polarity guards.
  * @evidence docs/spec.md#browser-failure-context Verifies one offline HTML attachment per valid failed observation, rendering context, negation status and no external requests in all three engines.
@@ -665,7 +759,9 @@ export async function verifiesPackedPlaywrightConsumer(): Promise<PlaywrightCons
     );
     const verified = await verifyRunner(runnerReport, output);
     await run([join(consumer, 'inspect-reports.mjs'), runnerReportPath], consumer);
+    const baselineWorkflow = await verifiesBaselineWorkflow(consumer, output);
     const report = {
+      baselineWorkflow,
       passed: verified.cases.filter((entry) => !entry.rejected).length,
       negativeControls: verified.cases.filter((entry) => entry.rejected).length,
       ...verified,

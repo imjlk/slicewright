@@ -1,0 +1,14 @@
+{
+  "name": "slicewright-baseline-workflow-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "preview": "node serve.mjs",
+    "approve": "node run.mjs approve",
+    "test": "node run.mjs test"
+  },
+  "devDependencies": {
+    "slicewright": "^0.5.0",
+    "@playwright/test": "^1.64.0"
+  }
+}
