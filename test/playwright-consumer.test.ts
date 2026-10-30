@@ -255,7 +255,10 @@ async function verifiesBaselineWorkflow(consumer: string, output: string): Promi
       const report = typia.assert<ObservationReport>(
         JSON.parse((await attachmentBytes(attachment)).toString('utf8')),
       );
-      ok(report.findings.some((finding) => finding.code === 'browser.pixels'));
+      const pixelCode = process.platform === 'win32' && entry.projectName === 'firefox'
+        ? 'browser.pixels-outside'
+        : 'browser.pixels';
+      ok(report.findings.some((finding) => finding.code === pixelCode));
       ok(result.attachments.some((item) => item.name.endsWith('-html')));
     }
   }

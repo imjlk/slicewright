@@ -1,5 +1,5 @@
 import { test } from '@playwright/test';
-import { domTarget, regionTarget, saveBrowserBaseline } from 'slicewright/browser';
+import { domTarget, loadBrowserBaseline, regionTarget, saveBrowserBaseline } from 'slicewright/browser';
 import { expect } from 'slicewright/playwright';
 
 const variants=[
@@ -35,6 +35,21 @@ for(const renderer of ['dom','canvas'])for(const variant of variants){
           // The separate approve command is the only baseline-writing path.
           await expect(panel).toMatchUI(checks);
           await saveBrowserBaseline(info.snapshotPath(name),await panel.capture(),{approved:true,environment});
+        }
+        if(process.platform==='win32'&&info.project.name==='firefox'&&renderer==='canvas'){
+          // Reviewed native glyph variation: only approved text rectangles get a budget.
+          // Keep geometry, alpha and every pixel outside these rectangles exact.
+          const reference=await loadBrowserBaseline(info.snapshotPath(name),{environment});
+          const actual=await panel.capture();
+          expect(actual.measurement).toEqual(reference.measurement);
+          expect(actual.clip).toEqual(reference.clip);
+          checks.pixelRegions=[{
+            name:'approved-native-glyphs',
+            bounds:Object.values(reference.measurement.content).flatMap(content=>content.textBounds??[])
+              .filter(bounds=>bounds.width>0&&bounds.height>0)
+              .map(bounds=>({...bounds,x:bounds.x-reference.clip.x,y:bounds.y-reference.clip.y})),
+            pixels:{mean:0.01,p99:0,max:32},
+          }];
         }
         await expect(panel).toMatchUIBaseline(name,{environment,checks});
       }
