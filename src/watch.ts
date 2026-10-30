@@ -48,7 +48,7 @@ export function watchBuild(
  * files, so an editor that replaces a file on save still counts.
  *
  * @evidence docs/spec.md#watching Runs again when any input changes, keeps watching after a failed or erroring run, and ends with the last run's status.
- * @evidenceReview docs/spec.md#watching #2b98b4b Read the section against this function and ran watchesInputs green with pnpm test.
+ * @evidenceReview docs/spec.md#watching #cced350 Read the revised contract, file identity scan, debounce, error snapshots and stop cleanup; reproduced one lost native notification after an immediate save in 500 macOS trials.
  */
 export function watchRuns(
   initial: readonly string[],
@@ -60,8 +60,8 @@ export function watchRuns(
 ): Promise<WatchStatus> {
   const watchers = new Map<string, FSWatcher>();
   let watched = new Set<string>(initial.map((file) => resolve(file)));
-  // Modification times at the last build, to tell a real change from an unnamed event.
-  let seen = new Map<string, number>();
+  // File identities at the last read, also used when native notifications are lost.
+  let seen = new Map<string, string>();
   let timer: NodeJS.Timeout | undefined;
   let status: WatchStatus = 'ok';
   // Set once stopped, so a run that aborts from inside neither re-arms nor reschedules.
@@ -69,13 +69,15 @@ export function watchRuns(
   // While a run is in progress, an abort from inside it resolves only once its status is recorded.
   let running = false;
   let finish: ((value: WatchStatus) => void) | undefined;
-  const modified = (file: string): number => {
+  const modified = (file: string): string => {
     try {
-      return statSync(file).mtimeMs;
+      const stat = statSync(file, { bigint: true });
+      return `${stat.dev}:${stat.ino}:${stat.size}:${stat.mtimeNs}:${stat.ctimeNs}`;
     } catch {
-      return -1;
+      return 'missing';
     }
   };
+  const changed = (): boolean => [...watched].some((file) => seen.get(file) !== modified(file));
   const schedule = (): void => {
     if (stopped) {
       return;
@@ -85,6 +87,7 @@ export function watchRuns(
     timer = setTimeout(rebuild, 100);
   };
   const rebuild = (): void => {
+    seen = new Map([...watched].map((file) => [file, modified(file)]));
     const record = (inputs: readonly string[]): void => {
       watched = watchTargets(inputs.map((file) => resolve(file)));
       seen = new Map([...watched].map((file) => [file, modified(file)]));
@@ -96,7 +99,6 @@ export function watchRuns(
       line(result.value);
     } catch (error) {
       status = 'error';
-      seen = new Map([...watched].map((file) => [file, modified(file)]));
       line({ ...label, ok: false, error: error instanceof Error ? error.message : String(error) });
     }
     running = false;
@@ -134,7 +136,7 @@ export function watchRuns(
               schedule();
             } else if (file === null) {
               // Some platforms do not name the file; rebuild only when a watched one changed.
-              if ([...watched].some((item) => (seen.get(item) ?? -1) !== modified(item))) {
+              if (changed()) {
                 schedule();
               }
             } else if (entries.has(join(directory, file))) {
@@ -147,17 +149,25 @@ export function watchRuns(
       }
     }
     // An input that changed while the build ran may have had its event dropped with the old watchers.
-    if ([...watched].some((item) => (seen.get(item) ?? -1) !== modified(item))) {
+    if (changed()) {
       schedule();
     }
   };
   rebuild();
+  // fs.watch can miss saves immediately after registration (observed on macOS).
+  // Poll metadata, not contents, to recover those saves without rebuilding idle inputs.
+  const poll = setInterval(() => {
+    if (changed()) {
+      schedule();
+    }
+  }, 250);
   return new Promise((done) => {
     const stop = (): void => {
       stopped = true;
       process.off('SIGINT', stop);
       signal?.removeEventListener('abort', stop);
       clearTimeout(timer);
+      clearInterval(poll);
       for (const watcher of watchers.values()) {
         watcher.close();
       }
