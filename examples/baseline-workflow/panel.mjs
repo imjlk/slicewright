@@ -33,7 +33,9 @@ function arrange(){
   const statusHeight=Math.max(...[copy.idle,copy.accepted].map(text=>wrap(text,available-textInset*2,fonts.status).length))*heights.status;
   const statusBounds={x:inset,y:action.y+action.height+16,width:available,height:statusHeight};
   const height=statusBounds.y+statusHeight+28;
-  layout={width,height,title,body,action,status:statusBounds,lines,content:{x:inset,y:58,width:available,height:height-86}};
+  // Include the usable bottom padding. Separately rounded DOM rectangles must
+  // not force the final child box to sit exactly on the declared content edge.
+  layout={width,height,title,body,action,status:statusBounds,lines,content:{x:inset,y:58,width:available,height:height-58-inset}};
   Object.assign(stage.style,{width:`${width}px`,height:`${height}px`});
   Object.assign(panel.style,{width:`${width}px`,height:`${height}px`});
   if(renderer==='canvas'){
