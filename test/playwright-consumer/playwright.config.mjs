@@ -13,7 +13,10 @@ export default defineConfig({
   // Serial workers keep native browser startup outside other tests' short deadlines.
   workers: 1,
   retries: 0,
-  timeout: 15_000,
+  // Cold Windows Firefox capture/setup exceeded the shortened 15 s budget in CI.
+  // Keep Playwright's normal 30 s test budget; matcher deadlines and the explicit
+  // 2 s remaining-test-budget probe remain independently bounded.
+  timeout: 30_000,
   expect: { timeout: 1000 },
   reporter: [['json', { outputFile: process.env.SLICEWRIGHT_CONSUMER_REPORT }]],
   outputDir: output,
