@@ -1000,8 +1000,9 @@ Pixels are exact unless explicit nonnegative finite mean/p99/max tolerances
 are supplied. Absolute clip and measurement geometry, named content and text,
 focus metadata, and recorded viewport/DPR must remain equal. Browser identity
 and caller labels are diagnostic context, not visual stability criteria.
-Snapshots without rendering metadata remain supported. A changed observation
-starts a new window for the positive matcher. The anchor is an independent copy,
+Object prototypes are not visual state: supported measurement records compare
+by their cloned values. Snapshots without rendering metadata remain supported.
+A changed observation starts a new window for the positive matcher. The anchor is an independent copy,
 so a custom capture callback reusing buffers cannot mutate prior observations.
 
 A negated assertion waits for an actual observed change; an initial snapshot

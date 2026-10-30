@@ -20,7 +20,7 @@ export interface StabilityObservation {
 /**
  * Tracks a sampled stable window against a copied anchor, never an adjacent frame.
  * @evidence docs/spec.md#browser-sustained-stability Checks pixels and explicit state against a fixed window anchor, resets on drift, and distinguishes pending observations from actual changes.
- * @evidenceReview docs/spec.md#browser-sustained-stability #81b4516 Read the window, copied anchor, time validation and explicit visual-state comparisons against the contract.
+ * @evidenceReview docs/spec.md#browser-sustained-stability #e0157b2 Read the revised value-only contract and normalized observed metadata against the copied anchor; reproduced the prior null-prototype first-capture false change.
  */
 export function createStabilityObserver(
   options: StabilityOptions = {},
@@ -51,7 +51,7 @@ export function createStabilityObserver(
     const reference = anchor;
     const comparison = checkSnapshot(actual, { reference, pixels });
     const findings = [...comparison.findings];
-    if (!isDeepStrictEqual(visualState(actual), visualState(reference))) {
+    if (!isDeepStrictEqual(structuredClone(visualState(actual)), visualState(reference))) {
       findings.push({
         severity: 'error',
         code: 'browser.stability-state',

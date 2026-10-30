@@ -23,7 +23,7 @@ async function panel(page, renderer = 'dom') {
     regionTarget(page, { measure: async () => ({ bounds: { x: 0, y: 0, width: 80, height: 40 } }) });
 }
 
-function snapshots(snapshot, change = false) {
+function snapshots(snapshot, change = false, nullPrototype = false) {
   let captures = 0;
   const unexpected = async () => { throw new Error('Stability must not issue input actions.'); };
   return observed({
@@ -31,6 +31,7 @@ function snapshots(snapshot, change = false) {
     capture: async () => {
       captures++;
       const actual = structuredClone(snapshot);
+      if (nullPrototype) actual.measurement.content = Object.assign(Object.create(null), actual.measurement.content ?? {});
       if (change) actual.raster.data.fill(captures % 2 ? 0 : 255);
       return actual;
     },
@@ -79,7 +80,7 @@ test('stability invalid input and capture errors', async ({ page }) => {
 for (const mode of ['pending negation', 'persistent drift', 'stable negation']) {
   test(`fails: stability ${mode}`, async ({ page }, testInfo) => {
     const snapshot = await (await panel(page)).capture();
-    const { target, state } = snapshots(snapshot, mode === 'persistent drift');
+    const { target, state } = snapshots(snapshot, mode === 'persistent drift', mode === 'pending negation');
     const started = performance.now();
     try {
       await (mode === 'persistent drift' ? expect(target) : expect(target).not).toBeStableUI({

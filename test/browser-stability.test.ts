@@ -2,7 +2,7 @@ import { deepStrictEqual, ok, strictEqual, throws } from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { createStabilityObserver } from '../src/browser-stability.js';
-import type { BrowserSnapshot } from '../src/browser.js';
+import type { BrowserContent, BrowserSnapshot } from '../src/browser.js';
 import { createRaster } from '../src/raster.js';
 
 function snapshot(red = 0): BrowserSnapshot {
@@ -14,7 +14,7 @@ function snapshot(red = 0): BrowserSnapshot {
 
 /**
  * @evidence docs/spec.md#browser-sustained-stability Exercises duration boundaries, reset anchors, cumulative drift, copied state, metadata and malformed options without wall-clock sleeps.
- * @evidenceReview docs/spec.md#browser-sustained-stability #81b4516 Read the deterministic timing, pixel/state, copied-buffer, context and validation assertions and ran all 54 unit tests successfully.
+ * @evidenceReview docs/spec.md#browser-sustained-stability #e0157b2 Ran all 55 unit tests including null-prototype pending, stable-window and real-text-change regressions; rechecked timing, copied-buffer and validation controls.
  */
 export function checksSustainedStability(): void {
   const observe = createStabilityObserver({ duration: 100 });
@@ -33,6 +33,16 @@ export function checksSustainedStability(): void {
   strictEqual(changed.report.ok, false);
   strictEqual(changed.reference.raster.data[0], 0);
   strictEqual(drift(snapshot(4), 200).report.ok, true);
+
+  const dictionary: Record<string, BrowserContent> = Object.create(null);
+  dictionary.label = { bounds: snapshot().clip, text: 'Ready' };
+  const custom = { ...snapshot(), measurement: { ...snapshot().measurement, content: dictionary } };
+  const values = createStabilityObserver({ duration: 100 });
+  strictEqual(values(custom, 0).pending, true, 'An object prototype is not an observed change.');
+  strictEqual(values(custom, 100).report.ok, true);
+  dictionary.label = { bounds: snapshot().clip, text: 'Changed' };
+  strictEqual(values(custom, 101).pending, false);
+  strictEqual(values(custom, 102).report.ok, false);
 
   const reused = snapshot();
   const copied = createStabilityObserver({ duration: 10 });

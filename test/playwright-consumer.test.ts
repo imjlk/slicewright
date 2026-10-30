@@ -510,7 +510,7 @@ async function verifyRunner(report: RunnerReport, output: string): Promise<{
  * semantics through public imports, including intentionally failing child tests.
  *
  * @evidence docs/spec.md#browser-sustained-stability Checks live DOM and Canvas settling, observed drift, pending negation, validation, native deadlines and compared-anchor failure artifacts in all engines.
- * @evidenceReview docs/spec.md#browser-sustained-stability #81b4516 Ran the packed three-engine suite with 84 expected outcomes, 249 unique attachments and 30 offline HTML reports; verified live DOM/Canvas settling, drift, pending negation and deadlines, then compiled the clean installed public declarations including negative type controls.
+ * @evidenceReview docs/spec.md#browser-sustained-stability #e0157b2 Ran the installed three-engine suite with null-prototype pending-negation metadata: all 84 expected outcomes, 249 attachments and 30 offline HTML reports passed, preserving deadline and pending-polarity guards.
  * @evidence docs/spec.md#browser-failure-context Verifies one offline HTML attachment per valid failed observation, rendering context, negation status and no external requests in all three engines.
  * @evidenceReview docs/spec.md#browser-failure-context #0d2038e Ran the packed three-engine suite with 63 expected outcomes, 177 unique attachments and 21 offline HTML reports; checked failed negation, concurrent failures, missing captures and preserved JSON/PNG after HTML attachment errors.
  * @evidence docs/spec.md#browser-regional-pixel-policies Runs public regional options through the real matcher for DOM and Canvas on every browser, with rendered inside and outside controls.
