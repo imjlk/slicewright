@@ -154,6 +154,21 @@ per project/platform. The matcher API stays the same; cross-browser pixel
 identity is not assumed. See [browser engine verification](browser.md#browser-engines)
 for repository setup and report locations.
 
+For a previously approved baseline, the same target can use:
+
+```ts
+await expect(panel).toMatchUIBaseline('quest-panel.slicewright.json', {
+  environment: 'linux-chromium-wide-dpr1-fonts-v1',
+  checks: { contentFits: true },
+  timeout: 3000,
+});
+```
+
+The runner's snapshot path resolves the manifest name. The matcher validates and
+loads it once within the deadline, then polls fresh captures. Missing or invalid
+baselines fail even under `.not`; `--update-snapshots` never approves or changes
+these files. See the [baseline guide](baselines.md) for explicit approval.
+
 ### Offline failure reports
 
 A failed UI assertion with a valid snapshot now attaches one self-contained HTML

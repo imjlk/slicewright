@@ -185,14 +185,14 @@ async function verifyRunner(report: RunnerReport, output: string): Promise<{
     report.stats,
     {
       ...report.stats,
-      expected: 57,
-      unexpected: 27,
+      expected: 69,
+      unexpected: 36,
       flaky: 0,
       skipped: 0,
     },
     failures,
   );
-  strictEqual(specs.length, 28, 'Every intended consumer case must actually execute.');
+  strictEqual(specs.length, 35, 'Every intended consumer case must actually execute.');
   const executions = specs.flatMap((spec) => {
     deepStrictEqual(
       spec.tests.map((test) => test.projectName).sort(),
@@ -201,7 +201,7 @@ async function verifyRunner(report: RunnerReport, output: string): Promise<{
     );
     return spec.tests.map((test) => ({ title: spec.title, ...test }));
   });
-  strictEqual(executions.length, 84);
+  strictEqual(executions.length, 105);
   const cases: { browser: BrowserName; name: string; rejected: boolean }[] = [];
   const versions = new Map<BrowserName, string>();
   const browserAttachments = new Map<BrowserName, number>();
@@ -321,6 +321,19 @@ async function verifyRunner(report: RunnerReport, output: string): Promise<{
           [null, null, 1],
         );
         match(details[2]?.error ?? '', /consumer second capture failed/);
+      } else if (spec.title.startsWith('baseline invalid')) {
+        strictEqual(artifacts.length, 12);
+        ok(artifacts.every((entry) => entry.name.endsWith('-assertion')));
+      } else if (spec.title.startsWith('baseline load deadline')) {
+        strictEqual(artifacts.length, 2);
+        for (const attachment of artifacts) {
+          const diagnostic = typia.assert<{ observation: string; attempts: number; matcher: string }>(
+            JSON.parse((await attachmentBytes(attachment)).toString('utf8')),
+          );
+          strictEqual(diagnostic.observation, 'unavailable');
+          strictEqual(diagnostic.attempts, 1);
+          strictEqual(diagnostic.matcher, 'toMatchUIBaseline');
+        }
       } else if (spec.title.startsWith('stability invalid')) {
         strictEqual(artifacts.length, 6);
         ok(artifacts.every((entry) => entry.name.endsWith('-assertion')));
@@ -420,6 +433,32 @@ async function verifyRunner(report: RunnerReport, output: string): Promise<{
       `${spec.title}: each failed assertion needs its own report.`,
     );
     strictEqual(actuals.length, count, `${spec.title}: each failed assertion needs its own image.`);
+    if (spec.title.startsWith('fails: baseline')) {
+      strictEqual(artifacts.length, count * 6);
+      ok(probe.captures !== undefined && probe.captures > 1);
+      strictEqual(probe.actions, 0);
+      for (const assertion of assertions) {
+        const diagnostic = typia.assert<{
+          matcher: string; baseline: { path: string; environment: string }; attempts: number;
+        }>(JSON.parse((await attachmentBytes(assertion)).toString('utf8')));
+        strictEqual(diagnostic.matcher, 'toMatchUIBaseline');
+        ok(diagnostic.baseline.path.includes(spec.projectName));
+        ok(diagnostic.baseline.path.includes('approved'));
+        ok(diagnostic.baseline.environment.includes(spec.projectName));
+        ok(diagnostic.attempts > 1);
+      }
+      for (const attachment of reports) {
+        const final = typia.assert<ObservationReport>(
+          JSON.parse((await attachmentBytes(attachment)).toString('utf8')),
+        );
+        strictEqual(final.ok, spec.title.includes('negation'));
+        if (!final.ok) {
+          ok(final.findings.some((finding) => finding.code === 'browser.pixels'));
+        }
+      }
+      strictEqual(artifacts.filter((entry) => entry.name.endsWith('-expected')).length, count);
+      strictEqual(artifacts.filter((entry) => entry.name.endsWith('-diff')).length, count);
+    }
     if (spec.title.startsWith('fails: stability')) {
       strictEqual(artifacts.length, 6);
       const attachment = reports[0];
@@ -490,18 +529,18 @@ async function verifyRunner(report: RunnerReport, output: string): Promise<{
   }
   const browsers = browserNames.map((name) => {
     const entries = cases.filter((entry) => entry.browser === name);
-    strictEqual(entries.length, 28, `${name}: complete matcher suite required.`);
+    strictEqual(entries.length, 35, `${name}: complete matcher suite required.`);
     const passed = entries.filter((entry) => !entry.rejected).length;
     const negativeControls = entries.filter((entry) => entry.rejected).length;
     const attachments = browserAttachments.get(name) ?? 0;
-    strictEqual(passed, 19, name);
-    strictEqual(negativeControls, 9, name);
-    strictEqual(attachments, 83, `${name}: expected every independent assertion artifact.`);
+    strictEqual(passed, 23, name);
+    strictEqual(negativeControls, 12, name);
+    strictEqual(attachments, 121, `${name}: expected every independent assertion artifact.`);
     const version = versions.get(name);
     ok(version, `${name}: actual browser version required.`);
     return { name, version, passed, negativeControls, attachments };
   });
-  strictEqual(artifactNames.size, 249);
+  strictEqual(artifactNames.size, 363);
   return { cases, browsers, attachments: artifactNames.size };
 }
 
@@ -509,6 +548,8 @@ async function verifyRunner(report: RunnerReport, output: string): Promise<{
  * Installs the tarball outside the repository and verifies real Playwright Test
  * semantics through public imports, including intentionally failing child tests.
  *
+ * @evidence docs/spec.md#playwright-baseline-assertions Runs installed DOM and Canvas baselines, custom snapshot paths, update-mode immutability, invalid inputs, bounded loading, polling, negation and soft failures with real runner artifacts.
+ * @evidenceReview docs/spec.md#playwright-baseline-assertions #528d222 Ran the clean installed three-engine suite: 105 expected outcomes, 363 unique attachments and 42 HTML reports; checked baseline paths, update-mode immutability, both error polarities, load deadlines, negation and soft failures.
  * @evidence docs/spec.md#browser-sustained-stability Checks live DOM and Canvas settling, observed drift, pending negation, validation, native deadlines and compared-anchor failure artifacts in all engines.
  * @evidenceReview docs/spec.md#browser-sustained-stability #e0157b2 Ran the installed three-engine suite with null-prototype pending-negation metadata: all 84 expected outcomes, 249 attachments and 30 offline HTML reports passed, preserving deadline and pending-polarity guards.
  * @evidence docs/spec.md#browser-failure-context Verifies one offline HTML attachment per valid failed observation, rendering context, negation status and no external requests in all three engines.
@@ -624,7 +665,12 @@ export async function verifiesPackedPlaywrightConsumer(): Promise<PlaywrightCons
     );
     const verified = await verifyRunner(runnerReport, output);
     await run([join(consumer, 'inspect-reports.mjs'), runnerReportPath], consumer);
-    const report = { passed: 45, negativeControls: 18, ...verified, output };
+    const report = {
+      passed: verified.cases.filter((entry) => !entry.rejected).length,
+      negativeControls: verified.cases.filter((entry) => entry.rejected).length,
+      ...verified,
+      output,
+    };
     await writeFile(join(output, 'consumer-report.json'), `${JSON.stringify(report, null, 2)}\n`);
     return report;
   } finally {

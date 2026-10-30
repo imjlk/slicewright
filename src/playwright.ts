@@ -9,6 +9,7 @@ import {
 } from '@playwright/test';
 import typia from 'typia';
 
+import { loadBrowserBaseline } from './browser-baseline.js';
 import { createStabilityObserver, type StabilityOptions } from './browser-stability.js';
 
 import {
@@ -48,6 +49,30 @@ export async function toMatchUI(
 
 export interface PlaywrightStabilityOptions extends PlaywrightMatchOptions, StabilityOptions {}
 
+export interface PlaywrightBaselineOptions extends PlaywrightMatchOptions {
+  /** Must exactly match the approved baseline's caller-owned environment key. */
+  readonly environment: string;
+  /** Additional checks; the reference is always the loaded baseline. */
+  readonly checks?: Omit<BrowserCheckOptions, 'reference'> & { readonly reference?: never };
+}
+
+/**
+ * Compares an existing approved baseline using the active runner's snapshot path.
+ * @evidence docs/spec.md#playwright-baseline-assertions Loads a fixed validated reference under the native assertion deadline and shares read-only observation, error and artifact handling.
+ * @evidenceReview docs/spec.md#playwright-baseline-assertions #528d222 Read the baseline contract, bounded one-time load, post-timeout guard, shared polarity/error paths and diagnostic context; baseline saving is never called.
+ */
+export async function toMatchUIBaseline(
+  this: ExpectMatcherState,
+  target: BrowserTarget,
+  name: string,
+  options: PlaywrightBaselineOptions,
+): Promise<MatcherReturnType> {
+  return runUIAssertion.call(this, target, {}, options, 'toMatchUIBaseline', undefined, {
+    name,
+    options,
+  });
+}
+
 /**
  * Waits for a sampled stable window; negation waits for an observed change.
  * @evidence docs/spec.md#browser-sustained-stability Uses native polling deadlines and shared artifacts while preventing an incomplete window from satisfying either polarity.
@@ -66,8 +91,9 @@ async function runUIAssertion(
   target: BrowserTarget,
   checks: BrowserCheckOptions,
   options: PlaywrightMatchOptions,
-  matcher: 'toMatchUI' | 'toBeStableUI',
+  matcher: 'toMatchUI' | 'toBeStableUI' | 'toMatchUIBaseline',
   stability?: PlaywrightStabilityOptions,
+  baseline?: { readonly name: string; readonly options: PlaywrightBaselineOptions },
 ): Promise<MatcherReturnType> {
   const info = activeTestInfo();
   const name = `slicewright-${randomUUID()}`;
@@ -82,8 +108,17 @@ async function runUIAssertion(
   let observing = true;
   let polling = false;
   let timeout = this.timeout ?? 5000;
+  let baselinePath: string | undefined;
+  let baselineChecks: BrowserCheckOptions | undefined;
   try {
     typia.assert<PlaywrightMatchOptions>(options);
+    if (baseline !== undefined) {
+      typia.assert<PlaywrightBaselineOptions>(baseline.options);
+      if (typeof baseline.name !== 'string' || baseline.name.trim().length === 0) {
+        throw new TypeError('UI baseline snapshot name must be a nonempty string.');
+      }
+      baselinePath = info.snapshotPath(baseline.name);
+    }
     const observeStability = stability === undefined
       ? undefined
       : createStabilityObserver(stability);
@@ -106,14 +141,25 @@ async function runUIAssertion(
     await baseExpect.configure({ soft: false }).poll(async () => {
       try {
         attempts += 1;
+        if (baseline !== undefined && baselinePath !== undefined && baselineChecks === undefined) {
+          const reference = await loadBrowserBaseline(baselinePath, {
+            environment: baseline.options.environment,
+          });
+          if (!observing) {
+            return this.isNot;
+          }
+          baselineChecks = { ...baseline.options.checks, reference };
+        }
+        const currentChecks = baselineChecks ?? checks;
+        artifactChecks = currentChecks;
         const captured = await target.capture();
         // A timed-out capture cannot update the final observation afterwards.
         if (!observing) {
           return this.isNot;
         }
         const stable = observeStability?.(captured, performance.now());
-        const checked = stable?.report ?? checkSnapshot(captured, checks);
-        artifactChecks = stable === undefined ? checks : { reference: stable.reference };
+        const checked = stable?.report ?? checkSnapshot(captured, currentChecks);
+        artifactChecks = stable === undefined ? currentChecks : { reference: stable.reference };
         observation.actual = captured;
         observation.report = checked;
         observation.attempt = attempts;
@@ -146,6 +192,9 @@ async function runUIAssertion(
         observation: observation.actual === undefined ? 'unavailable' : 'last-valid-capture',
         lastValidAttempt: observation.attempt ?? null,
         error: describeError(error),
+        ...(baselinePath === undefined ? {} : {
+          baseline: { path: baselinePath, environment: baseline?.options.environment },
+        }),
       },
     );
     if (!polling || observationFailure !== undefined) {
@@ -170,11 +219,12 @@ async function runUIAssertion(
       name: matcher,
       pass: this.isNot,
       actual: observation.report,
-      expected: checks,
+      expected: artifactChecks,
       timeout,
       message: () => [
         `Expected browser UI ${this.isNot ? 'not ' : ''}${matcher === 'toBeStableUI' ? 'to remain visually stable.' : 'to match the supplied checks.'}`,
         describeError(error),
+        ...(baselinePath === undefined ? [] : [`Baseline: ${baselinePath}`]),
         ...(findings ?? []),
         ...(artifactFailure === undefined ? [] : [artifactFailure]),
       ].join('\n'),
@@ -185,7 +235,7 @@ async function runUIAssertion(
 }
 
 /** Playwright's ordinary expect API extended with observation-only UI assertions. */
-export const expect = baseExpect.extend({ toMatchUI, toBeStableUI });
+export const expect = baseExpect.extend({ toMatchUI, toBeStableUI, toMatchUIBaseline });
 
 function activeTestInfo(): TestInfo {
   try {

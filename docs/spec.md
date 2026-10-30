@@ -788,6 +788,33 @@ options, capture errors, and concurrent artifact paths are verified through the
 runner's actual results. Public declarations compile in that consumer without
 repository source imports.
 
+## Playwright baseline assertions
+
+The optional `slicewright/playwright` entry point exports `toMatchUIBaseline`
+and adds it to its extended `expect`. It accepts a browser target, a nonempty
+snapshot name, and options with a required explicit rendering `environment`
+key. The manifest path is resolved by the active test's `snapshotPath(name)`;
+the runner owns project/platform separation and custom path templates.
+
+The matcher loads and validates the existing baseline once per assertion,
+then compares fresh target captures against that fixed reference. Optional
+`checks` adds browser checks and pixel policies but cannot supply a different
+`reference`. Positive timeouts and intervals, configured expect deadlines,
+remaining test budget, negation and soft assertions follow `toMatchUI`.
+The assertion deadline includes baseline loading. Actions are never repeated.
+
+Missing, corrupt or incompatible baselines and invalid inputs are errors in
+both polarities, not visual mismatches. No capture starts after a timed-out
+load finishes. Failure assertion JSON identifies the baseline path and
+environment when resolved; valid failed observations also retain the reference,
+image differences and offline HTML report. Unavailable captures produce no
+invented image. Late loads cannot add observations or attachments.
+
+The matcher never creates or changes baseline files, including when Playwright
+is run with `--update-snapshots`. Approval remains a separate explicit
+`saveBrowserBaseline(..., { approved: true, environment })` operation. DOM,
+Canvas and custom browser targets use the same assertion and baseline format.
+
 ## Persistent browser baselines
 
 The browser entry point can save an explicitly approved `BrowserSnapshot` with
