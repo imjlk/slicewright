@@ -26,8 +26,24 @@ function snapshotProbe(state) {
   return { ...state, observationSource: 'captured-once', matcherActions: state.actions };
 }
 
+// Hold the clicked application state until its first real capture completes.
+// A slow screenshot cannot consume a timer and accidentally skip the retry.
+async function gatedRetryTarget(page, fixtureUrl, renderer = 'dom') {
+  const target = await delayedTarget(page, fixtureUrl, renderer, -1);
+  return observed({
+    ...target,
+    async capture() {
+      const snapshot = await target.capture();
+      await page.evaluate(() => window.delayedFixture.completeAfterObservation());
+      return snapshot;
+    },
+  });
+}
+
 for (const renderer of ['dom', 'canvas']) {
   test(`public interaction ${renderer}`, async ({ page, browser, fixtureUrl }, testInfo) => {
+    // Cold native Firefox capture can exceed the runner default on Windows.
+    test.setTimeout(60_000);
     const { panel, action } = await exampleTargets(page, fixtureUrl, renderer);
     const first = await panel.capture();
     const actionBefore = await action.capture();
@@ -60,7 +76,7 @@ for (const renderer of ['dom', 'canvas']) {
   });
 
   test(`delayed retry ${renderer}`, async ({ page, fixtureUrl }, testInfo) => {
-    const { target, state } = observed(await delayedTarget(page, fixtureUrl, renderer));
+    const { target, state } = await gatedRetryTarget(page, fixtureUrl, renderer);
     const before = await target.capture();
     await target.click();
     await expect(target).toMatchUI({
@@ -74,7 +90,7 @@ for (const renderer of ['dom', 'canvas']) {
 }
 
 test('negated retry waits for mismatch', async ({ page, fixtureUrl }) => {
-  const { target, state } = observed(await delayedTarget(page, fixtureUrl));
+  const { target, state } = await gatedRetryTarget(page, fixtureUrl);
   await target.click();
   await expect(target).not.toMatchUI({ text: { label: 'Waiting' } }, { timeout: 5000, intervals: [800] });
   expect(state.captures).toBeGreaterThan(1);
