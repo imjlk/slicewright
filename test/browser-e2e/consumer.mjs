@@ -111,8 +111,9 @@ async function checkPositionedCapture(browser, engineOutput, position) {
 }
 
 function targets(page, renderer) {
+  let bound;
   if (renderer === 'dom') {
-    return {
+    bound = {
       panel: domTarget(page, {
         root: page.locator('#panel'),
         contentBox: page.locator('#content'),
@@ -126,12 +127,23 @@ function targets(page, renderer) {
         content: { label: page.locator('#action-label') },
       }),
     };
+  } else {
+    const target = (id) => regionTarget(page, {
+      prepare: () => page.locator('#panel').scrollIntoViewIfNeeded(),
+      measure: () => page.evaluate((name) => window.browserE2EFixture.measure(name), id),
+    });
+    bound = { panel: target('panel'), action: target('action') };
   }
-  const target = (id) => regionTarget(page, {
-    prepare: () => page.locator('#panel').scrollIntoViewIfNeeded(),
-    measure: () => page.evaluate((name) => window.browserE2EFixture.measure(name), id),
+  // Judge activation paint in the status region. A native focus-outline edge
+  // elsewhere in the panel must not hide a stale status (observed on Windows).
+  const status = regionTarget(page, {
+    measure: async () => {
+      const content = (await bound.panel.measure()).content?.status;
+      ok(content, 'The fixture must expose a measured status region.');
+      return { bounds: content.bounds, content: { status: content } };
+    },
   });
-  return { panel: target('panel'), action: target('action') };
+  return { ...bound, status };
 }
 
 async function settled(page) {
@@ -209,6 +221,7 @@ async function scenario(page, bound, directory, scroll, baselineEnvironment) {
   await settled(page);
   const pressed = await bound.action.capture();
   const pressedPanel = await bound.panel.capture();
+  const pressedStatus = await bound.status.capture();
   await verify('pressed', pressed, {
     changedFrom: hover, stableGeometry: stable, contentFits: true,
     text: { label: 'Accept quest' },
@@ -221,6 +234,10 @@ async function scenario(page, bound, directory, scroll, baselineEnvironment) {
     changedFrom: pressedPanel,
     contentFits: true,
     text: { status: 'Quest accepted: 1', action: 'Accept quest' },
+  });
+  await verify('activation-status', await bound.status.capture(), {
+    changedFrom: pressedStatus,
+    text: { status: 'Quest accepted: 1' },
   });
   await verify('activation-action', await bound.action.capture(), {
     stableGeometry: stable, contentFits: true, text: { label: 'Accept quest' },
@@ -246,7 +263,7 @@ async function scenario(page, bound, directory, scroll, baselineEnvironment) {
 
 const requiredFailure = {
   'missing-handler': { step: 'activation-panel', code: 'browser.text' },
-  'stale-paint': { step: 'activation-panel', code: 'browser.pixels-unchanged' },
+  'stale-paint': { step: 'activation-status', code: 'browser.pixels-unchanged' },
   shift: { step: 'activation-action', code: 'browser.geometry' },
   clipping: { step: 'activation-panel', code: 'browser.content-overflow' },
   overlay: { step: 'hover', code: 'browser.pixels-unchanged' },

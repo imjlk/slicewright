@@ -611,8 +611,15 @@ throws prints the command's input with `ok: false` and the error, and the
 watch goes on. Inputs are watched as for builds (see Build manifest): through
 their directories, missing directories through the nearest existing ancestor,
 symlinks where they are and where they point, and a replaced directory anew;
-an event that names no file runs again only when a watched file's
-modification time changed, and changes settle for 100 ms first. When the
+an event that names no file runs again only when a watched file's state
+changed, and changes settle for 100 ms first. A 250 ms fallback also compares
+watched files by existence, inode, size, nanosecond modification time and change
+time, recovering lost filesystem notifications including immediate saves after
+watch registration and replacements with preserved modification times. This is
+metadata observation, not content hashing: a change invisible to all those
+fields is not guaranteed to be detected. Only changed watched files trigger the
+fallback; idle inputs do not repeatedly rebuild. Both timers and all directory
+watchers close on interrupt/abort, including an abort from inside a run. When the
 watch stops, its exit status is that of the last run: 1 when inspect or build
 failed its findings, 2 when the run threw. A preview writes its sheet whatever
 the findings, so only an error fails it.
