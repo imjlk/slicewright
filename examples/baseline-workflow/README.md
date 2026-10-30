@@ -3,7 +3,9 @@
 A small cream-and-wood letter panel is implemented in HTML/CSS and Canvas. The
 same test checks four viewport/language/text-size combinations and a real click
 in Chromium, Firefox and WebKit. Decoration has no text; title, body, action and
-status each have explicit measured content regions.
+status each have explicit measured content regions. Both renderers expose a
+named button and a live status region; Canvas maintains those DOM semantics
+explicitly alongside its painted content.
 
 Use Node 24+ and Slicewright 0.5+. Copy this directory into your project, then:
 

@@ -29,6 +29,8 @@ for(const renderer of ['dom','canvas'])for(const variant of variants){
         await expect(panel).toBeStableUI({duration:200});
         const expectedStatus=variant.locale==='ko'?(state==='idle'?'새로운 편지가 기다려요.':'편지를 받았어요!'):
           (state==='idle'?'A new letter is waiting.':'Letter collected!');
+        await expect(page.getByRole('button')).toHaveAccessibleName(variant.locale==='ko'?'편지 받기':'Take letter');
+        await expect(page.getByRole('status')).toHaveText(expectedStatus);
         const checks={contentFits:true,text:{status:expectedStatus}};
         const name=`${renderer}-${variant.name}-${state}.slicewright.json`;
         if(process.env.SLICEWRIGHT_EXAMPLE_APPROVE==='1'){

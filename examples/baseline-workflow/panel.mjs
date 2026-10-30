@@ -14,7 +14,7 @@ const stage=document.querySelector('#stage');
 const measureContext=document.createElement('canvas').getContext('2d');
 const fonts={title:`bold ${22*scale}px Georgia,serif`,body:`${16*scale}px Arial,sans-serif`,status:`${16*scale}px Arial,sans-serif`,action:`bold ${16*scale}px Arial,sans-serif`};
 const heights={title:32*scale,body:26*scale,status:26*scale,action:26*scale};
-let count=0,layout,canvas,ctx,panel,content,nodes,ink={};
+let count=0,layout,canvas,ctx,panel,content,nodes,statusLive,ink={};
 const status=()=>count?copy.accepted:copy.idle;
 function wrap(text,width,font){
   measureContext.font=font;const lines=[];let line='';
@@ -69,19 +69,23 @@ function draw(name,bounds,lines,color='#473723'){
     ink[name].push({x:x-m.actualBoundingBoxLeft,y:y-m.actualBoundingBoxAscent,width:m.actualBoundingBoxLeft+m.actualBoundingBoxRight,height:m.actualBoundingBoxAscent+m.actualBoundingBoxDescent});
   }
 }
-function activate(){count++;arrange();}
+function activate(){count++;arrange();if(statusLive)statusLive.textContent=status();}
 function translate(b){const origin=panel.getBoundingClientRect();return {...b,x:origin.x+b.x,y:origin.y+b.y};}
 const ready=document.fonts.ready.then(()=>{
   if(renderer==='canvas'){
     canvas=panel=document.createElement('canvas');ctx=canvas.getContext('2d');canvas.id='panel';canvas.tabIndex=0;
+    canvas.setAttribute('role','button');
     canvas.setAttribute('aria-label',copy.action);
+    statusLive=document.createElement('div');statusLive.setAttribute('role','status');
+    statusLive.setAttribute('aria-live','polite');statusLive.textContent=status();
+    statusLive.style.cssText='position:absolute;width:1px;height:1px;padding:0;border:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap';
     canvas.addEventListener('click',event=>{const b=canvas.getBoundingClientRect(),x=event.clientX-b.x,y=event.clientY-b.y,a=layout.action;if(x>=a.x&&x<=a.x+a.width&&y>=a.y&&y<=a.y+a.height)activate();});
     canvas.addEventListener('keydown',event=>{if((event.key==='Enter'||event.key===' ')&&!event.repeat){event.preventDefault();activate();}});
   }else{
     panel=document.createElement('article');panel.id='panel';panel.innerHTML='<div class="frame"></div><div class="crest"></div><div id="content"><h2 id="title" class="block"></h2><p id="body" class="block"></p><button id="action"></button><p id="status" class="block" role="status"></p></div>';
     content=panel.querySelector('#content');nodes=Object.fromEntries(['title','body','action','status'].map(name=>[name,panel.querySelector(`#${name}`)]));nodes.action.addEventListener('click',activate);
   }
-  stage.append(panel);arrange();addEventListener('resize',arrange);
+  stage.append(panel);if(statusLive)stage.append(statusLive);arrange();addEventListener('resize',arrange);
 });
 window.letterPanel={ready,state:()=>({count,status:status()}),measure:(actionOnly=false)=>{
   if(actionOnly)return{bounds:translate(layout.action)};
