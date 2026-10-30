@@ -47,6 +47,10 @@ export function checkedRect(rect: Rect, name: string, positive = false): void {
   }
 }
 
+/**
+ * @evidence docs/spec.md#browser-failure-context Validates optional rendering context without making it an implicit pixel-match requirement or inventing absent identity.
+ * @evidenceReview docs/spec.md#browser-failure-context #0d2038e Read the optional metadata contract and finite positive viewport/DPR, nonblank identity and string-label checks; checked the passing unit and three-engine installed consumer results.
+ */
 export function checkedRendering(value: BrowserRenderingEnvironment | undefined): void {
   typia.assert<BrowserRenderingEnvironment | undefined>(value);
   if (value === undefined) {
