@@ -9,6 +9,8 @@ import {
 } from '@playwright/test';
 import typia from 'typia';
 
+import { createStabilityObserver, type StabilityOptions } from './browser-stability.js';
+
 import {
   checkSnapshot,
   writeBrowserArtifacts,
@@ -41,6 +43,32 @@ export async function toMatchUI(
   checks: BrowserCheckOptions,
   options: PlaywrightMatchOptions = {},
 ): Promise<MatcherReturnType> {
+  return runUIAssertion.call(this, target, checks, options, 'toMatchUI');
+}
+
+export interface PlaywrightStabilityOptions extends PlaywrightMatchOptions, StabilityOptions {}
+
+/**
+ * Waits for a sampled stable window; negation waits for an observed change.
+ * @evidence docs/spec.md#browser-sustained-stability Uses native polling deadlines and shared artifacts while preventing an incomplete window from satisfying either polarity.
+ * @evidenceReview docs/spec.md#browser-sustained-stability #81b4516 Read the shared observation-only polling path, pending polarity guard and last anchor diagnostics.
+ */
+export async function toBeStableUI(
+  this: ExpectMatcherState,
+  target: BrowserTarget,
+  options: PlaywrightStabilityOptions = {},
+): Promise<MatcherReturnType> {
+  return runUIAssertion.call(this, target, {}, options, 'toBeStableUI', options);
+}
+
+async function runUIAssertion(
+  this: ExpectMatcherState,
+  target: BrowserTarget,
+  checks: BrowserCheckOptions,
+  options: PlaywrightMatchOptions,
+  matcher: 'toMatchUI' | 'toBeStableUI',
+  stability?: PlaywrightStabilityOptions,
+): Promise<MatcherReturnType> {
   const info = activeTestInfo();
   const name = `slicewright-${randomUUID()}`;
   const observation: {
@@ -49,12 +77,16 @@ export async function toMatchUI(
     attempt?: number;
     failure?: { readonly error: unknown };
   } = {};
+  let artifactChecks = checks;
   let attempts = 0;
   let observing = true;
   let polling = false;
   let timeout = this.timeout ?? 5000;
   try {
     typia.assert<PlaywrightMatchOptions>(options);
+    const observeStability = stability === undefined
+      ? undefined
+      : createStabilityObserver(stability);
     timeout = options.timeout ?? timeout;
     positive(timeout, 'UI assertion timeout');
     if (options.intervals !== undefined) {
@@ -66,7 +98,7 @@ export async function toMatchUI(
       }
     }
     if (typeof target?.capture !== 'function') {
-      throw new TypeError('toMatchUI requires a BrowserTarget with a capture operation.');
+      throw new TypeError(`${matcher} requires a BrowserTarget with a capture operation.`);
     }
     polling = true;
     // Playwright bounds even an in-flight capture by the remaining test budget.
@@ -79,11 +111,13 @@ export async function toMatchUI(
         if (!observing) {
           return this.isNot;
         }
-        const checked = checkSnapshot(captured, checks);
+        const stable = observeStability?.(captured, performance.now());
+        const checked = stable?.report ?? checkSnapshot(captured, checks);
+        artifactChecks = stable === undefined ? checks : { reference: stable.reference };
         observation.actual = captured;
         observation.report = checked;
         observation.attempt = attempts;
-        return checked.ok;
+        return stable?.pending === true ? this.isNot : checked.ok;
       } catch (error) {
         const failure = captureError(error);
         if (observing) {
@@ -103,9 +137,9 @@ export async function toMatchUI(
       name,
       observation.actual,
       observation.report,
-      checks,
+      artifactChecks,
       {
-        matcher: 'toMatchUI',
+        matcher,
         negated: this.isNot,
         timeout,
         attempts,
@@ -133,13 +167,13 @@ export async function toMatchUI(
       ({ code, message }) => `- ${code}: ${message}`,
     );
     return {
-      name: 'toMatchUI',
+      name: matcher,
       pass: this.isNot,
       actual: observation.report,
       expected: checks,
       timeout,
       message: () => [
-        `Expected browser UI ${this.isNot ? 'not ' : ''}to match the supplied checks.`,
+        `Expected browser UI ${this.isNot ? 'not ' : ''}${matcher === 'toBeStableUI' ? 'to remain visually stable.' : 'to match the supplied checks.'}`,
         describeError(error),
         ...(findings ?? []),
         ...(artifactFailure === undefined ? [] : [artifactFailure]),
@@ -147,11 +181,11 @@ export async function toMatchUI(
     };
   }
   observing = false;
-  return { name: 'toMatchUI', pass: !this.isNot, message: () => '' };
+  return { name: matcher, pass: !this.isNot, message: () => '' };
 }
 
 /** Playwright's ordinary expect API extended with observation-only UI assertions. */
-export const expect = baseExpect.extend({ toMatchUI });
+export const expect = baseExpect.extend({ toMatchUI, toBeStableUI });
 
 function activeTestInfo(): TestInfo {
   try {

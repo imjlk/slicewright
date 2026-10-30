@@ -976,3 +976,37 @@ validation, baseline/artifact round-trips, literal hostile labels, and the HTML
 failure status. The real Playwright suite verifies one HTML per valid failed
 observation across Chromium, Firefox, and WebKit, including negation and
 concurrent failures, while unavailable captures retain diagnostics only.
+
+## Browser sustained stability
+
+The optional Playwright entry point exports `toBeStableUI` and adds it to its
+extended `expect`. It observes a browser target until at least two valid
+snapshots span a finite positive `duration` (default 200 ms) without a change.
+The existing Playwright timeout and interval options, assertion/test deadlines,
+soft assertions, and isolated failure artifacts apply. Polling only captures;
+it never retries input actions. This is sampled stability, not a claim that
+every intervening animation frame was identical.
+
+Each observation is compared with the first snapshot of the current stable
+window, so cumulative drift cannot hide behind small adjacent differences.
+Pixels are exact unless explicit nonnegative finite mean/p99/max tolerances
+are supplied. Absolute clip and measurement geometry, named content and text,
+focus metadata, and recorded viewport/DPR must remain equal. Browser identity
+and caller labels are diagnostic context, not visual stability criteria.
+Snapshots without rendering metadata remain supported. A changed observation
+starts a new window for the positive matcher. The anchor is an independent copy,
+so a custom capture callback reusing buffers cannot mutate prior observations.
+
+A negated assertion waits for an actual observed change; an initial snapshot
+or an incomplete stable window cannot satisfy either polarity. Stable samples
+continue polling for a change under negation until the native deadline. Invalid
+options/snapshots and capture exceptions propagate immediately for both
+polarities. Failures retain the last valid snapshot, its compared window anchor,
+findings, assertion polarity, and HTML/JSON/PNG diagnostics. An incomplete window
+is reported explicitly rather than described as an observed change.
+
+Deterministic tests cover duration boundaries, window resets, cumulative drift,
+mutable buffers, geometry/text/focus changes, missing metadata, and validation.
+A clean installed Playwright consumer checks settled DOM and Canvas output,
+observed change, pending-window negation, deadlines, capture errors and failure
+artifacts in Chromium, Firefox, and WebKit using the same public API.

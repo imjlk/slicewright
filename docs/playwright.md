@@ -165,3 +165,28 @@ snapshot checks, so failed `.not` assertions never appear as successful tests.
 If capture never produced a valid snapshot, only assertion JSON is attached.
 Passing assertions create no failure artifacts. If HTML creation/attachment
 fails, existing diagnostics and the original assertion error remain available.
+
+### Wait for sampled visual stability
+
+```ts
+await expect(panel).toBeStableUI({ duration: 300, timeout: 5000, intervals: [50] });
+// Wait for an actual change between observations:
+await expect(panel).not.toBeStableUI({ timeout: 2000 });
+```
+
+The same API works with DOM, Canvas, and custom targets. At least two captures
+must span `duration` (200 ms by default). Each sample must match the window's
+first image and absolute geometry, text, focus, and viewport/DPR; a change starts
+a new window. This checks sampled observations, not every animation frame.
+Use application readiness signals before asserting when an animation starts late.
+
+Pixels default to exact equality. Explicit `pixels: { mean, p99, max }` tolerances
+apply against the fixed window anchor, preventing small cumulative changes from
+being hidden by adjacent-frame comparisons. Labels and browser identity do not
+change the verdict. Negation waits for an observed change; an incomplete window
+alone cannot pass it. Native assertion/test deadlines, soft assertions, capture
+errors, and offline failure reports behave as in `toMatchUI`. Failures include the
+last compared anchor image and distinguish a pending duration from observed drift.
+
+For a custom consumer expect instance, import `toBeStableUI` and pass it to
+`baseExpect.extend({ toBeStableUI })` alongside `toMatchUI` as needed.
