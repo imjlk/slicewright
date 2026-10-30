@@ -942,3 +942,37 @@ mismatches, and changes inside allowances. A clean installed-package scenario
 uses the same policy API for real DOM and Canvas captures in all three engines,
 accepts a declared small color change, rejects border and larger region changes,
 and exercises the Playwright matcher without weakening unrelated comparisons.
+
+## Browser failure context
+
+DOM and region captures include optional `rendering` metadata: the observed
+viewport in CSS pixels, device scale factor, runner platform, and the connected
+browser's name and version when available. Source `environmentLabels` are
+caller-supplied string labels (for example font-set or environment keys), copied
+into the capture and clearly identified as supplied labels. The runner platform
+is not claimed to be the remote browser's operating system. Capture rejects a
+DPR change during the screenshot. Old or custom snapshots without rendering
+metadata remain valid; missing identity stays unknown, never guessed.
+
+Rendering metadata is validated, copied into JSON/HTML artifacts, and preserved
+by baseline save/load. It is diagnostic context, not an automatically approved
+baseline environment key and not an additional pixel/geometry assertion.
+Malformed dimensions, DPR, browser identity, or labels are input errors.
+
+Each failed Playwright UI assertion with a valid captured snapshot automatically
+attaches a standalone HTML report alongside its existing JSON and PNG files.
+The report distinguishes the failed assertion (including negation and capture
+errors after a last valid observation) from the positive snapshot-check result:
+a matching positive observation must not make a failed negated assertion look
+successful. The HTML CLI result also reflects a recorded assertion failure.
+When no valid observation exists, only assertion diagnostics are attached; no
+pixels, environment, or HTML observation is fabricated. Passing assertions
+produce no failure attachments. Unique filenames preserve concurrent/soft
+failures. HTML generation errors retain the original assertion/capture failure
+and already attached diagnostics, using the existing artifact-error reporting.
+
+Unit and clean installed-package browser tests verify optional metadata,
+validation, baseline/artifact round-trips, literal hostile labels, and the HTML
+failure status. The real Playwright suite verifies one HTML per valid failed
+observation across Chromium, Firefox, and WebKit, including negation and
+concurrent failures, while unavailable captures retain diagnostics only.

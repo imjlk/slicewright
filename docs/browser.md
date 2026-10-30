@@ -286,8 +286,9 @@ Open the new HTML file directly in a browser. It embeds all available PNGs, so
 it can be moved or shared as one file without a server. Switch between actual,
 expected, previous, and difference images; blend actual over a reference; toggle
 measured target, content, and text rectangles. Findings, details, clip, dimensions,
-and supplied focus state are retained. Browser/platform/font identity is not
-recorded by this artifact format and must be supplied by the surrounding runner.
+and supplied focus state are retained. Captured snapshots include observed browser/version, viewport, DPR, and runner
+platform. Old/custom snapshots without this context remain unrecorded. Font-set
+and application identity can be supplied as explicit labels.
 
 The command returns JSON and exits 0 for a passing report, 1 for a report with
 findings, or 2 for invalid input/output. It refuses existing output files and
@@ -334,3 +335,17 @@ with each name, declared/rounded bounds, tolerance, sample count, statistics,
 and alpha-change count, plus the strict outside result. A passing regional
 policy may therefore have nonzero whole-image differences. The HTML report
 includes a dedicated policy section. References of a different size still fail.
+
+### Rendering context
+
+`domTarget(page, { root, environmentLabels: { fontSet: 'game-fonts-v2' } })`
+and `regionTarget(page, { measure, environmentLabels: { fontSet: 'game-fonts-v2' } })`
+record the same optional labels alongside observed browser/version, viewport,
+DPR and runner platform in `snapshot.rendering`. Labels are caller assertions;
+they do not inspect fonts or approve a baseline. Runner platform describes the
+Node host, not necessarily the operating system of a remote browser.
+
+Baseline save/load preserves this context, but its explicit `environment` key
+still controls approval compatibility. Rendering metadata alone does not reject
+an otherwise matching pixel or geometry assertion. Existing custom snapshots
+without metadata remain supported.

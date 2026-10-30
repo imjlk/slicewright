@@ -167,16 +167,19 @@ export function checksBrowserSnapshots(): void {
 }
 
 /**
+ * @evidence docs/spec.md#browser-failure-context Tests captured metadata, caller label isolation and rejection of DPR changes through the Page double.
+ * @evidenceReview docs/spec.md#browser-failure-context #0d2038e Reviewed the captured context and DPR-change assertions alongside existing movement and truncation guards.
  * @evidence docs/spec.md#browser-ui-verification Exercises fresh pointer coordinates, non-recentering release, scrolled fractional CSS captures, immutable observations, and rejection of offscreen, moving, invalid, or truncated targets through a recording Page double.
  * @evidenceReview docs/spec.md#browser-ui-verification #9f7e47a Read the section and ran pnpm test: fresh pointer coordinates, non-recentering release, scrolled CSS clips and capture rejection passed with a Page double; real delivery is covered by the packed browser consumer.
  */
 export async function capturesBrowserTargets(): Promise<void> {
   const events: unknown[] = [];
   let current: BrowserMeasurement = { bounds: { x: 2.25, y: 10.25, width: 5.5, height: 4.5 } };
-  let viewport = { scrollX: 10, scrollY: 200, width: 100, height: 100 };
+  let viewport = { scrollX: 10, scrollY: 200, width: 100, height: 100, deviceScaleFactor: 2 };
   let onScreenshot = (): void => {};
   let screenshotWidth = 6;
   const page = {
+    context: () => ({ browser: () => null }),
     mouse: {
       async move(x: number, y: number) {
         events.push(['move', x, y]);
@@ -200,7 +203,9 @@ export async function capturesBrowserTargets(): Promise<void> {
       return encodePng(createRaster(screenshotWidth, 5));
     },
   } as unknown as Page;
+  const labels = { fontSet: 'fixture-fonts-v1' };
   const target = regionTarget(page, {
+    environmentLabels: labels,
     async prepare() {
       events.push(['prepare']);
     },
@@ -239,6 +244,20 @@ export async function capturesBrowserTargets(): Promise<void> {
       },
     ],
   ]);
+  deepStrictEqual(captured.rendering, {
+    viewport: { width: 100, height: 100 },
+    deviceScaleFactor: 2,
+    runnerPlatform: process.platform,
+    labels: { fontSet: 'fixture-fonts-v1' },
+  });
+  labels.fontSet = 'changed';
+  strictEqual(captured.rendering?.labels?.fontSet, 'fixture-fonts-v1');
+  onScreenshot = () => {
+    viewport = { ...viewport, deviceScaleFactor: 3 };
+  };
+  await rejects(target.capture(), /changed during capture/);
+  viewport = { ...viewport, deviceScaleFactor: 2 };
+  onScreenshot = () => {};
   const original = structuredClone(current);
   const mutableBounds = current.bounds as { x: number };
   mutableBounds.x = 500;
@@ -360,3 +379,32 @@ export function checksBrowserFocus(): void {
   );
 }
 void test('browser keyboard focus assertions', checksBrowserFocus);
+
+/**
+ * @evidence docs/spec.md#browser-failure-context Rejects malformed rendering metadata and confirms it remains diagnostic rather than a pixel equality condition.
+ * @evidenceReview docs/spec.md#browser-failure-context #0d2038e Read the optional-metadata contract and the invalid identity, label, viewport and scale assertions; checked old/custom snapshots remain accepted.
+ */
+export function checksBrowserRenderingContext(): void {
+  const original = snapshot();
+  const rendering = {
+    viewport: { width: 320, height: 200 },
+    deviceScaleFactor: 2,
+    runnerPlatform: 'test-runner',
+    browser: { name: 'chromium', version: 'fixture' },
+    labels: { fontSet: 'known-v1' },
+  };
+  strictEqual(checkSnapshot({ ...original, rendering }, { reference: original }).ok, true);
+  for (const invalid of [
+    { ...rendering, deviceScaleFactor: -1 },
+    { ...rendering, deviceScaleFactor: Infinity },
+    { ...rendering, viewport: { width: 0, height: 20 } },
+    { ...rendering, runnerPlatform: ' ' },
+    { ...rendering, browser: { name: '', version: '1' } },
+    { ...rendering, browser: { name: 'chromium', version: 1 } },
+    { ...rendering, labels: { fontSet: false } },
+  ]) {
+    throws(() => checkSnapshot({ ...original, rendering: invalid } as unknown as BrowserSnapshot));
+  }
+}
+
+void test('browser rendering context', checksBrowserRenderingContext);

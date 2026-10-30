@@ -9,6 +9,7 @@ ok(path && environment, 'Supply a baseline path and environment key.');
 const snapshot = await loadBrowserBaseline(path, { environment });
 process.stdout.write(JSON.stringify({
   measurement: snapshot.measurement,
+  ...(snapshot.rendering === undefined ? {} : { rendering: snapshot.rendering }),
   clip: snapshot.clip,
   raster: {
     width: snapshot.raster.width,

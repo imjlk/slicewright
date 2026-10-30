@@ -5,8 +5,17 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 import typia from 'typia';
 
-import { checkedMeasurement, checkedRect, checkedSnapshot } from './browser-validation.js';
-import type { BrowserMeasurement, BrowserSnapshot } from './browser.js';
+import {
+  checkedMeasurement,
+  checkedRect,
+  checkedRendering,
+  checkedSnapshot,
+} from './browser-validation.js';
+import type {
+  BrowserMeasurement,
+  BrowserRenderingEnvironment,
+  BrowserSnapshot,
+} from './browser.js';
 import { decodePng, encodePng } from './png.js';
 import type { Raster, Rect } from './raster.js';
 
@@ -22,6 +31,7 @@ export interface BrowserBaselineLoadOptions {
 }
 
 interface BrowserBaselineManifest {
+  readonly rendering?: BrowserRenderingEnvironment;
   readonly format: 'slicewright/browser-baseline';
   readonly version: 1;
   readonly environment: string;
@@ -56,6 +66,7 @@ export async function saveBrowserBaseline(
     version: 1,
     environment,
     measurement: checkedMeasurement(snapshot.measurement),
+    ...(snapshot.rendering === undefined ? {} : { rendering: structuredClone(snapshot.rendering) }),
     clip: structuredClone(snapshot.clip),
     width: snapshot.raster.width,
     height: snapshot.raster.height,
@@ -164,6 +175,7 @@ export async function loadBrowserBaseline(
   }
   const snapshot: BrowserSnapshot = {
     measurement: manifest.measurement,
+    ...(manifest.rendering === undefined ? {} : { rendering: structuredClone(manifest.rendering) }),
     clip: manifest.clip,
     raster,
   };
@@ -175,6 +187,7 @@ function checkedManifest(value: unknown): BrowserBaselineManifest {
   const manifest = typia.assert<BrowserBaselineManifest>(value);
   checkedEnvironment(manifest.environment);
   checkedMeasurement(manifest.measurement);
+  checkedRendering(manifest.rendering);
   checkedRect(manifest.clip, 'Browser baseline clip', true);
   if (!/^[a-f0-9]{64}$/.test(manifest.pngSha256)) {
     throw new TypeError('Browser baseline PNG digest must be a lowercase SHA-256 hex string.');

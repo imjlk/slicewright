@@ -195,6 +195,20 @@ test('artifact failures preserve the original failure', async ({ page, fixtureUr
   } finally {
     testInfo.attach = originalAttach;
   }
+  // Fail only the final HTML attachment, after real JSON/PNG attachments succeeded.
+  testInfo.attach = async (name, options) => {
+    if (name.endsWith('-html')) { artifactFailures++; throw new Error('consumer HTML attachment failed'); }
+    await originalAttach.call(testInfo, name, options);
+  };
+  try {
+    await rejects(() => expect(timed.target).toMatchUI(
+      { text: { label: 'Missing when HTML attachment fails' } }, { timeout: 250, intervals: [25] },
+    ), error => {
+      match(error.message, /browser\.text/);
+      match(error.message, /consumer HTML attachment failed/);
+      return true;
+    });
+  } finally { testInfo.attach = originalAttach; }
   await probe(testInfo, { ...snapshotProbe(timed.state), artifactFailures, captureErrors, timeoutDiagnostic });
 });
 

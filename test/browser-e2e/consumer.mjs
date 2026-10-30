@@ -60,6 +60,7 @@ async function restoreBaseline(path, environment, original) {
   const saved = JSON.parse(stdout);
   const restored = {
     measurement: saved.measurement,
+    ...(saved.rendering === undefined ? {} : { rendering: saved.rendering }),
     clip: saved.clip,
     raster: {
       width: saved.raster.width,

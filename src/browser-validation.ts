@@ -1,6 +1,10 @@
 import typia from 'typia';
 
-import type { BrowserMeasurement, BrowserSnapshot } from './browser.js';
+import type {
+  BrowserMeasurement,
+  BrowserRenderingEnvironment,
+  BrowserSnapshot,
+} from './browser.js';
 import type { Rect } from './raster.js';
 
 export function checkedMeasurement(value: BrowserMeasurement): BrowserMeasurement {
@@ -23,6 +27,7 @@ export function checkedMeasurement(value: BrowserMeasurement): BrowserMeasuremen
 
 export function checkedSnapshot(value: BrowserSnapshot): void {
   typia.assert<BrowserSnapshot>(value);
+  checkedRendering(value.rendering);
   checkedMeasurement(value.measurement);
   checkedRect(value.clip, 'Snapshot clip', true);
   const { width, height, data } = value.raster;
@@ -39,5 +44,21 @@ export function checkedRect(rect: Rect, name: string, positive = false): void {
     throw new RangeError(
       `${name} must be finite with ${positive ? 'positive' : 'nonnegative'} dimensions.`,
     );
+  }
+}
+
+export function checkedRendering(value: BrowserRenderingEnvironment | undefined): void {
+  typia.assert<BrowserRenderingEnvironment | undefined>(value);
+  if (value === undefined) {
+    return;
+  }
+  if (![value.viewport.width, value.viewport.height, value.deviceScaleFactor].every(
+    (number) => Number.isFinite(number) && number > 0,
+  )) {
+    throw new RangeError('Rendering viewport and device scale factor must be finite and positive.');
+  }
+  if (value.runnerPlatform.trim() === '' || (value.browser !== undefined &&
+    (value.browser.name.trim() === '' || value.browser.version.trim() === ''))) {
+    throw new TypeError('Recorded rendering identity must not be blank.');
   }
 }
