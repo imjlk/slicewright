@@ -78,6 +78,8 @@ DOM and Canvas, with explicit focus-visible state and separate pixel assertions.
 Review downloaded failure artifacts with the [offline HTML report](docs/browser.md#offline-failure-report).
 Apply tolerances only where declared with [regional pixel policies](docs/browser.md#explicit-regional-pixel-policies).
 
+The [baseline workflow example](examples/baseline-workflow) demonstrates explicit
+approval and read-only regression tests for responsive English/Korean DOM and Canvas UI.
 Use `toMatchUIBaseline()` to compare a named approved baseline through Playwright's
 snapshot paths. The [baseline guide](docs/baselines.md) shows how to save an explicitly approved
 rendered snapshot, reload it in a later run, and reject incompatible rendering

@@ -47,11 +47,14 @@
     }
     target.addEventListener('click', () => {
       clicks++;
-      setTimeout(() => { label = 'Ready'; paint(); }, delay);
+      if (delay >= 0) setTimeout(() => { label = 'Ready'; paint(); }, delay);
     });
     paint();
     window.delayedFixture = {
       state: () => ({ clicks, label }),
+      completeAfterObservation: () => {
+        if (delay < 0 && clicks > 0) { label = 'Ready'; paint(); }
+      },
       measure: () => ({
         bounds: { x: 30, y: 30, width: 240, height: 80 },
         contentBox: { x: 50, y: 55, width: 200, height: 30 },

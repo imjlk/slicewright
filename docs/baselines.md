@@ -5,6 +5,11 @@ between test runs. They use the same HTML/CSS and Canvas snapshot contract as
 the [browser API](browser.md), and loaded snapshots work with the
 [Playwright Test matcher](playwright.md).
 
+The [runnable baseline workflow](../examples/baseline-workflow) covers a responsive
+English/Korean panel in DOM and Canvas, including 200% text, separate approval
+and comparison commands, and a deliberate painted regression. Review its UI
+before approval and use equivalent browser/font environments for later runs.
+
 ## Compare an existing baseline
 
 Inside Playwright Test, use the named baseline matcher:
