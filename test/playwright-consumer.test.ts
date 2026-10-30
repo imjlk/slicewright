@@ -185,14 +185,14 @@ async function verifyRunner(report: RunnerReport, output: string): Promise<{
     report.stats,
     {
       ...report.stats,
-      expected: 45,
-      unexpected: 18,
+      expected: 57,
+      unexpected: 27,
       flaky: 0,
       skipped: 0,
     },
     failures,
   );
-  strictEqual(specs.length, 21, 'Every intended consumer case must actually execute.');
+  strictEqual(specs.length, 28, 'Every intended consumer case must actually execute.');
   const executions = specs.flatMap((spec) => {
     deepStrictEqual(
       spec.tests.map((test) => test.projectName).sort(),
@@ -201,7 +201,7 @@ async function verifyRunner(report: RunnerReport, output: string): Promise<{
     );
     return spec.tests.map((test) => ({ title: spec.title, ...test }));
   });
-  strictEqual(executions.length, 63);
+  strictEqual(executions.length, 84);
   const cases: { browser: BrowserName; name: string; rejected: boolean }[] = [];
   const versions = new Map<BrowserName, string>();
   const browserAttachments = new Map<BrowserName, number>();
@@ -321,6 +321,9 @@ async function verifyRunner(report: RunnerReport, output: string): Promise<{
           [null, null, 1],
         );
         match(details[2]?.error ?? '', /consumer second capture failed/);
+      } else if (spec.title.startsWith('stability invalid')) {
+        strictEqual(artifacts.length, 6);
+        ok(artifacts.every((entry) => entry.name.endsWith('-assertion')));
       } else if (spec.title.startsWith('invalid options')) {
         strictEqual(artifacts.length, 20);
         ok(artifacts.every((entry) => entry.name.endsWith('-assertion')));
@@ -417,6 +420,26 @@ async function verifyRunner(report: RunnerReport, output: string): Promise<{
       `${spec.title}: each failed assertion needs its own report.`,
     );
     strictEqual(actuals.length, count, `${spec.title}: each failed assertion needs its own image.`);
+    if (spec.title.startsWith('fails: stability')) {
+      strictEqual(artifacts.length, 6);
+      const attachment = reports[0];
+      ok(attachment);
+      const final = typia.assert<ObservationReport>(
+        JSON.parse((await attachmentBytes(attachment)).toString('utf8')),
+      );
+      strictEqual(final.ok, spec.title.includes('stable negation'));
+      if (spec.title.includes('pending')) {
+        ok(final.findings.some((finding) => finding.code === 'browser.stability-pending'));
+      }
+      if (spec.title.includes('drift')) {
+        ok(final.findings.some((finding) => finding.code === 'browser.pixels'));
+      }
+      ok(probe.captures !== undefined && probe.captures > 1);
+      strictEqual(probe.actions, 0);
+      ok(probe.elapsed !== undefined && probe.elapsed >= 175 && probe.elapsed < 1750);
+      ok(artifacts.some((entry) => entry.name.endsWith('-expected')));
+      ok(artifacts.some((entry) => entry.name.endsWith('-diff')));
+    }
     if (spec.title.includes('project timeout')) {
       const reportAttachment = reports[0];
       ok(reportAttachment);
@@ -467,18 +490,18 @@ async function verifyRunner(report: RunnerReport, output: string): Promise<{
   }
   const browsers = browserNames.map((name) => {
     const entries = cases.filter((entry) => entry.browser === name);
-    strictEqual(entries.length, 21, `${name}: complete matcher suite required.`);
+    strictEqual(entries.length, 28, `${name}: complete matcher suite required.`);
     const passed = entries.filter((entry) => !entry.rejected).length;
     const negativeControls = entries.filter((entry) => entry.rejected).length;
     const attachments = browserAttachments.get(name) ?? 0;
-    strictEqual(passed, 15, name);
-    strictEqual(negativeControls, 6, name);
-    strictEqual(attachments, 59, `${name}: expected every independent assertion artifact.`);
+    strictEqual(passed, 19, name);
+    strictEqual(negativeControls, 9, name);
+    strictEqual(attachments, 83, `${name}: expected every independent assertion artifact.`);
     const version = versions.get(name);
     ok(version, `${name}: actual browser version required.`);
     return { name, version, passed, negativeControls, attachments };
   });
-  strictEqual(artifactNames.size, 177);
+  strictEqual(artifactNames.size, 249);
   return { cases, browsers, attachments: artifactNames.size };
 }
 
@@ -486,6 +509,8 @@ async function verifyRunner(report: RunnerReport, output: string): Promise<{
  * Installs the tarball outside the repository and verifies real Playwright Test
  * semantics through public imports, including intentionally failing child tests.
  *
+ * @evidence docs/spec.md#browser-sustained-stability Checks live DOM and Canvas settling, observed drift, pending negation, validation, native deadlines and compared-anchor failure artifacts in all engines.
+ * @evidenceReview docs/spec.md#browser-sustained-stability #81b4516 Ran the packed three-engine suite with 84 expected outcomes, 249 unique attachments and 30 offline HTML reports; verified live DOM/Canvas settling, drift, pending negation and deadlines, then compiled the clean installed public declarations including negative type controls.
  * @evidence docs/spec.md#browser-failure-context Verifies one offline HTML attachment per valid failed observation, rendering context, negation status and no external requests in all three engines.
  * @evidenceReview docs/spec.md#browser-failure-context #0d2038e Ran the packed three-engine suite with 63 expected outcomes, 177 unique attachments and 21 offline HTML reports; checked failed negation, concurrent failures, missing captures and preserved JSON/PNG after HTML attachment errors.
  * @evidence docs/spec.md#browser-regional-pixel-policies Runs public regional options through the real matcher for DOM and Canvas on every browser, with rendered inside and outside controls.
