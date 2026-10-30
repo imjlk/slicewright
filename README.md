@@ -75,6 +75,9 @@ failure attachments for either renderer.
 [Keyboard focus checks](docs/browser.md#keyboard-focus) share the same API for
 DOM and Canvas, with explicit focus-visible state and separate pixel assertions.
 
+Review downloaded failure artifacts with the [offline HTML report](docs/browser.md#offline-failure-report).
+Apply tolerances only where declared with [regional pixel policies](docs/browser.md#explicit-regional-pixel-policies).
+
 The [baseline guide](docs/baselines.md) shows how to save an explicitly approved
 rendered snapshot, reload it in a later run, and reject incompatible rendering
 environments or damaged baseline files.
@@ -352,5 +355,3 @@ The core is pure TypeScript over RGBA buffers. PNG input and output use
 ## License
 
 MIT
-
-Review downloaded failure artifacts with the [offline HTML report](docs/browser.md#offline-failure-report).

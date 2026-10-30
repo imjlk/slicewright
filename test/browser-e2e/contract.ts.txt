@@ -6,6 +6,8 @@ import {
   regionTarget,
   saveBrowserBaseline,
   writeBrowserArtifacts,
+  writeBrowserReportHtml,
+  type BrowserPixelRegion,
   type BrowserMeasurement,
   type BrowserTarget,
 } from 'slicewright/browser';
@@ -22,7 +24,11 @@ async function scenario(target: BrowserTarget): Promise<void> {
   const baseline = await loadBrowserBaseline('baseline.json', {
     environment: 'consumer-type-contract',
   });
-  checkSnapshot(before, { reference: baseline });
+  const pixelRegions: BrowserPixelRegion[] = [{
+    name: 'status', bounds: [{ x: 0, y: 0, width: 10, height: 10 }],
+    pixels: { mean: 0.01, p99: 0, max: 16 },
+  }];
+  checkSnapshot(before, { reference: baseline, pixelRegions });
   await target.hover();
   await target.press();
   await target.release();
@@ -36,6 +42,7 @@ async function scenario(target: BrowserTarget): Promise<void> {
     text: { label: 'Accept quest' },
   });
   await writeBrowserArtifacts('artifacts', { actual, changedFrom: baseline, report });
+  await writeBrowserReportHtml('artifacts', 'report.html');
 }
 
 void scenario(domTarget(page, {

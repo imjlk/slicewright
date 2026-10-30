@@ -296,3 +296,41 @@ never approves or edits baselines. The same operation is available as
 Keep `report.json` and its fixed PNG filenames together. JSON artifact paths
 are ignored; corrupt JSON, invalid measurements, mismatched PNG dimensions,
 and symlinked artifact files are refused.
+
+## Explicit regional pixel policies
+
+Give dynamic pixels their own budget without relaxing the surrounding border,
+icon, or layout. The same `pixelRegions` option works with `checkSnapshot` and
+`toMatchUI` for DOM and Canvas targets:
+
+```ts
+const reference = await target.capture();
+// An application-declared area, measured in image-local CSS pixels.
+const policy = [{
+  name: 'status-fill',
+  bounds: [{ x: 24, y: 24, width: 60, height: 24 }],
+  pixels: { mean: 2, p99: 2, max: 2 },
+}];
+await page.getByRole('button', { name: 'Refresh' }).click();
+await expect(target).toMatchUI({ reference, pixelRegions: policy });
+```
+
+For a measured viewport rectangle, subtract the snapshot's `clip.x` and
+`clip.y` to obtain image-local coordinates. Do not multiply by device pixel
+ratio: browser captures already use CSS pixels. Fractional rectangles include
+all touched pixels. Bounds must lie fully inside the image and must not overlap
+after rounding, even within a region. Multiple disjoint rectangles share one
+region's sample count and budget.
+
+Each region computes its own mean, p99, and maximum on the 0–255 premultiplied
+error scale. Everything outside stays exact, and alpha must be identical
+everywhere. A region budget can admit a small real visual regression: name and
+bound it deliberately. This API never infers text or ignores an area for you.
+It cannot be combined with the whole-image `pixels` option. Geometry and text
+assertions are still separate, while `changedFrom` always checks the full image.
+
+Reports retain the full-image statistics for diagnosis and expose `pixelPolicy`
+with each name, declared/rounded bounds, tolerance, sample count, statistics,
+and alpha-change count, plus the strict outside result. A passing regional
+policy may therefore have nonzero whole-image differences. The HTML report
+includes a dedicated policy section. References of a different size still fail.

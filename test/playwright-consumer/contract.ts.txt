@@ -9,6 +9,8 @@ async function scenario(target: BrowserTarget): Promise<void> {
   await target.click();
   await expect(target).toMatchUI({
     changedFrom: before,
+    reference: before,
+    pixelRegions: [{ name: 'status', bounds: [{ x: 0, y: 0, width: 10, height: 10 }], pixels: { mean: 1, p99: 1, max: 1 } }],
     stableGeometry: { reference: before.measurement, tolerance: 0.1 },
     contentFits: true,
     text: { label: 'Ready' },

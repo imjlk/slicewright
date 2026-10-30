@@ -16,3 +16,4 @@ import './pixel-grid.test.js';
 import './browser.test.js';
 import './browser-baseline.test.js';
 import './browser-report.test.js';
+import './browser-pixels.test.js';

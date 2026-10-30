@@ -185,14 +185,14 @@ async function verifyRunner(report: RunnerReport, output: string): Promise<{
     report.stats,
     {
       ...report.stats,
-      expected: 39,
+      expected: 45,
       unexpected: 18,
       flaky: 0,
       skipped: 0,
     },
     failures,
   );
-  strictEqual(specs.length, 19, 'Every intended consumer case must actually execute.');
+  strictEqual(specs.length, 21, 'Every intended consumer case must actually execute.');
   const executions = specs.flatMap((spec) => {
     deepStrictEqual(
       spec.tests.map((test) => test.projectName).sort(),
@@ -201,7 +201,7 @@ async function verifyRunner(report: RunnerReport, output: string): Promise<{
     );
     return spec.tests.map((test) => ({ title: spec.title, ...test }));
   });
-  strictEqual(executions.length, 57);
+  strictEqual(executions.length, 63);
   const cases: { browser: BrowserName; name: string; rejected: boolean }[] = [];
   const versions = new Map<BrowserName, string>();
   const browserAttachments = new Map<BrowserName, number>();
@@ -449,11 +449,11 @@ async function verifyRunner(report: RunnerReport, output: string): Promise<{
   }
   const browsers = browserNames.map((name) => {
     const entries = cases.filter((entry) => entry.browser === name);
-    strictEqual(entries.length, 19, `${name}: complete matcher suite required.`);
+    strictEqual(entries.length, 21, `${name}: complete matcher suite required.`);
     const passed = entries.filter((entry) => !entry.rejected).length;
     const negativeControls = entries.filter((entry) => entry.rejected).length;
     const attachments = browserAttachments.get(name) ?? 0;
-    strictEqual(passed, 13, name);
+    strictEqual(passed, 15, name);
     strictEqual(negativeControls, 6, name);
     strictEqual(attachments, 49, `${name}: expected every independent assertion artifact.`);
     const version = versions.get(name);
@@ -468,6 +468,8 @@ async function verifyRunner(report: RunnerReport, output: string): Promise<{
  * Installs the tarball outside the repository and verifies real Playwright Test
  * semantics through public imports, including intentionally failing child tests.
  *
+ * @evidence docs/spec.md#browser-regional-pixel-policies Runs public regional options through the real matcher for DOM and Canvas on every browser, with rendered inside and outside controls.
+ * @evidenceReview docs/spec.md#browser-regional-pixel-policies #17cfb4a Ran the clean installed three-engine Playwright suite with 63 intended outcomes, including all six regional-policy matcher cases, and 147 unique failure attachments.
  * @evidence docs/spec.md#playwright-test-integration Exercises installed declarations, optional-peer isolation, retrying DOM and Canvas checks, real input exactly once, negation, soft assertions, deadlines, invalid input, and isolated runner attachments.
  * @evidenceReview docs/spec.md#playwright-test-integration #4274194 Read the contract and timed probes using clones of real snapshots captured before their deadlines, repeated completed callback checks and action rejection; ran the packed three-engine consumer with 51 expected outcomes and 147 artifacts, including unchanged live interaction and delayed-render checks and strict native deadline diagnostics.
  * @evidence docs/spec.md#browser-engine-compatibility Runs each installed public matcher scenario in Chromium, Firefox, and WebKit projects, validates actual engine identity and independent outcomes, and checks globally unique artifacts within each engine directory.
@@ -539,7 +541,7 @@ export async function verifiesPackedPlaywrightConsumer(): Promise<PlaywrightCons
       join(root, 'test/browser-e2e/stable-capture.mjs'),
       join(consumer, 'stable-capture.mjs'),
     );
-    for (const name of ['focus-consumer.mjs', 'focus.html']) {
+    for (const name of ['focus-consumer.mjs', 'focus.html', 'regions-consumer.mjs']) {
       await cp(join(root, 'test/browser-e2e', name), join(consumer, name));
     }
     await cp(join(root, 'examples/browser-e2e'), join(consumer, 'fixture'), { recursive: true });
@@ -576,7 +578,7 @@ export async function verifiesPackedPlaywrightConsumer(): Promise<PlaywrightCons
       JSON.parse(await readFile(runnerReportPath, 'utf8')),
     );
     const verified = await verifyRunner(runnerReport, output);
-    const report = { passed: 39, negativeControls: 18, ...verified, output };
+    const report = { passed: 45, negativeControls: 18, ...verified, output };
     await writeFile(join(output, 'consumer-report.json'), `${JSON.stringify(report, null, 2)}\n`);
     return report;
   } finally {

@@ -4,6 +4,11 @@ import { join, resolve } from 'node:path';
 import type { Locator, Page } from 'playwright-core';
 import typia from 'typia';
 
+import {
+  compareBrowserPixelRegions,
+  type BrowserPixelPolicyReport,
+  type BrowserPixelRegion,
+} from './browser-pixels.js';
 import { checkedMeasurement, checkedRect, checkedSnapshot } from './browser-validation.js';
 import type { Finding } from './inspect.js';
 import { decodePng, encodePng } from './png.js';
@@ -22,6 +27,12 @@ export {
   type BrowserBaselineLoadOptions,
   type BrowserBaselineSaveOptions,
 } from './browser-baseline.js';
+
+export type {
+  BrowserPixelRegion,
+  BrowserPixelRegionResult,
+  BrowserPixelPolicyReport,
+} from './browser-pixels.js';
 
 export { writeBrowserReportHtml } from './browser-report.js';
 
@@ -81,6 +92,7 @@ export interface BrowserCheckOptions {
   readonly reference?: BrowserSnapshot;
   /** All three tolerances must be supplied; the default is exact equality. */
   readonly pixels?: RasterDifference;
+  readonly pixelRegions?: readonly BrowserPixelRegion[];
   readonly changedFrom?: BrowserSnapshot;
   readonly stableGeometry?: {
     readonly reference: BrowserMeasurement;
@@ -91,6 +103,7 @@ export interface BrowserCheckOptions {
 }
 
 export interface BrowserReport {
+  readonly pixelPolicy?: BrowserPixelPolicyReport;
   readonly ok: boolean;
   readonly findings: readonly Finding[];
   readonly pixels?: RasterDifference;
@@ -255,6 +268,11 @@ export function checkSnapshot(
   if (options.pixels !== undefined && options.reference === undefined) {
     throw new TypeError('Pixel tolerances require a reference snapshot.');
   }
+  if (options.pixelRegions !== undefined && (options.reference === undefined || options.pixels !== undefined)) {
+    throw new TypeError(
+      'Regional pixel policies require a reference and cannot combine with whole-image tolerances.',
+    );
+  }
   const thresholds = options.pixels ?? { mean: 0, p99: 0, max: 0 };
   for (const value of Object.values(thresholds)) {
     nonnegative(value, 'Pixel tolerance');
@@ -282,7 +300,26 @@ export function checkSnapshot(
   const pixels = options.reference === undefined
     ? undefined
     : comparePixels(actual, options.reference, findings, 'reference');
-  if (pixels !== undefined && (['mean', 'p99', 'max'] as const).some(
+  const pixelPolicy = options.pixelRegions === undefined || options.reference === undefined
+    ? undefined
+    : compareBrowserPixelRegions(actual, options.reference, options.pixelRegions);
+  for (const region of pixelPolicy?.regions ?? []) {
+    if (!region.ok) {
+      findings.push(
+        finding('browser.pixel-region', `Pixel region ${region.name} exceeds its policy.`, {
+          ...region,
+        }),
+      );
+    }
+  }
+  if (pixelPolicy !== undefined && !pixelPolicy.outside.ok) {
+    findings.push(
+      finding('browser.pixels-outside', 'Pixels outside declared regions changed.', {
+        ...pixelPolicy.outside,
+      }),
+    );
+  }
+  if (options.pixelRegions === undefined && pixels !== undefined && (['mean', 'p99', 'max'] as const).some(
     (key) => pixels[key] > thresholds[key],
   )) {
     findings.push(
@@ -333,6 +370,7 @@ export function checkSnapshot(
     ok: findings.length === 0,
     findings,
     ...(pixels === undefined ? {} : { pixels }),
+    ...(pixelPolicy === undefined ? {} : { pixelPolicy }),
     ...(change === undefined ? {} : { change }),
   };
 }

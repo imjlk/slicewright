@@ -905,3 +905,40 @@ symlinks are refused. Untrusted text is displayed as text, never HTML or script.
 The HTML uses embedded assets and no network, CDN, server, or package runtime.
 Unit and clean packed-consumer checks cover relocation, corrupt input, existing
 output preservation, hostile text, browser interaction, and offline viewing.
+
+## Browser regional pixel policies
+
+`checkSnapshot` and `toMatchUI` accept `pixelRegions` alongside a reference:
+an explicit, nonempty list of uniquely named regions, each with nonempty
+`bounds` rectangles and `pixels: { mean, p99, max }` tolerances on the 0–255
+premultiplied difference scale. Rectangle coordinates are local to the captured
+image in CSS pixels, not viewport or device pixels. Fractional rectangles
+include every touched pixel by rounding outward. All bounds must be finite,
+positive, and fully inside the actual image; covered pixels must not overlap,
+even within one region. Names must be nonblank and unique. Tolerances must be
+finite and between 0 and 255. Invalid policies, missing references, or combining
+regional and whole-image `pixels` tolerances are input errors.
+
+Each region's mean and p99 are calculated over only its covered pixels. Every
+pixel outside the declared regions remains exact. Alpha must remain identical
+inside and outside regions, even when an RGB tolerance is nonzero. Transparent
+RGB retains the existing premultiplied comparison semantics. A reference size
+mismatch is still an error finding; no policy can excuse it. `changedFrom`
+continues to check the complete image independently of regional allowances.
+No content, text, or ignored area is inferred and no baseline is updated.
+
+A regional mismatch produces `browser.pixel-region`, an outside mismatch
+`browser.pixels-outside`. The report retains whole-image statistics plus
+`pixelPolicy` with the declared names, bounds, applied tolerances, rounded
+pixel bounds, sample counts, regional statistics, and alpha-change counts,
+including the strict outside result. JSON artifacts and the HTML viewer expose
+this policy and its results. Snapshot metadata, text, and geometry assertions
+are separate; a tolerance may intentionally admit small real visual changes
+inside its declared budget.
+
+Unit tests cover exact defaults, per-region mean/p99/peak limits, alpha and
+outside guards, fractional rounding, malformed/overlapping bounds, dimension
+mismatches, and changes inside allowances. A clean installed-package scenario
+uses the same policy API for real DOM and Canvas captures in all three engines,
+accepts a declared small color change, rejects border and larger region changes,
+and exercises the Playwright matcher without weakening unrelated comparisons.
