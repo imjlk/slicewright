@@ -55,12 +55,14 @@ its text. They are supplied by the example application; Slicewright does not
 infer text or accessibility from pixels. Each renderer has its own baseline;
 DOM and Canvas are not required to rasterize text identically.
 
-Windows Firefox Canvas runs use an explicit regional pixel policy for the
-approved text rectangles: mean error at most 0.01, p99 0 and maximum 32 on the
-0–255 channel scale. Separate approval/comparison processes exhibited three
-changed glyph-edge pixels (maximum 14), with identical measurements and alpha.
+Windows Firefox runs use an explicit regional pixel policy for the approved
+text rectangles: mean error at most 0.01, p99 0 and maximum 32 for Canvas or 40
+for DOM, on the 0–255 channel scale. CI captures exhibited three changed Canvas
+glyph-edge pixels (maximum 14) and 57 changed DOM glyph-edge pixels (maximum 37,
+regional mean 0.008991), with identical measurements, alpha and outside pixels.
 The example requires exact measurements and capture bounds, exact alpha, and
-exact pixels outside those approved rectangles. Other platforms/renderers stay
-pixel-exact. This small budget can also admit a real change inside a text region;
-review it for your fonts rather than copying a whole-image tolerance. The frame
-color negative control must still fail outside the allowed text regions.
+exact pixels outside those approved rectangles. Other platforms and engines
+stay pixel-exact. These small budgets can also admit a real change inside a
+text region; review them for your fonts rather than copying a whole-image
+tolerance. The frame color negative control must still fail outside the allowed
+text regions.
