@@ -4,6 +4,7 @@ import { expect as baseExpect } from '@playwright/test';
 import { expect, toMatchUI } from 'slicewright/playwright';
 
 import { delayedTarget, exampleTargets, observed, probe, test } from './fixtures.mjs';
+import { runKeyboardScenario } from './focus-consumer.mjs';
 import { settleInitialPanel } from './stable-capture.mjs';
 
 // Short runner-semantics deadlines consume a real snapshot captured beforehand.
@@ -327,3 +328,10 @@ test('fails: hanging capture respects remaining test budget', async ({}, testInf
     await probe(testInfo, { elapsed: Date.now() - started, timeout: 5000 });
   }
 });
+
+for (const renderer of ['dom', 'canvas']) {
+  test(`keyboard focus ${renderer}`, async ({ page }, testInfo) => {
+    await runKeyboardScenario(page, renderer, 'none', testInfo.outputPath('keyboard'),
+      (target, checks) => expect(target).toMatchUI(checks, { timeout: 5000 }));
+  });
+}

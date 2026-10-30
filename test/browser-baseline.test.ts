@@ -77,7 +77,10 @@ export async function roundTripsBrowserBaselines(): Promise<void> {
   const directory = await mkdtemp(join(tmpdir(), 'slicewright-baseline-'));
   const path = join(directory, 'panel.json');
   try {
-    const original = snapshot();
+    const original = {
+      ...snapshot(),
+      measurement: { ...snapshot().measurement, focus: { focused: true, visible: true } },
+    };
     await saveBrowserBaseline(path, original, approval);
     deepStrictEqual(await loadBrowserBaseline(path, { environment }), original);
     ok(checkSnapshot(original, {

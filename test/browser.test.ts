@@ -249,6 +249,11 @@ export async function capturesBrowserTargets(): Promise<void> {
     current = { bounds: { ...current.bounds, y: 11.25 } };
   };
   await rejects(target.capture(), /changed during capture/);
+  current = { ...original, focus: { focused: false, visible: false } };
+  onScreenshot = () => {
+    current = { ...original, focus: { focused: true, visible: true } };
+  };
+  await rejects(target.capture(), /changed during capture/);
   current = original;
   onScreenshot = () => {
     viewport = { ...viewport, scrollY: 201 };
@@ -308,3 +313,50 @@ export async function writesBrowserFailureArtifacts(): Promise<void> {
 void test('browser snapshot contracts', checksBrowserSnapshots);
 void test('browser target measurement and capture guards', capturesBrowserTargets);
 void test('browser failure artifacts', writesBrowserFailureArtifacts);
+
+/**
+ * @evidence docs/spec.md#browser-keyboard-focus Exercises unknown versus false focus, exact and visible expectations, logical focus without painting, geometry independence, and malformed or contradictory observations.
+ * @evidenceReview docs/spec.md#browser-keyboard-focus #cdf74d0 Read the assertion cases for missing and false states, visible mismatch, unchanged pixels, geometry independence, invalid focus values, and mid-capture focus changes.
+ */
+export function checksBrowserFocus(): void {
+  const unknown = snapshot();
+  const blurred = snapshot({ ...measurement(), focus: { focused: false, visible: false } });
+  const keyboard = snapshot({ ...measurement(), focus: { focused: true, visible: true } });
+  const pointer = snapshot({ ...measurement(), focus: { focused: true, visible: false } });
+  deepStrictEqual(codes(checkSnapshot(unknown, { focus: { focused: false } })), [
+    'browser.focus-missing',
+  ]);
+  ok(checkSnapshot(unknown).ok, 'Legacy measurements remain valid without a focus assertion.');
+  ok(checkSnapshot(blurred, { focus: { focused: false, visible: false } }).ok);
+  ok(checkSnapshot(keyboard, { focus: { focused: true, visible: true } }).ok);
+  ok(checkSnapshot(pointer, { focus: { focused: true } }).ok);
+  deepStrictEqual(codes(checkSnapshot(pointer, { focus: { focused: true, visible: true } })), [
+    'browser.focus',
+  ]);
+  deepStrictEqual(
+    codes(
+      checkSnapshot(keyboard, {
+        focus: { focused: true, visible: true },
+        changedFrom: blurred,
+      }),
+    ),
+    ['browser.pixels-unchanged'],
+    'Focus metadata alone cannot prove a painted indicator.',
+  );
+  ok(checkSnapshot(keyboard, { stableGeometry: { reference: blurred.measurement } }).ok);
+  throws(
+    () => checkSnapshot(keyboard, { focus: { focused: false, visible: true } }),
+    /Visible focus/,
+  );
+  throws(
+    () => checkSnapshot(snapshot({ ...measurement(), focus: { focused: false, visible: true } })),
+    /Visible focus/,
+  );
+  throws(() =>
+    checkSnapshot(
+      keyboard,
+      { focus: { focused: 'true' } } as unknown as Parameters<typeof checkSnapshot>[1],
+    ),
+  );
+}
+void test('browser keyboard focus assertions', checksBrowserFocus);

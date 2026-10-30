@@ -239,3 +239,37 @@ requires exact metadata, alpha, and pixels outside text bounds. Negative boundar
 probes and the real activation must fail under this same policy. This allowance can
 hide tiny text changes within its budget; it does not change the library's
 zero-tolerance default or the other interaction checks.
+
+
+## Keyboard focus
+
+Send keys through Playwright; the browser targets and matcher only observe.
+DOM targets report the root element's `:focus` and `:focus-visible` states.
+Canvas bindings supply the same `focus: { focused, visible }` measurement from
+explicit application instrumentation. A focused descendant does not make a DOM
+container focused. Missing instrumentation fails even when expecting false.
+
+```ts
+import { expect } from 'slicewright/playwright';
+
+const before = await action.capture();
+await page.keyboard.press('Tab');
+await expect(action).toMatchUI({
+  focus: { focused: true, visible: true },
+  changedFrom: before,
+});
+await page.keyboard.press('Enter');
+await expect(panel).toMatchUI({ text: { status: 'Quest accepted: 1' } });
+```
+
+`visible` describes focus-visible state, not whether an indicator was painted.
+Use a focused reference or an isolated `changedFrom` comparison to verify pixels;
+unrelated animations can also change pixels. Disabled-control skipping and
+activation behavior belong to the application and must be tested with real keys.
+Saved baselines preserve focus metadata; old baselines without it still load but
+cannot satisfy a focus assertion.
+
+The repository keyboard fixture explicitly declares `tabindex="0"` on its
+controls so its expected tab order is independent of macOS WebKit's default
+button-navigation preference. Targets do not modify focusability or system
+preferences. Test your application's intended tab order in its own environment.

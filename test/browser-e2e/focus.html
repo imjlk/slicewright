@@ -1,0 +1,77 @@
+<!doctype html><meta charset="utf-8"><title>Keyboard focus fixture</title>
+<style>
+body { margin: 20px; background: #f4f1e9; font: 16px sans-serif; }
+#controls { display: flex; gap: 16px; margin: 20px 0; }
+.control { box-sizing: border-box; width: 160px; height: 64px; border: 0; border-radius: 0;
+  background: #d5dbc3; color: #243322; font: 18px sans-serif; outline: none; }
+.control:disabled { background: #ddd; color: #777; }
+.control:focus-visible { box-shadow: inset 0 0 0 4px #2b68df; }
+.no-ring .control:focus-visible { box-shadow: none; }
+canvas { display: block; outline: none; }
+</style>
+<button id="before" tabindex="0">Before</button><div id="controls"></div><button id="after" tabindex="0">After</button>
+<script>
+window.installFocusFixture = (renderer, fault) => {
+  const controls = document.querySelector('#controls');
+  const labels = ['Accept', 'Unavailable', 'Cancel'];
+  const counts = [0, 0, 0];
+  const enabled = (index) => index !== 1 || fault === 'order';
+  let focused = -1;
+  let backwards = false;
+  let heldSpace = false;
+  let canvas;
+  const activate = (index) => { if (index !== 1) counts[index] += fault === 'duplicate' ? 2 : 1; };
+  document.addEventListener('keydown', (event) => { if (event.key === 'Tab') backwards = event.shiftKey; });
+  if (renderer === 'dom') {
+    document.body.classList.toggle('no-ring', fault === 'paint');
+    for (let index = 0; index < 3; index++) {
+      const button = document.createElement('button');
+      button.tabIndex = 0; button.className = 'control'; button.id = `control-${index}`; button.textContent = labels[index];
+      button.disabled = !enabled(index);
+      button.addEventListener('click', () => activate(index));
+      controls.append(button);
+    }
+  } else {
+    canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 64;
+    canvas.tabIndex = 0; canvas.setAttribute('aria-label', 'Canvas controls'); controls.append(canvas);
+    const draw = () => {
+      const ctx = canvas.getContext('2d'); ctx.clearRect(0, 0, 512, 64);
+      for (let index = 0; index < 3; index++) {
+        const x = index * 176;
+        ctx.fillStyle = index === 1 ? '#ddd' : '#d5dbc3'; ctx.fillRect(x, 0, 160, 64);
+        ctx.fillStyle = index === 1 ? '#777' : '#243322'; ctx.font = '18px sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(labels[index], x + 80, 32);
+        if (focused === index && canvas.matches(':focus-visible') && fault !== 'paint') {
+          ctx.strokeStyle = '#2b68df'; ctx.lineWidth = 4; ctx.strokeRect(x + 2, 2, 156, 60);
+        }
+      }
+    };
+    canvas.addEventListener('focus', () => { focused = backwards ? 2 : 0; draw(); });
+    canvas.addEventListener('blur', () => { focused = -1; heldSpace = false; draw(); });
+    canvas.addEventListener('keydown', (event) => {
+      if (event.key === 'Tab') {
+        let next = focused + (event.shiftKey ? -1 : 1);
+        while (next >= 0 && next < 3 && !enabled(next)) next += event.shiftKey ? -1 : 1;
+        if (next >= 0 && next < 3) { event.preventDefault(); focused = next; draw(); }
+      }
+      if (event.key === 'Enter' && !event.repeat) { event.preventDefault(); activate(focused); }
+      if (event.key === ' ') { event.preventDefault(); if (!event.repeat) heldSpace = true; }
+    });
+    canvas.addEventListener('keyup', (event) => {
+      if (event.key === ' ' && heldSpace) { event.preventDefault(); heldSpace = false; activate(focused); }
+    });
+    draw();
+  }
+  window.focusFixture = {
+    counts: () => [...counts],
+    measure(index) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        bounds: { x: rect.x + index * 176, y: rect.y, width: 160, height: 64 },
+        focus: { focused: document.activeElement === canvas && focused === index,
+          visible: canvas.matches(':focus-visible') && focused === index },
+      };
+    },
+  };
+};
+</script>

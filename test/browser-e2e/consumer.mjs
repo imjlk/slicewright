@@ -11,6 +11,7 @@ import {
   checkSnapshot, domTarget, regionTarget, saveBrowserBaseline, writeBrowserArtifacts,
 } from 'slicewright/browser';
 
+import { runKeyboardScenario } from './focus-consumer.mjs';
 import { settleInitialPanel } from './stable-capture.mjs';
 import {
   assertFreshBaseline, compareFreshBaseline, verifyFreshBaselineControls, writeFreshBaselineArtifacts,
@@ -319,11 +320,21 @@ async function runEngine(browserType) {
     browser: browserName,
     version: browser.version(),
     cases: [],
+    keyboardCases: [],
     captureProbes: 0,
     baselineRoundTrips: 0,
     output: join(output, browserName),
   };
   try {
+    for (const renderer of ['dom', 'canvas']) {
+      for (const fault of ['none', 'order', 'paint', 'duplicate']) {
+        const context = await browser.newContext({ viewport: { width: 800, height: 600 } });
+        try {
+          engine.keyboardCases.push(await runKeyboardScenario(await context.newPage(), renderer, fault,
+            join(engine.output, `keyboard-${renderer}-${fault}`)));
+        } finally { await context.close(); }
+      }
+    }
     for (const position of ['fixed', 'sticky']) {
       await checkPositionedCapture(browser, engine.output, position);
       engine.captureProbes += 1;
