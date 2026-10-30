@@ -265,6 +265,17 @@ async function verifyRunner(report: RunnerReport, output: string): Promise<{
         ok(bytes.readUInt32BE(16) > 0 && bytes.readUInt32BE(20) > 0);
       }
     }
+    const htmlReports = artifacts.filter((entry) => entry.name.endsWith('-html'));
+    const jsonReports = artifacts.filter((entry) => entry.name.endsWith('-report'));
+    strictEqual(
+      htmlReports.length,
+      jsonReports.length - (spec.title.startsWith('artifact failures') ? 1 : 0),
+      `${label}: every valid observation needs an HTML report.`,
+    );
+    for (const html of htmlReports) {
+      strictEqual(html.contentType, 'text/html');
+      match((await attachmentBytes(html)).toString('utf8'), /<!doctype html>/);
+    }
     if (preparedSnapshotCases.has(spec.title)) {
       const probe = await probeFor(result);
       strictEqual(
@@ -313,6 +324,13 @@ async function verifyRunner(report: RunnerReport, output: string): Promise<{
       } else if (spec.title.startsWith('invalid options')) {
         strictEqual(artifacts.length, 20);
         ok(artifacts.every((entry) => entry.name.endsWith('-assertion')));
+      } else if (spec.title.startsWith('artifact failures')) {
+        strictEqual(
+          artifacts.length,
+          3,
+          'JSON and PNG diagnostics survive an HTML attachment failure.',
+        );
+        strictEqual(htmlReports.length, 0);
       } else if (spec.title.startsWith('late capture errors')) {
         strictEqual(artifacts.length, 2);
         ok(artifacts.every((entry) => entry.name.endsWith('-assertion')));
@@ -328,7 +346,7 @@ async function verifyRunner(report: RunnerReport, output: string): Promise<{
       }
       if (spec.title.startsWith('artifact failures')) {
         const probe = await probeFor(result);
-        strictEqual(probe.artifactFailures, 7);
+        strictEqual(probe.artifactFailures, 8);
         strictEqual(probe.captureErrors, 6);
         strictEqual(probe.timeoutDiagnostic, true);
       }
@@ -455,12 +473,12 @@ async function verifyRunner(report: RunnerReport, output: string): Promise<{
     const attachments = browserAttachments.get(name) ?? 0;
     strictEqual(passed, 15, name);
     strictEqual(negativeControls, 6, name);
-    strictEqual(attachments, 49, `${name}: expected every independent assertion artifact.`);
+    strictEqual(attachments, 59, `${name}: expected every independent assertion artifact.`);
     const version = versions.get(name);
     ok(version, `${name}: actual browser version required.`);
     return { name, version, passed, negativeControls, attachments };
   });
-  strictEqual(artifactNames.size, 147);
+  strictEqual(artifactNames.size, 177);
   return { cases, browsers, attachments: artifactNames.size };
 }
 
@@ -468,6 +486,8 @@ async function verifyRunner(report: RunnerReport, output: string): Promise<{
  * Installs the tarball outside the repository and verifies real Playwright Test
  * semantics through public imports, including intentionally failing child tests.
  *
+ * @evidence docs/spec.md#browser-failure-context Verifies one offline HTML attachment per valid failed observation, rendering context, negation status and no external requests in all three engines.
+ * @evidenceReview docs/spec.md#browser-failure-context #0d2038e Ran the packed three-engine suite with 63 expected outcomes, 177 unique attachments and 21 offline HTML reports; checked failed negation, concurrent failures, missing captures and preserved JSON/PNG after HTML attachment errors.
  * @evidence docs/spec.md#browser-regional-pixel-policies Runs public regional options through the real matcher for DOM and Canvas on every browser, with rendered inside and outside controls.
  * @evidenceReview docs/spec.md#browser-regional-pixel-policies #17cfb4a Ran the clean installed three-engine Playwright suite with 63 intended outcomes, including all six regional-policy matcher cases, and 147 unique failure attachments.
  * @evidence docs/spec.md#playwright-test-integration Exercises installed declarations, optional-peer isolation, retrying DOM and Canvas checks, real input exactly once, negation, soft assertions, deadlines, invalid input, and isolated runner attachments.
@@ -578,6 +598,7 @@ export async function verifiesPackedPlaywrightConsumer(): Promise<PlaywrightCons
       JSON.parse(await readFile(runnerReportPath, 'utf8')),
     );
     const verified = await verifyRunner(runnerReport, output);
+    await run([join(consumer, 'inspect-reports.mjs'), runnerReportPath], consumer);
     const report = { passed: 45, negativeControls: 18, ...verified, output };
     await writeFile(join(output, 'consumer-report.json'), `${JSON.stringify(report, null, 2)}\n`);
     return report;

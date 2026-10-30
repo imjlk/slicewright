@@ -79,6 +79,13 @@ export async function roundTripsBrowserBaselines(): Promise<void> {
   try {
     const original = {
       ...snapshot(),
+      rendering: {
+        viewport: { width:320, height:240 },
+        deviceScaleFactor:2,
+        runnerPlatform:'test',
+        browser: { name:'chromium', version:'fixture' },
+        labels:{ fontSet:'fixed' },
+      },
       measurement: { ...snapshot().measurement, focus: { focused: true, visible: true } },
     };
     await saveBrowserBaseline(path, original, approval);

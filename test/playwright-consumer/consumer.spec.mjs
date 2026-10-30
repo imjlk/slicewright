@@ -195,6 +195,20 @@ test('artifact failures preserve the original failure', async ({ page, fixtureUr
   } finally {
     testInfo.attach = originalAttach;
   }
+  // Fail only the final HTML attachment, after real JSON/PNG attachments succeeded.
+  testInfo.attach = async (name, options) => {
+    if (name.endsWith('-html')) { artifactFailures++; throw new Error('consumer HTML attachment failed'); }
+    await originalAttach.call(testInfo, name, options);
+  };
+  try {
+    await rejects(() => expect(timed.target).toMatchUI(
+      { text: { label: 'Missing when HTML attachment fails' } }, { timeout: 250, intervals: [25] },
+    ), error => {
+      match(error.message, /browser\.text/);
+      match(error.message, /consumer HTML attachment failed/);
+      return true;
+    });
+  } finally { testInfo.attach = originalAttach; }
   await probe(testInfo, { ...snapshotProbe(timed.state), artifactFailures, captureErrors, timeoutDiagnostic });
 });
 
@@ -270,10 +284,11 @@ test('fails: soft matcher continues after two failures', async ({ page, fixtureU
 
 test('fails: concurrent assertions retain distinct artifacts', async ({ page, fixtureUrl }, testInfo) => {
   const first = await delayedTarget(page, fixtureUrl);
+  // Prepare each real snapshot before another tab backgrounds its page on Firefox.
+  const firstObservation = observedSnapshot(await first.capture());
   const secondPage = await page.context().newPage();
   try {
     const second = await delayedTarget(secondPage, fixtureUrl, 'canvas');
-    const firstObservation = observedSnapshot(await first.capture());
     const secondObservation = observedSnapshot(await second.capture());
     const results = await Promise.allSettled([
       expect(firstObservation.target).toMatchUI({ text: { label: 'Parallel DOM mismatch' } }, { timeout: 1000, intervals: [25] }),

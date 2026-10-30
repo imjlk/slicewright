@@ -12,6 +12,7 @@ import typia from 'typia';
 import {
   checkSnapshot,
   writeBrowserArtifacts,
+  writeBrowserReportHtml,
   type BrowserCheckOptions,
   type BrowserReport,
   type BrowserSnapshot,
@@ -29,6 +30,8 @@ export interface PlaywrightMatchOptions {
  * Observes a browser target with Playwright Test's assertion and test deadlines.
  * Only valid mismatches retry; actions remain the caller's responsibility.
  *
+ * @evidence docs/spec.md#browser-failure-context Attaches HTML after JSON and PNG diagnostics with explicit assertion failure context while preserving missing-capture and error paths.
+ * @evidenceReview docs/spec.md#browser-failure-context #0d2038e Read failure attachment ordering, unique paths, negation context and artifact-error propagation.
  * @evidence docs/spec.md#playwright-test-integration Integrates observation-only retry, native negation and soft assertions, positive deadlines, immediate observation errors, and unique failure attachments with Playwright Test.
  * @evidenceReview docs/spec.md#playwright-test-integration #4274194 Read the polling-budget contract and ran the packed Playwright consumer: 11 passing cases and 6 intended failures verified polarity, soft continuation, deadlines, capture-only retries, immutable error causes, late rejection and 49 failure attachments.
  */
@@ -204,6 +207,11 @@ async function attachFailure(
     const paths = await writeBrowserArtifacts(info.outputPath(name), {
       actual,
       report,
+      assertion: {
+        matcher: String(diagnostic.matcher),
+        negated: diagnostic.negated === true,
+        error: String(diagnostic.error),
+      },
       ...(checks.reference === undefined ? {} : { reference: checks.reference }),
       ...(checks.changedFrom === undefined ? {} : { changedFrom: checks.changedFrom }),
     });
@@ -213,6 +221,11 @@ async function attachFailure(
         contentType: kind === 'report' ? 'application/json' : 'image/png',
       });
     }
+    const html = await writeBrowserReportHtml(
+      info.outputPath(name),
+      info.outputPath(name, 'report.html'),
+    );
+    await info.attach(`${name}-html`, { path: html.path, contentType: 'text/html' });
     return undefined;
   } catch (error) {
     return `Unable to attach slicewright failure artifacts: ${describeError(error)}`;

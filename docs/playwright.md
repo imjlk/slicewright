@@ -153,3 +153,15 @@ Use separate [persistent baselines](baselines.md) and rendering-environment keys
 per project/platform. The matcher API stays the same; cross-browser pixel
 identity is not assumed. See [browser engine verification](browser.md#browser-engines)
 for repository setup and report locations.
+
+### Offline failure reports
+
+A failed UI assertion with a valid snapshot now attaches one self-contained HTML
+report alongside JSON and PNG diagnostics. Open the HTML attachment directly to
+compare images and inspect measured regions, regional policies, and rendering
+context. The report identifies assertion failure separately from positive
+snapshot checks, so failed `.not` assertions never appear as successful tests.
+
+If capture never produced a valid snapshot, only assertion JSON is attached.
+Passing assertions create no failure artifacts. If HTML creation/attachment
+fails, existing diagnostics and the original assertion error remain available.

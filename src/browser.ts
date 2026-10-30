@@ -57,7 +57,23 @@ export interface BrowserMeasurement {
   readonly content?: Readonly<Record<string, BrowserContent>>;
 }
 
+export interface BrowserRenderingEnvironment {
+  readonly viewport: { readonly width: number; readonly height: number };
+  readonly deviceScaleFactor: number;
+  readonly runnerPlatform: string;
+  readonly browser?: { readonly name: string; readonly version: string };
+  /** Caller-supplied identifiers; never inferred from browser or font pixels. */
+  readonly labels?: Readonly<Record<string, string>>;
+}
+
+export interface BrowserAssertionFailure {
+  readonly matcher: string;
+  readonly negated: boolean;
+  readonly error: string;
+}
+
 export interface BrowserSnapshot {
+  readonly rendering?: BrowserRenderingEnvironment;
   readonly measurement: BrowserMeasurement;
   /** The enclosing screenshot rectangle, in viewport CSS pixels at capture time. */
   readonly clip: Rect;
@@ -65,12 +81,14 @@ export interface BrowserSnapshot {
 }
 
 export interface BrowserRegionSource {
+  readonly environmentLabels?: Readonly<Record<string, string>>;
   /** Wait for application readiness and, when needed, scroll before an operation. */
   readonly prepare?: () => Promise<void>;
   readonly measure: () => Promise<BrowserMeasurement>;
 }
 
 export interface BrowserDomSource {
+  readonly environmentLabels?: Readonly<Record<string, string>>;
   readonly root: Locator;
   readonly contentBox?: Locator;
   readonly content?: Readonly<Record<string, Locator>>;
@@ -111,6 +129,7 @@ export interface BrowserReport {
 }
 
 export interface BrowserArtifactInput {
+  readonly assertion?: BrowserAssertionFailure;
   readonly actual: BrowserSnapshot;
   readonly reference?: BrowserSnapshot;
   readonly changedFrom?: BrowserSnapshot;
@@ -127,6 +146,7 @@ export interface BrowserArtifactPaths {
 }
 
 interface Viewport {
+  readonly deviceScaleFactor: number;
   readonly scrollX: number;
   readonly scrollY: number;
   readonly width: number;
@@ -139,10 +159,15 @@ interface Viewport {
  *
  * @evidence docs/spec.md#browser-ui-verification Measures fresh CSS rectangles, sends pointer input, and captures CSS-scale pixels with scroll and geometry guards through the optional browser entry point.
  * @evidenceReview docs/spec.md#browser-ui-verification #9f7e47a Read the section against the fresh-measurement, real-input and capture guards, and checked Playwright screenshot clip coordinate handling in the installed implementation.
+ * @evidenceReview docs/spec.md#browser-failure-context #0d2038e Read the new context contract, observed viewport/DPR path, browser-null handling and copied source labels.
+ * @evidence docs/spec.md#browser-failure-context Captures observed browser, viewport and DPR context, clones supplied labels and rejects DPR changes without guessing missing browser identity.
  * @evidence docs/spec.md#browser-engine-compatibility Uses the same page input and CSS-scale screenshot path for browser engines, checking viewport stability and decoded clip dimensions without renderer-specific state changes.
  * @evidenceReview docs/spec.md#browser-engine-compatibility #d7e3d78 Re-read the compatibility contract and shared capture/input path; checked that checkSnapshot still defaults to zero pixel tolerance and accepts only explicit thresholds, while the text-region allowance belongs to the consumer fixture.
  */
 export function regionTarget(page: Page, source: BrowserRegionSource): BrowserTarget {
+  const labels = source.environmentLabels === undefined
+    ? undefined
+    : structuredClone(typia.assert<Readonly<Record<string, string>>>(source.environmentLabels));
   const measure = async (): Promise<BrowserMeasurement> => {
     await source.prepare?.();
     return checkedMeasurement(await source.measure());
@@ -207,7 +232,15 @@ export function regionTarget(page: Page, source: BrowserRegionSource): BrowserTa
       if (raster.width !== clip.width || raster.height !== clip.height) {
         throw new Error('Browser screenshot was truncated or was not captured at CSS-pixel scale.');
       }
+      const browser = page.context().browser();
       return {
+        rendering: {
+          viewport: { width: before.width, height: before.height },
+          deviceScaleFactor: before.deviceScaleFactor,
+          runnerPlatform: process.platform,
+          ...(browser === null ? {} : { browser: { name: browser.browserType().name(), version: browser.version() } }),
+          ...(labels === undefined ? {} : { labels: structuredClone(labels) }),
+        },
         measurement,
         clip: { ...clip, x: clip.x - before.scrollX, y: clip.y - before.scrollY },
         raster,
@@ -227,6 +260,7 @@ export function domTarget(page: Page, source: BrowserDomSource): BrowserTarget {
     throw new TypeError('Every browser DOM locator must belong to the supplied page.');
   }
   return regionTarget(page, {
+    ...(source.environmentLabels === undefined ? {} : { environmentLabels: source.environmentLabels }),
     prepare: () => source.root.scrollIntoViewIfNeeded(),
     async measure() {
       const root = await measureDom(source.root);
@@ -387,6 +421,7 @@ export async function writeBrowserArtifacts(
   directory: string,
   input: BrowserArtifactInput,
 ): Promise<BrowserArtifactPaths> {
+  typia.assert<BrowserAssertionFailure | undefined>(input.assertion);
   checkedSnapshot(input.actual);
   if (input.reference !== undefined) {
     checkedSnapshot(input.reference);
@@ -422,6 +457,7 @@ export async function writeBrowserArtifacts(
   }
   await writeFile(paths.report, `${JSON.stringify({
     ...input.report,
+    ...(input.assertion === undefined ? {} : { assertion: input.assertion }),
     actual: snapshotMetadata(input.actual),
     ...(input.reference === undefined ? {} : { reference: snapshotMetadata(input.reference) }),
     ...(input.changedFrom === undefined ? {} : { changedFrom: snapshotMetadata(input.changedFrom) }),
@@ -464,9 +500,9 @@ async function measureDom(locator: Locator): Promise<BrowserContent> {
 async function readViewport(page: Page): Promise<Viewport> {
   const viewport = await page.evaluate(() => {
     const view = globalThis as unknown as {
-      scrollX: number; scrollY: number; innerWidth: number; innerHeight: number;
+      scrollX: number; scrollY: number; innerWidth: number; innerHeight: number; devicePixelRatio: number;
     };
-    return { scrollX: view.scrollX, scrollY: view.scrollY, width: view.innerWidth, height: view.innerHeight };
+    return { scrollX: view.scrollX, scrollY: view.scrollY, width: view.innerWidth, height: view.innerHeight, deviceScaleFactor: view.devicePixelRatio };
   });
   typia.assert<Viewport>(viewport);
   for (const value of Object.values(viewport)) {
@@ -474,7 +510,7 @@ async function readViewport(page: Page): Promise<Viewport> {
       throw new RangeError('Browser viewport measurements must be finite.');
     }
   }
-  if (viewport.width <= 0 || viewport.height <= 0) {
+  if (viewport.width <= 0 || viewport.height <= 0 || viewport.deviceScaleFactor <= 0) {
     throw new RangeError('Browser viewport must have positive dimensions.');
   }
   return viewport;
@@ -488,7 +524,7 @@ function nonnegative(value: number, name: string): void {
 
 function sameViewport(a: Viewport, b: Viewport): boolean {
   return a.scrollX === b.scrollX && a.scrollY === b.scrollY &&
-    a.width === b.width && a.height === b.height;
+    a.width === b.width && a.height === b.height && a.deviceScaleFactor === b.deviceScaleFactor;
 }
 
 function nearRect(a: Rect, b: Rect, tolerance: number): boolean {
@@ -613,6 +649,7 @@ function finding(code: string, message: string, details?: Readonly<Record<string
 function snapshotMetadata(snapshot: BrowserSnapshot): object {
   return {
     measurement: snapshot.measurement,
+    ...(snapshot.rendering === undefined ? {} : { rendering: snapshot.rendering }),
     clip: snapshot.clip,
     width: snapshot.raster.width,
     height: snapshot.raster.height,
