@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.4.0 — 2026-10-30
+
+### Minor changes
+
+- [dee2996](https://github.com/imjlk/slicewright/commit/dee2996a6b96e78b74c069cdc15b1949f84a3967) Add `expect(target).toBeStableUI()` to wait for sampled visual stability across HTML/CSS, Canvas, and custom browser targets, with duration windows, explicit pixel tolerances, native Playwright deadlines, and failure diagnostics. — Thanks Neo!
+- [de5f109](https://github.com/imjlk/slicewright/commit/de5f1096553e793b780066bc50e10e232c479f72) Add an offline, read-only HTML viewer for browser failure artifacts with image comparisons, measured-region overlays, and a browser-report CLI. — Thanks Neo!
+- [23be3e1](https://github.com/imjlk/slicewright/commit/23be3e1614fdb3faec84a3d811faf97a004dd5f8) Add explicit browser baseline save and load APIs with versioned metadata, rendering-environment checks, PNG integrity validation, and complete-snapshot replacement for later UI regression tests. — Thanks Neo!
+- [d248918](https://github.com/imjlk/slicewright/commit/d248918ac4e83be49053173dddcc7678af08a028) Add optional Playwright Test assertions that wait for DOM and Canvas UI expectations and automatically attach failure images and reports without repeating user input. — Thanks Neo!
+- [8df1c04](https://github.com/imjlk/slicewright/commit/8df1c04081c11b75c773b6c82383a541b208f5d2) Add explicit named-region pixel tolerances for DOM and Canvas browser assertions, retaining exact alpha and outside-region checks with per-region diagnostics. — Thanks Neo!
+- [d447543](https://github.com/imjlk/slicewright/commit/d447543130480fa7cdb44a7ceb09c8537501ab1e) Observe and assert keyboard focus through the same DOM and Canvas browser API, including focus-visible state and missing-instrumentation diagnostics. — Thanks Neo!
+- [072e5bf](https://github.com/imjlk/slicewright/commit/072e5bfd4d9178f44a6871a9c1f8c4c40053fbf4) Add the optional `slicewright/browser` API for verifying HTML/CSS and Canvas UI with the same Playwright-driven interactions, explicit content regions, rendered pixel comparisons, and diagnostic artifacts. — Thanks Neo!
+- [7e19dc9](https://github.com/imjlk/slicewright/commit/7e19dc94fcb173f902d0f03a87abf23c0a427d57) Automatically attach offline HTML reports to failed Playwright UI assertions, distinguish negated assertion failures from positive observations, and preserve observed rendering context and supplied environment labels in snapshots, reports, and baselines. — Thanks Neo!
+
+### Fixed
+
+- [654bfe6](https://github.com/imjlk/slicewright/commit/654bfe60c3dd544b9e649ade10d0911f2b160383) Compare custom target measurement records by value so null-prototype records cannot be mistaken for a visual change on the first stability capture. — Thanks Neo!
+- [6ae58db](https://github.com/imjlk/slicewright/commit/6ae58db2289d0d7885e730a825f6b28a7416d4ee) Recover missed watch notifications with a lightweight file-metadata fallback, including immediate saves after startup and file replacements that preserve modification times. Stop polling and pending rebuilds when the watch is aborted. — Thanks Neo!
+
+### Patch changes
+
+- [2e41ddd](https://github.com/imjlk/slicewright/commit/2e41ddd1481c17ba48320116695e9b67d5256999) Add a reusable layered UI assembly recipe to the skill, with explicit attachment placement, total content insets, responsive rules, and checks for enlarged multilingual text and decoration input handling. — Thanks Neo!
+
 ## 0.3.2 — 2026-10-27
 
 ### Patch changes
