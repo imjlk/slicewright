@@ -23,6 +23,8 @@ export {
   type BrowserBaselineSaveOptions,
 } from './browser-baseline.js';
 
+export { writeBrowserReportHtml } from './browser-report.js';
+
 /** An explicitly named content item; all rectangles use viewport CSS pixels. */
 export interface BrowserContent {
   readonly bounds: Rect;

@@ -352,3 +352,5 @@ The core is pure TypeScript over RGBA buffers. PNG input and output use
 ## License
 
 MIT
+
+Review downloaded failure artifacts with the [offline HTML report](docs/browser.md#offline-failure-report).

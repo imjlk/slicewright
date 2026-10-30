@@ -4,6 +4,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'nod
 
 import { cli, define } from 'gunshi';
 
+import { writeBrowserReportHtml } from './browser-report.js';
 import { joinNegativeNumbers } from './argv.js';
 import { defaultChromaOptions, removeChroma } from './chroma.js';
 import { compareSet, defaultCompareSlack } from './compare.js';
@@ -750,6 +751,20 @@ function buildManifest(path: string): BuildManifest {
   }
 }
 
+const browserReport = define({
+  name: 'browser-report',
+  description: 'Create an offline HTML viewer from browser artifacts',
+  args: {
+    input: { type: 'positional', required: true, description: 'Artifact directory' },
+    out: { type: 'string', required: true, description: 'New HTML output file (must not exist)' },
+  },
+  run: async (ctx) => {
+    const result = await writeBrowserReportHtml(ctx.values.input, ctx.values.out);
+    print(result);
+    failOnErrors(result.ok);
+  },
+});
+
 const targets = define({
   name: 'targets',
   description: 'List export targets and what each can represent',
@@ -1111,6 +1126,7 @@ const main = define({
 });
 
 const subCommands = {
+  'browser-report': browserReport,
   prompt,
   inspect,
   compare,

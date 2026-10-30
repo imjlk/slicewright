@@ -11,6 +11,7 @@ import {
   checkSnapshot, domTarget, regionTarget, saveBrowserBaseline, writeBrowserArtifacts,
 } from 'slicewright/browser';
 
+import { verifyHtmlReport } from './report-consumer.mjs';
 import { runKeyboardScenario } from './focus-consumer.mjs';
 import { settleInitialPanel } from './stable-capture.mjs';
 import {
@@ -321,6 +322,7 @@ async function runEngine(browserType) {
     version: browser.version(),
     cases: [],
     keyboardCases: [],
+    htmlReport: false,
     captureProbes: 0,
     baselineRoundTrips: 0,
     output: join(output, browserName),
@@ -335,6 +337,7 @@ async function runEngine(browserType) {
         } finally { await context.close(); }
       }
     }
+    engine.htmlReport = await verifyHtmlReport(browser, join(engine.output, 'html-report'));
     for (const position of ['fixed', 'sticky']) {
       await checkPositionedCapture(browser, engine.output, position);
       engine.captureProbes += 1;

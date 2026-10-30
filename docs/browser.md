@@ -273,3 +273,26 @@ The repository keyboard fixture explicitly declares `tabindex="0"` on its
 controls so its expected tab order is independent of macOS WebKit's default
 button-navigation preference. Targets do not modify focusability or system
 preferences. Test your application's intended tab order in its own environment.
+
+## Offline failure report
+
+After `writeBrowserArtifacts` (or downloading a Playwright failure artifact directory):
+
+```sh
+slicewright browser-report ./artifacts/panel --out ./panel-report.html
+```
+
+Open the new HTML file directly in a browser. It embeds all available PNGs, so
+it can be moved or shared as one file without a server. Switch between actual,
+expected, previous, and difference images; blend actual over a reference; toggle
+measured target, content, and text rectangles. Findings, details, clip, dimensions,
+and supplied focus state are retained. Browser/platform/font identity is not
+recorded by this artifact format and must be supplied by the surrounding runner.
+
+The command returns JSON and exits 0 for a passing report, 1 for a report with
+findings, or 2 for invalid input/output. It refuses existing output files and
+never approves or edits baselines. The same operation is available as
+`await writeBrowserReportHtml(directory, output)` from `slicewright/browser`.
+Keep `report.json` and its fixed PNG filenames together. JSON artifact paths
+are ignored; corrupt JSON, invalid measurements, mismatched PNG dimensions,
+and symlinked artifact files are refused.
