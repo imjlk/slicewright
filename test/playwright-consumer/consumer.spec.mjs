@@ -284,10 +284,11 @@ test('fails: soft matcher continues after two failures', async ({ page, fixtureU
 
 test('fails: concurrent assertions retain distinct artifacts', async ({ page, fixtureUrl }, testInfo) => {
   const first = await delayedTarget(page, fixtureUrl);
+  // Prepare each real snapshot before another tab backgrounds its page on Firefox.
+  const firstObservation = observedSnapshot(await first.capture());
   const secondPage = await page.context().newPage();
   try {
     const second = await delayedTarget(secondPage, fixtureUrl, 'canvas');
-    const firstObservation = observedSnapshot(await first.capture());
     const secondObservation = observedSnapshot(await second.capture());
     const results = await Promise.allSettled([
       expect(firstObservation.target).toMatchUI({ text: { label: 'Parallel DOM mismatch' } }, { timeout: 1000, intervals: [25] }),
