@@ -51,7 +51,7 @@ export interface PlaywrightStabilityOptions extends PlaywrightMatchOptions, Stab
 /**
  * Waits for a sampled stable window; negation waits for an observed change.
  * @evidence docs/spec.md#browser-sustained-stability Uses native polling deadlines and shared artifacts while preventing an incomplete window from satisfying either polarity.
- * @evidenceReview docs/spec.md#browser-sustained-stability #81b4516 Read the shared observation-only polling path, pending polarity guard and last anchor diagnostics.
+ * @evidenceReview docs/spec.md#browser-sustained-stability #e0157b2 Read the revised value-only contract, observer call, pending polarity guard and last anchor diagnostics.
  */
 export async function toBeStableUI(
   this: ExpectMatcherState,
