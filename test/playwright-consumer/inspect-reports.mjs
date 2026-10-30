@@ -43,7 +43,7 @@ for(const type of [chromium,firefox,webkit]){
         count++;
       }
     }
-    strictEqual(count,10);ok(withEnvironment>0);ok(negated>0);deepStrictEqual(requests,[]);
+    strictEqual(count,14);ok(withEnvironment>0);ok(negated>0);deepStrictEqual(requests,[]);
     verified.push({browser:type.name(),htmlReports:count,withEnvironment,negated});
   }finally{await browser.close();}
 }

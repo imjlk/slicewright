@@ -1,6 +1,6 @@
 import { expect as baseExpect, type Page } from '@playwright/test';
 import { domTarget, regionTarget, type BrowserTarget } from 'slicewright/browser';
-import { expect, toMatchUI, toBeStableUI, type PlaywrightStabilityOptions } from 'slicewright/playwright';
+import { expect, toMatchUI, toBeStableUI, toMatchUIBaseline, type PlaywrightBaselineOptions, type PlaywrightStabilityOptions } from 'slicewright/playwright';
 
 declare const page: Page;
 
@@ -17,12 +17,19 @@ async function scenario(target: BrowserTarget): Promise<void> {
   }, { timeout: 1000, intervals: [25, 50] });
   await expect.soft(target).not.toMatchUI({ reference: before });
   await expect.configure({ timeout: 1000 })(target).toMatchUI({ contentFits: true });
-  const customExpect = baseExpect.extend({ toMatchUI, toBeStableUI });
+  const customExpect = baseExpect.extend({ toMatchUI, toBeStableUI, toMatchUIBaseline });
   await customExpect(target).toMatchUI({ reference: before });
   const stability: PlaywrightStabilityOptions = { duration: 200, timeout: 1000, intervals: [25], pixels: { mean: 0, p99: 0, max: 0 } };
   await expect(target).toBeStableUI(stability);
   await expect.soft(target).not.toBeStableUI();
   await customExpect(target).toBeStableUI(stability);
+  const baseline: PlaywrightBaselineOptions = { environment: 'linux-chromium-wide', checks: { contentFits: true }, timeout: 2000 };
+  await expect(target).toMatchUIBaseline('panel.slicewright.json', baseline);
+  await customExpect.soft(target).not.toMatchUIBaseline('panel.slicewright.json', baseline);
+  // @ts-expect-error baseline environment is required
+  await expect(target).toMatchUIBaseline('panel.slicewright.json', {});
+  // @ts-expect-error callers cannot replace the approved reference
+  await expect(target).toMatchUIBaseline('panel.slicewright.json', { environment: 'test', checks: { reference: before } });
   // @ts-expect-error duration is a number
   await expect(target).toBeStableUI({ duration: '200' });
   // @ts-expect-error all three pixel thresholds are required

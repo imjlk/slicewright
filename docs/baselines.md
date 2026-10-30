@@ -7,6 +7,38 @@ the [browser API](browser.md), and loaded snapshots work with the
 
 ## Compare an existing baseline
 
+Inside Playwright Test, use the named baseline matcher:
+
+```ts
+await expect(panel).toMatchUIBaseline('quest-panel.slicewright.json', {
+  environment: 'linux-chromium-wide-dpr1-fonts-v1',
+  checks: { contentFits: true },
+  timeout: 3000,
+});
+```
+
+Import `expect` from `slicewright/playwright`. The matcher resolves the exact
+name through `testInfo.snapshotPath(name)`, including your project's
+`snapshotPathTemplate`. Use distinct names within a test file and separate
+paths for different projects/platforms. The explicit environment key is still
+required; a path is not proof of compatible rendering.
+
+Loading and fresh captures share the assertion deadline. The baseline is loaded
+once and remains fixed throughout polling. Optional `checks` accepts the usual
+browser checks and regional tolerances, except `reference`, which is always the
+approved snapshot. `.not` succeeds on a valid visual mismatch; a missing,
+corrupt or incompatible baseline fails in both polarities. `expect.soft` and
+configured timeouts work as with `toMatchUI`. Failure JSON records the resolved
+path and environment; valid observations attach the reference and HTML report.
+
+This matcher is read-only even with `--update-snapshots`. Create or replace a
+baseline only through the separate approval operation below. For your own
+expect instance, use `baseExpect.extend({ toMatchUIBaseline })` with the exported
+matcher from `slicewright/playwright`.
+
+To load references explicitly, or use a different runner, keep using the
+baseline APIs directly:
+
 Choose the baseline path and a rendering-environment key in your project:
 
 ```ts

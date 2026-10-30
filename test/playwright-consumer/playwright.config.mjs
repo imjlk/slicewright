@@ -13,6 +13,9 @@ export default defineConfig({
   // Serial workers keep native browser startup outside other tests' short deadlines.
   workers: 1,
   retries: 0,
+  // Baseline assertions must remain read-only even under explicit runner update mode.
+  updateSnapshots: 'all',
+  snapshotPathTemplate: '{testDir}/approved/{projectName}/{testFilePath}/{arg}{ext}',
   // Cold Windows Firefox capture/setup exceeded the shortened 15 s budget in CI.
   // Keep Playwright's normal 30 s test budget; matcher deadlines and the explicit
   // 2 s remaining-test-budget probe remain independently bounded.
