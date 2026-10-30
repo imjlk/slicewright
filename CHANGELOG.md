@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.0 — 2026-10-31
+
+### Minor changes
+
+- [9cbcd26](https://github.com/imjlk/slicewright/commit/9cbcd26d6b4c4a7805c181d80664163563138b63) Add `toMatchUIBaseline()` for read-only Playwright assertions against explicitly approved DOM and Canvas baselines, using runner snapshot paths, environment validation, bounded loading and automatic failure reports. — Thanks Neo!
+
+### Patch changes
+
+- [d7fd21d](https://github.com/imjlk/slicewright/commit/d7fd21dbc01028a67d513ba3ed78bcbebeb195be) Guide agents through renderer-neutral browser regression checks with explicit content regions, reviewed baseline approval, matching rendering environments, responsive multilingual coverage and failure-report inspection. — Thanks Neo!
+
 ## 0.4.0 — 2026-10-30
 
 ### Minor changes
