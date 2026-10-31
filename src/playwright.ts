@@ -1,12 +1,8 @@
 import { randomUUID } from 'node:crypto';
+import { createRequire } from 'node:module';
 
-import {
-  expect as baseExpect,
-  test,
-  type ExpectMatcherState,
-  type MatcherReturnType,
-  type TestInfo,
-} from '@playwright/test';
+import type * as PlaywrightTest from '@playwright/test';
+import type { ExpectMatcherState, MatcherReturnType, TestInfo } from '@playwright/test';
 import typia from 'typia';
 
 import { loadBrowserBaseline } from './browser-baseline.js';
@@ -22,6 +18,34 @@ import {
   type BrowserTarget,
 } from './browser.js';
 
+/**
+ * Loads the optional `@playwright/test` peer, naming the install command when
+ * it is missing instead of surfacing the bare module resolution error. It is
+ * required, not imported, so the project's one Playwright instance is shared.
+ *
+ * @evidence docs/spec.md#playwright-test-integration Explains the missing optional @playwright/test peer and how to install it.
+ * @evidenceReview docs/spec.md#playwright-test-integration #d4f3a85 Re-read the section after the missing-peer sentence, checked this code against it, and ran explainsMissingPlaywrightTest and the Playwright consumer check green.
+ */
+export function loadPlaywrightTest(
+  load: (id: string) => unknown = createRequire(import.meta.url),
+): typeof PlaywrightTest {
+  try {
+    return load('@playwright/test') as typeof PlaywrightTest;
+  } catch (cause) {
+    const code = (cause as { code?: unknown } | undefined)?.code;
+    const message = cause instanceof Error ? cause.message : '';
+    if (code === 'MODULE_NOT_FOUND' && message.includes('@playwright/test')) {
+      throw new Error(
+        'slicewright/playwright needs the optional peer @playwright/test, which is not installed. Install it next to slicewright: npm install --save-dev @playwright/test playwright-core',
+        { cause },
+      );
+    }
+    throw cause;
+  }
+}
+
+const { expect: baseExpect, test } = loadPlaywrightTest();
+
 export interface PlaywrightMatchOptions {
   /** A finite positive assertion timeout; defaults to the active expect configuration. */
   readonly timeout?: number;
@@ -36,7 +60,7 @@ export interface PlaywrightMatchOptions {
  * @evidence docs/spec.md#browser-failure-context Attaches HTML after JSON and PNG diagnostics with explicit assertion failure context while preserving missing-capture and error paths.
  * @evidenceReview docs/spec.md#browser-failure-context #0d2038e Read failure attachment ordering, unique paths, negation context and artifact-error propagation.
  * @evidence docs/spec.md#playwright-test-integration Integrates observation-only retry, native negation and soft assertions, positive deadlines, immediate observation errors, and unique failure attachments with Playwright Test.
- * @evidenceReview docs/spec.md#playwright-test-integration #4274194 Read the polling-budget contract and ran the packed Playwright consumer: 11 passing cases and 6 intended failures verified polarity, soft continuation, deadlines, capture-only retries, immutable error causes, late rejection and 49 failure attachments.
+ * @evidenceReview docs/spec.md#playwright-test-integration #d4f3a85 Re-read the section after the missing-peer sentence, checked this code against it, and ran explainsMissingPlaywrightTest and the Playwright consumer check green.
  */
 export async function toMatchUI(
   this: ExpectMatcherState,
