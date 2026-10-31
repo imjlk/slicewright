@@ -102,6 +102,7 @@ the manifest; each piece takes the `normalize` options (`width`, `height`,
 
 ```json
 {
+  "$schema": "./node_modules/slicewright/schema/build-manifest.schema.json",
   "out": "ui/ui.png",
   "css": true,
   "pieces": [
@@ -112,7 +113,16 @@ the manifest; each piece takes the `normalize` options (`width`, `height`,
 }
 ```
 
-Unknown keys are errors. `--watch` builds again whenever the manifest or a
+The package ships a JSON Schema for the manifest at
+`schema/build-manifest.schema.json` (also exported as
+`slicewright/build-manifest.schema.json` and served at
+`https://unpkg.com/slicewright/schema/build-manifest.schema.json`), so pointing
+`$schema` at it gives editors completion and checks; the build ignores the key.
+Unknown keys are errors, and every problem is reported at once with its path and
+the closest allowed key, for example
+`pieces[0].widht is not a key of pieces[0]. Did you mean "width"?`. CLI usage
+errors read the same way: a missing flag, a value outside its choices, or a
+misspelled flag or command names the fix and exits with code 2. `--watch` builds again whenever the manifest or a
 piece's PNG changes and prints one JSON line per build.
 
 ### Agent skill

@@ -6,6 +6,7 @@ import { cli, define } from 'gunshi';
 
 import { writeBrowserReportHtml } from './browser-report.js';
 import { joinNegativeNumbers } from './argv.js';
+import { friendlyCliErrors } from './friendly-errors.js';
 import { defaultChromaOptions, removeChroma } from './chroma.js';
 import { compareSet, defaultCompareSlack } from './compare.js';
 import {
@@ -1223,10 +1224,11 @@ try {
     strict: true,
   });
 } catch (error) {
-  const messages =
-    error instanceof AggregateError
-      ? error.errors.map((item: unknown) => (item instanceof Error ? item.message : String(item)))
-      : [error instanceof Error ? error.message : String(error)];
+  const named = process.argv.slice(2).find((arg) => !arg.startsWith('-'));
+  const messages = friendlyCliErrors(error, {
+    command: named !== undefined && Object.hasOwn(subCommands, named) ? named : undefined,
+    commands: Object.keys(subCommands),
+  });
   process.stderr.write(messages.map((message) => `slicewright: ${message}\n`).join(''));
   process.exitCode = usageFailed;
 }

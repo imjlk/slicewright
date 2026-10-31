@@ -40,10 +40,13 @@
     "./playwright": {
       "types": "./dist/playwright.d.ts",
       "default": "./dist/playwright.js"
-    }
+    },
+    "./build-manifest.schema.json": "./schema/build-manifest.schema.json",
+    "./package.json": "./package.json"
   },
   "files": [
     "dist",
+    "schema",
     "skills"
   ],
   "publishConfig": {
@@ -58,6 +61,7 @@
     "test": "ttsx test/index.ts",
     "build": "pnpm clean && ttsc -p tsconfig.build.json",
     "examples": "ttsx tools/make-examples.ts",
+    "schema": "ttsx tools/manifest-schema.ts",
     "engine:check": "ttsx tools/engine-check.ts",
     "browser:check": "ttsx tools/browser-check.ts",
     "playwright:check": "ttsx tools/playwright-check.ts",

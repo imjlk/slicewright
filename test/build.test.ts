@@ -14,13 +14,14 @@ import { join } from 'node:path';
 import { test, type TestContext } from 'node:test';
 
 import { buildInputs, BuildManifestError, readBuildManifest, runBuild } from '../src/build.js';
+import { buildManifestSchema, buildManifestSchemaUrl, schemaAt } from '../src/manifest-schema.js';
 import { encodePng } from '../src/png.js';
 import { watchTargets } from '../src/watch.js';
 import { panel, shadedBar } from './fixtures.js';
 
 /**
  * @evidence docs/spec.md#build-manifest Builds a dialog and a bar from a manifest into pieces, exports, and one packed atlas, skips packing when a piece fails, and refuses manifests the shape or the rules reject.
- * @evidenceReview docs/spec.md#build-manifest #81ef4f6 Checked the assertions against the section's validation, path, piece, failure, and watch-input rules and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#build-manifest #fe9a80d Reread the section with the $schema key and published schema, checked the assertions against it, and ran this test green with pnpm test.
  */
 export function buildsManifests(): void {
   const dir = mkdtempSync(join(tmpdir(), 'slicewright-build-한글 경로-'));
@@ -284,6 +285,12 @@ export function buildsManifests(): void {
     strictEqual(clashing.ok, false);
     ok(clashing.pack?.cssFindings.some((finding) => finding.code === 'pack.css-class-collision'));
 
+    // An editor's $schema key is allowed and ignored.
+    strictEqual(
+      readBuildManifest({ $schema: buildManifestSchemaUrl, out: 'ui.png', pieces: [{ input: 'a.png' }] })
+        .pieces.length,
+      1,
+    );
     // Manifests the shape or the rules reject.
     throws(() => readBuildManifest({ out: 'ui.png', pieces: [] }));
     throws(() => readBuildManifest({ out: 'ui.png', pieces: [{ input: 'a.png', width: 0 }] }));
@@ -421,7 +428,7 @@ export function buildsGroups(): void {
  * File symlinks need privileges on Windows, so they get their own test with an explicit skip.
  *
  * @evidence docs/spec.md#build-manifest Refuses a piece written through a dangling symlink onto the packed image, and watches where dangling input links will point; skips only when Windows denies creating the link.
- * @evidenceReview docs/spec.md#build-manifest #81ef4f6 Read the dangling-link rules in the section against realPath and watchTargets and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#build-manifest #fe9a80d Reread the section with the $schema key and published schema, checked the assertions against it, and ran this test green with pnpm test.
  */
 export function followsDanglingSymlinks(context: TestContext): void {
   const dir = mkdtempSync(join(tmpdir(), 'slicewright-build-link-'));
@@ -481,6 +488,38 @@ export function followsDanglingSymlinks(context: TestContext): void {
   }
 }
 
+/**
+ * @evidence docs/spec.md#build-manifest Publishes a JSON Schema generated from the manifest type that matches the committed schema file, allows $schema, refuses unknown keys, and is exported by the package.
+ * @evidenceReview docs/spec.md#build-manifest #fe9a80d Reread the section with the $schema key and published schema, checked the assertions against it, and ran this test green with pnpm test.
+ */
+export function publishesManifestSchema(): void {
+  const schema = buildManifestSchema();
+  const committed = readFileSync(
+    new URL('../schema/build-manifest.schema.json', import.meta.url),
+    'utf8',
+  );
+  // `pnpm schema` rewrites the file; it must match the type that validates manifests.
+  strictEqual(committed, `${JSON.stringify(schema, null, 2)}\n`);
+  strictEqual(schema['$schema'], 'https://json-schema.org/draft/2020-12/schema');
+  strictEqual(schema.$id, buildManifestSchemaUrl);
+  strictEqual(schema['additionalProperties'], false);
+  deepStrictEqual(schema['required'], ['out', 'pieces']);
+  ok(schema.properties?.['$schema'] !== undefined);
+  ok(!committed.includes('#/components/'));
+  ok(!committed.includes('readOnly'));
+  deepStrictEqual(schemaAt(schema, ['pieces', 0, 'width']), { type: 'integer', minimum: 1 });
+  strictEqual(schemaAt(schema, ['pieces', 0])?.['additionalProperties'], false);
+  strictEqual(schemaAt(schema, ['groups', 0, 'slack'])?.type, 'integer');
+  strictEqual(schemaAt(schema, ['nope', 0]), undefined);
+  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
+    files: string[];
+    exports: Record<string, unknown>;
+  };
+  ok(pkg.files.includes('schema'));
+  strictEqual(pkg.exports['./build-manifest.schema.json'], './schema/build-manifest.schema.json');
+}
+
 void test('build manifest', buildsManifests);
 void test('build groups', buildsGroups);
 void test('build follows dangling symlinks', followsDanglingSymlinks);
+void test('build manifest schema', publishesManifestSchema);
