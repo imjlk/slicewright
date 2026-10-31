@@ -1,7 +1,15 @@
 import { deepStrictEqual, ok, strictEqual, throws } from 'node:assert/strict';
-import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, parse, resolve } from 'node:path';
 import { test, type TestContext } from 'node:test';
 
 import { defaultInspectOptions, inspectRaster } from '../src/inspect.js';
@@ -147,7 +155,12 @@ export function packsAtlases(): void {
  * @evidenceReview docs/spec.md#atlas-packing #76a0a67 Checked the assertions against the section and ran this test green with pnpm test.
  */
 export function packsAtlasFiles(): void {
-  const dir = mkdtempSync(join(tmpdir(), 'slicewright-pack-한글 경로-'));
+  // The stylesheet points at the examples by relative URL, which needs them on
+  // the same drive: Windows CI keeps the temp folder on C: and the checkout on D:.
+  const sameDrive = parse(tmpdir()).root === parse(resolve('examples')).root;
+  const parent = sameDrive ? tmpdir() : resolve('.slicewright');
+  mkdirSync(parent, { recursive: true });
+  const dir = mkdtempSync(join(parent, 'slicewright-pack-한글 경로-'));
   try {
     const options = {
       ...defaultPackOptions,
