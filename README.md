@@ -38,7 +38,7 @@ the full loop.
 
 ## Use
 
-Node 24 or newer.
+Node 22 or newer.
 
 ```bash
 npx slicewright prompt --kind panel --style "hand-painted fantasy wood"
@@ -112,7 +112,7 @@ piece's PNG changes and prints one JSON line per build.
 
 slicewright ships an [Agent Skills](https://agentskills.io) skill in
 [`skills/slicewright`](skills/slicewright/SKILL.md). The skill runs the CLI
-through `npx`, so it needs Node 24 or newer but no npm install of its own.
+through `npx`, so it needs Node 22 or newer but no npm install of its own.
 
 **Any agent**, with the [`skills`](https://github.com/vercel-labs/skills) CLI
 (Node 22.20 or newer). It installs into `.agents/skills/`, which Codex, Cursor,
@@ -302,7 +302,7 @@ CI runs the checks, tests, build, packed browser scenarios, and engine renders o
 Linux and native Windows.
 The repository's `.gitattributes` keeps text files at LF even when Windows Git
 uses `core.autocrlf=true`; CRLF compiler input otherwise fails the format check.
-Use Node 24 or newer in the shell running pnpm, including PowerShell.
+Use Node 22 or newer in the shell running pnpm, including PowerShell.
 
 The first compiler invocation builds native plugins and can take several
 minutes. Under mise it uses the pinned Go toolchain; otherwise ttsc defaults to

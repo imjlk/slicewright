@@ -11,7 +11,7 @@ API below remains available to other runners and scripts.
 
 ## Install
 
-Use Node 24 or newer. In a project using Playwright Test:
+Use Node 22 or newer. In a project using Playwright Test:
 
 ```sh
 npm install --save-dev slicewright @playwright/test playwright-core

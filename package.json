@@ -22,7 +22,7 @@
   ],
   "type": "module",
   "engines": {
-    "node": ">=24.0.0"
+    "node": ">=22.0.0"
   },
   "packageManager": "pnpm@11.7.0",
   "bin": {
@@ -88,7 +88,7 @@
     "@ttsc/evidence": "0.30.4",
     "@ttsc/graph": "0.30.4",
     "@ttsc/lint": "0.30.4",
-    "@types/node": "^24.0.0",
+    "@types/node": "^22.0.0",
     "playwright-core": "^1.64.0",
     "ttsc": "0.30.4",
     "typescript": "7.0.2"

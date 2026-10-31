@@ -3,7 +3,7 @@ name: slicewright
 description: Make and check stretchable game UI art, and verify rendered HTML/CSS or Canvas UI with explicit targets and approved visual baselines. Use for nine-slice assets, slice insets, smeared or seamed UI, atlas frames, or browser UI regression checks with Slicewright and Playwright.
 license: MIT
 metadata:
-  compatibility: Requires Node.js 24 or newer and npm (runs the slicewright CLI through npx).
+  compatibility: Requires Node.js 22 or newer and npm (runs the slicewright CLI through npx).
 ---
 
 # slicewright
@@ -22,8 +22,8 @@ art. Keep the asset workflow below for tasks that actually involve UI images.
 
 ## Run the CLI
 
-slicewright needs Node.js 24 or newer; check with `node --version` first and
-ask the user to upgrade when it is older.
+slicewright needs Node.js 22 or newer. Node 22, 24 and later all work, so do
+not suggest an upgrade unless `node --version` reports a major version below 22.
 Every `slicewright <command>` in this skill and its references means
 `npx -y slicewright <command>`. Leave the version off: npx then runs the
 project's installed copy, at whatever version the project pins, and downloads
