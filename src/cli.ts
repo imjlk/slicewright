@@ -5,7 +5,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'nod
 import { cli, define } from 'gunshi';
 
 import { writeBrowserReportHtml } from './browser-report.js';
-import { joinNegativeNumbers } from './argv.js';
+import { aliasedValue, joinNegativeNumbers } from './argv.js';
 import { friendlyCliErrors } from './friendly-errors.js';
 import { defaultChromaOptions, removeChroma } from './chroma.js';
 import { compareSet, defaultCompareSlack } from './compare.js';
@@ -241,7 +241,12 @@ slicewright compare dialog.png button.png bar.png --kind set`,
       type: 'enum',
       choices: ['states', 'set'],
       default: 'states',
-      description: 'states share one size and slices; a set only shares its line weight',
+      description: 'states share one size and slices; a set only shares its line weight (also --as)',
+    },
+    as: {
+      type: 'enum',
+      choices: ['states', 'set'],
+      description: 'Same as --kind: compare the PNGs as states or as a set',
     },
     slack: {
       type: 'number',
@@ -278,7 +283,7 @@ slicewright compare dialog.png button.png bar.png --kind set`,
     const report = compareSet(
       inputs.map((path, index) => ({ name: names[index] ?? path, raster: readPng(path) })),
       {
-        kind: ctx.values.kind === 'set' ? 'set' : 'states',
+        kind: aliasedValue<string>(ctx, 'kind', 'as') === 'set' ? 'set' : 'states',
         slack,
         inspect: inspectOptions(
           {
@@ -458,13 +463,15 @@ slicewright key generated.png --out keyed.png --key magenta`,
     keep: {
       type: 'number',
       default: defaultChromaOptions.keep,
-      description: 'Key dominance kept opaque',
+      description: 'Key dominance at or below this stays opaque (also --keep-below)',
     },
+    'keep-below': { type: 'number', description: 'Same as --keep' },
     drop: {
       type: 'number',
       default: defaultChromaOptions.drop,
-      description: 'Key dominance cleared',
+      description: 'Key dominance at or above this is cleared (also --drop-above)',
     },
+    'drop-above': { type: 'number', description: 'Same as --drop' },
     'despill-radius': {
       type: 'number',
       default: defaultChromaOptions.despillRadius,
@@ -474,8 +481,8 @@ slicewright key generated.png --out keyed.png --key magenta`,
   run: (ctx) => {
     const result = removeChroma(readPng(ctx.values.input), {
       key: ctx.values.key,
-      keep: ctx.values.keep,
-      drop: ctx.values.drop,
+      keep: aliasedValue<number>(ctx, 'keep', 'keep-below'),
+      drop: aliasedValue<number>(ctx, 'drop', 'drop-above'),
       despillRadius: ctx.values['despill-radius'],
     });
     writeOutputFile(ctx.values.out, encodePng(result.raster));

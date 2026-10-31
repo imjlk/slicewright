@@ -55,7 +55,7 @@ that the resulting heights and `minSize` suit the intended draws:
 slicewright normalize art/dialog.png --width 480 --out ui/dialog.png > reports/dialog-normalize.json
 slicewright normalize art/button.png --width 192 --out ui/button.png > reports/button-normalize.json
 slicewright normalize art/bar.png --width 240 --mode three --out ui/bar.png > reports/bar-normalize.json
-slicewright compare --kind set ui/dialog.png ui/button.png ui/bar.png > reports/set-compare.json
+slicewright compare --as set ui/dialog.png ui/button.png ui/bar.png > reports/set-compare.json
 ```
 
 Open the preview sheets from the main workflow together at their intended

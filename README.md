@@ -8,7 +8,9 @@ splits the job: the prompt asks for art that survives stretching, and
 inspection finds or checks the exact slice insets afterwards.
 
 - `prompt` turns a UI kind and a style into a structural generation prompt.
-- `key` removes a green or magenta background and despills the edge.
+- `key` removes a green or magenta background and despills the edge. Pixels
+  whose key dominance is at or below `--keep` (also `--keep-below`) stay
+  opaque and those at or above `--drop` (also `--drop-above`) are cleared.
 - `resize` resizes with premultiplied area averaging, or nearest for pixel art.
 - `normalize` crops, resizes to the in-game size, picks insets there, can
   rebuild a smaller texture, and writes a one-frame atlas.
@@ -16,7 +18,8 @@ inspection finds or checks the exact slice insets afterwards.
   smearing, repeating edges, seams, noise, alpha holes, margins, and spill. It
   also finds the content padding: where text fits inside the frame.
 - `compare` checks that states of one element (normal, hover, pressed) share a
-  size, slice mode, insets, and content padding, or with `--kind set` that the
+  size, slice mode, insets, and content padding, or with `--kind set` (also
+  `--as set`) that the
   pieces of a matching set share an outline weight.
 - `preview` renders the art at several stretched sizes on one PNG; pick
   cells with `--cells` and enlarge small art with `--zoom`.

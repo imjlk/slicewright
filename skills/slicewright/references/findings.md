@@ -19,7 +19,7 @@
 | `noise.tolerance` | Generated art is noisy, so matching tolerance was raised per axis. | Informational. `--noise off` restores exact matching. |
 | `noise.high` | The interior is busy along both axes. | Stretching smears it; use a flatter fill or tile it. |
 | `alpha.interior` | The middle of the element is partly transparent (alpha below 224). | Fine when intended (glass, a shadow, a glow). If not, a generator faked alpha: regenerate on a chroma key and run `key`. |
-| `alpha.chroma-spill` | The alpha edge is tinted by the key color. | Re-run `key` with a lower `--keep`, or despill elsewhere. |
+| `alpha.chroma-spill` | The alpha edge is tinted by the key color. | Re-run `key` with a lower `--keep-below` (`--keep`), or despill elsewhere. |
 | `margin.transparent` | Transparent border pixels become part of the corners. | `normalize` crops them; otherwise crop unless the spacing is intended. |
 | `resize.thin-lines` | An outline drawn straight onto the fill is narrower than the downscale can keep, so it fades (area) or can drop out (nearest). | Ask for outlines at least the named thickness in the source, or normalize to a larger size. |
 | `rebuild.x.lossy`, `rebuild.y.lossy` | `--keep` would flatten texture or shading on that axis. | Informational: that axis kept its full span. |
