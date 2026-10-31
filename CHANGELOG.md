@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.6.0 — 2026-11-01
+
+### Fixed
+
+- [42840d6](https://github.com/imjlk/slicewright/commit/42840d6a522391cae47df086ca2a798b73f4f024) Create missing output folders for every command that writes a file, always report the normalized `layout` so any normalize report works with `--layout`, report `insetsSource: "layout"` for a given layout, refuse cross-drive image references on Windows with a request for `--image-ref`, warn with `target.image-ref` when a Godot texture path leaves the project, name the missing `@playwright/test` peer and the artifact folder `browser-report` expects, and add examples and clearer option text to `--help`. — Thanks @imjlk!
+
+### Added
+
+- [7750a97](https://github.com/imjlk/slicewright/commit/7750a976feec92c7914889e469776a18dbf30ba9) Tell flat pixel art apart from art that is not pixel art: with too few color edges on both axes, `--pixel-art` now reports `pixel.grid-undetermined` with the candidate scale (the largest every edge lies on, and its divisors) instead of `pixel.no-grid`, a sparse axis takes the scale found on the other axis, and the new `--pixel-scale N` option snaps art at a known scale. — Thanks @imjlk!
+- [253e290](https://github.com/imjlk/slicewright/commit/253e2907378cda627c9162b97658aee92090b6b5) Clearer flag names alongside the existing ones: `key --keep-below` and `--drop-above` for `--keep` and `--drop`, and `compare --as` for `--kind`. The old names keep working; giving both names of one flag is a usage error. — Thanks @imjlk!
+- [5060d48](https://github.com/imjlk/slicewright/commit/5060d48beb3c34408176ddce9157c9e02195520a) Readable errors: CLI usage errors name the missing flag, list an option's choices, and suggest the closest flag or command, and a refused build manifest lists every problem with its path and the closest allowed key. Manifests may carry a `$schema` key, and the package publishes a JSON Schema for them at `schema/build-manifest.schema.json`. — Thanks @imjlk!
+
+### Changed
+
+- [3d5f5d0](https://github.com/imjlk/slicewright/commit/3d5f5d09918af9f47fb85e832829b6b01ae4ed3f) Support Node 22: `engines` now allows Node 22 or newer and the published types are checked against Node 22, and the skill no longer asks users on Node 22 to upgrade. — Thanks @imjlk!
+
 ## 0.5.0 — 2026-10-31
 
 ### Minor changes
