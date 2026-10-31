@@ -120,8 +120,10 @@ multi-region layout;
 it renders in previews and reports `target.unsupported` on export.
 
 A rebuilt multi-region texture is too small for detection to find its regions
-again, so normalization reports the full `layout` for a multi-region result.
-Given back as a layout file, a layout replaces detection and insets: each axis
+again, so normalization reports the full `layout` for every result, single- or
+multi-region, and the report can be given back as a layout file as it is.
+Given back as a layout file, a layout replaces detection and insets, and the
+report's `insetsSource` is `layout`: each axis
 must cover the image in order (a `layout.size` error otherwise), every stretch
 segment must be uniform (a `stretch.<axis>.nonuniform` error otherwise), and the
 insets are the outermost flexible lines. The layout's `content` padding, when
@@ -246,13 +248,28 @@ length of their mean unit vector). The largest period scoring at least 0.85
 is refined to its best score within the next half pixel, and a period within
 0.03 of a whole number becomes that number; the mean phase gives the offset.
 An axis with no such period has scale 1. A divisor of the true period also
-fits, which is why the largest one wins. When either axis has a grid, the
+fits, which is why the largest one wins. An axis with fewer than six
+boundaries has no grid when at least six pairs of adjacent lines differ
+(detail at every pixel merges into a few runs), and is otherwise sparse: when the other axis fit a whole scale, the sparse axis
+takes the greatest common divisor of that scale and the spacing between its
+own boundaries and the content's ends (art pixels are square), offset to the
+content's start, if every boundary is on a whole pixel and the divisor is at
+least 2, and otherwise stays at scale 1; when the other axis showed no grid,
+neither does the sparse one. When both axes are sparse the grid is
+undetermined (scale 1 on both), and the greatest common divisor of every
+spacing on both axes, from 2 to 32 and only when there is at least one
+boundary and every boundary is on a whole pixel, is reported as the candidate scale: the art
+may be upscaled by it or any divisor, or be at its native size. A known
+scale (`--pixel-scale`, from 1 to the content size, implying pixel art)
+skips the search and only places the grid at the boundaries' mean phase, or
+at the content's start when there are none. When either axis has a grid, the
 share of visible pixels differing by more than 24 from the center pixels of
 their cell and its neighbors (a fractional grid rounds its boundaries) is the
 off-grid share. Inspection with pixel art reports
 `pixel.upscaled` with the scale, offset, fit, and native size, adds a
 `pixel.off-grid` warning when more than 10% of pixels are off the grid, and
-reports `pixel.no-grid` when there is none. Normalization with pixel art
+reports `pixel.no-grid` when there is none, or `pixel.grid-undetermined`
+with the candidate scale and its divisors when both axes are sparse. Normalization with pixel art
 snaps the cropped image to one pixel per cell by sampling each cell's center
 (a `snap` step) before resizing, resizes with nearest sampling whatever the
 filter, reports the grid findings judged before the snap, and does not look
@@ -479,7 +496,10 @@ layout's rounding down, so a tiled export carries a `target.tile` warning. The
 Godot target writes `<name>.tres`, a `StyleBoxTexture` resource whose texture is
 the image reference when it starts with `res://`, and otherwise `res://` plus
 the image's path from where the command runs, taken as the project root, with content margins from the content padding; its usage prints the
-same values as `NinePatchRect` properties.
+same values as `NinePatchRect` properties. A texture path that leaves the
+project, through a `..` segment, a drive, or an absolute path, is still written
+but carries a `target.image-ref` warning asking to run from the project root or
+give a `res://` image reference.
 
 ## Atlas frames
 
@@ -564,14 +584,17 @@ A build manifest lists the pieces of a set in one JSON file so the whole set
 is rebuilt with one command: every piece is normalized, written with its
 one-frame atlas and any exports it asks for, and then all pieces are packed.
 The manifest's shape is validated before anything is read or written, with
-unknown keys refused so a misspelled setting is not ignored, and so is what the
+unknown keys refused so a misspelled setting is not ignored (a `$schema` key
+is allowed for editors and otherwise ignored), and so is what the
 shape cannot say: piece names, which default to the input's file
 name, and the pack name must be plain file names, piece names must be unique
 ignoring letter case, a piece gives a scale or a size but not both and not
 insets with multiple regions, insets and
 padding use the command-line syntax, every target exists, and no path or name
 holds a NUL character. A bad manifest
-is a usage error. Paths in the manifest are relative to it; the pieces go to a
+is a usage error. The package publishes the manifest's JSON Schema (draft
+2020-12) as `schema/build-manifest.schema.json`, generated from the same type
+that validates manifests. Paths in the manifest are relative to it; the pieces go to a
 `pieces` directory beside the packed PNG unless the manifest names another. A
 piece takes the same normalization settings as the normalize command. A build
 refuses to write over any piece's input or the manifest, and refuses two
@@ -663,6 +686,36 @@ dominance kept opaque and cleared), and `compare --as` is `--kind` (whether the
 PNGs are states or a set). The original name keeps its default when neither is
 given; giving both names of one flag is a usage error rather than one of the
 values being silently dropped.
+
+## Error messages
+
+A usage error names the fix rather than the parser's wording. A missing
+required flag or argument names the command and the flag (`normalize needs
+--out <value>`), a value outside a flag's choices lists the choices with the
+closest one when the value looks like a typo, a value of the wrong type names
+the type, an unknown option suggests the closest option of that command, and
+an unknown command suggests the closest command and lists them all; each
+flag error also points at the command's `--help`. A name counts as a typo of
+another within an edit distance of a third of the longer name (at least one
+edit), where swapping two neighboring letters is one edit, ignoring letter
+case. A build manifest reports every problem at once, each with its path:
+an unknown key with the closest allowed key at that place and the list of
+allowed keys, a missing required key, a value outside its choices with the
+choices, and any other mismatch with the expected type in words. Errors that
+are not parser or manifest-shape errors keep their own messages.
+
+## Output files
+
+Every command that writes a file creates the missing parent directories of
+that file first, so an output path inside a folder that does not exist yet
+works the same for `normalize`, `preview`, `key`, `resize`, `frame`, `export`,
+`pack`, `build`, and `browser-report`. A written file that refers to an image,
+such as an atlas or a target export, uses the image's path from the file's own
+directory with forward slashes, unless an image reference is given. Two
+Windows drives have no relative path, so rather than write an absolute or
+broken reference the command refuses with a usage error asking for
+`--image-ref`, before writing anything, and a packed stylesheet gives that
+frame no class, with a `pack.css-skipped` warning.
 
 ## Generation prompts
 
@@ -765,7 +818,9 @@ The matcher accepts a `BrowserTarget`, `BrowserCheckOptions`, and optional
 `timeout` and `intervals`. It runs inside an active Playwright Test and uses only
 the target's capture operation and the existing snapshot checker. It never
 performs or repeats pointer or keyboard actions. Core and browser entry points
-remain usable without `@playwright/test` installed.
+remain usable without `@playwright/test` installed; importing
+`slicewright/playwright` without it fails with an error that names the missing
+peer and the command that installs it.
 
 A valid mismatching observation is captured and checked again until the
 expectation succeeds or Playwright exhausts its polling budget. An interval

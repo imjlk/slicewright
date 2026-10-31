@@ -3,7 +3,9 @@
 `slicewright build ui.build.json` normalizes every piece, compares state
 groups, exports each piece's targets, and packs everything into one atlas.
 Paths are relative to the manifest. Add `--watch` to rebuild when the manifest
-or a piece changes.
+or a piece changes. A refused manifest lists every problem with its path and,
+for a misspelled key or value, the closest allowed one; fix them all before
+rerunning.
 
 ```json
 {
@@ -26,6 +28,7 @@ or a piece changes.
 
 | Field | Meaning |
 | --- | --- |
+| `$schema` | Optional; points editors at the published JSON Schema (`./node_modules/slicewright/schema/build-manifest.schema.json`). The build ignores it. |
 | `out` | Packed PNG (required); its atlas JSON goes next to it. |
 | `name` | Texture key and file name of the atlas and stylesheet; defaults to the PNG name. |
 | `piecesDir` | Where normalized pieces go; defaults to `pieces` beside `out`. |

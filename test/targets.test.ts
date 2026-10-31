@@ -11,7 +11,7 @@ function codes(findings: ReadonlyArray<{ readonly code: string }>): string[] {
 
 /**
  * @evidence docs/spec.md#experimental-targets Exports a nine-slice, a tiled panel, and a three-slice to Unity, Defold, and Godot, checking each engine's inset order, files, stretch modes, and experimental status.
- * @evidenceReview docs/spec.md#experimental-targets #de67bfb Checked the assertions against the section's orders, files, tiling, emulation, and res:// rules and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#experimental-targets #6ad4f5b Re-read the section after adding the target.image-ref paragraph, added the res:// escape assertions, and ran this test green with pnpm test.
  */
 export function exportsExperimentalTargets(): void {
   const raster = panel(40, 30);
@@ -77,6 +77,21 @@ export function exportsExperimentalTargets(): void {
   ok(String(rooted.files[0]?.contents).includes('path="res://ui/panel.png"'));
   const resRef = exportForTarget('godot', { ...input, imageRef: 'res://art/panel.png' });
   ok(String(resRef.files[0]?.contents).includes('path="res://art/panel.png"'));
+  strictEqual(codes(rooted.findings).includes('target.image-ref'), false);
+  // An image outside the working directory has no res:// path; the export warns.
+  for (const image of ['../art/panel.png', 'D:/art/panel.png']) {
+    const outside = exportForTarget('godot', {
+      ...input,
+      loaderPaths: { image, directory: 'ui' },
+    });
+    ok(codes(outside.findings).includes('target.image-ref'), image);
+    strictEqual(outside.files.length, 1);
+  }
+  ok(
+    codes(exportForTarget('godot', { ...input, imageRef: 'res://../panel.png' }).findings).includes(
+      'target.image-ref',
+    ),
+  );
 
   // A tiled axis: Godot tiles per axis, Unity tiles both, Defold cannot tile.
   const tiled = layoutFromInsets({ left: 6, right: 6, top: 6, bottom: 6 }, 40, 30, {

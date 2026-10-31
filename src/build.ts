@@ -17,6 +17,8 @@ import { buildPack, type PackFilesResult } from './pack-files.js';
 import { defaultPackOptions } from './pack.js';
 import { decodePng, encodePng } from './png.js';
 import type { Raster } from './raster.js';
+import { friendlyManifestIssues } from './friendly-errors.js';
+import { buildManifestSchema } from './manifest-schema.js';
 import { parseInsets, type SliceInsets, type SliceMode } from './slices.js';
 import { exportForTarget, findTarget, sliceTargets } from './targets/index.js';
 
@@ -62,6 +64,8 @@ export interface BuildGroup {
 
 /** A `slicewright build` manifest: pieces normalized, exported, and packed into one atlas. */
 export interface BuildManifest {
+  /** JSON Schema the manifest follows, for editors; ignored by the build. */
+  readonly $schema?: string;
   /** The packed PNG, relative to the manifest; its atlas goes next to it. */
   readonly out: string;
   /** Texture key and file name of the atlas and stylesheet; defaults to the PNG name. */
@@ -139,12 +143,21 @@ export interface BuildReport {
  * cannot say. Piece names must be unique plain file names, a piece takes a
  * scale or a size, and every target must exist.
  *
- * @evidence docs/spec.md#build-manifest Validates the manifest shape, unique plain piece names, size or scale, insets syntax, and known targets before anything is built.
- * @evidenceReview docs/spec.md#build-manifest #81ef4f6 Checked this code against the section line by line and ran buildsManifests green with pnpm test.
+ * @evidence docs/spec.md#build-manifest Validates the manifest shape (allowing $schema, reporting every shape problem at once), unique plain piece names, size or scale, insets syntax, and known targets before anything is built.
+ * @evidenceReview docs/spec.md#build-manifest #fe9a80d Reread the section with the $schema key and published schema and checked this code against it line by line; ran buildsManifests and the manifest error tests green with pnpm test.
  */
 export function readBuildManifest(json: unknown): BuildManifest {
   // Unknown keys are refused, so a misspelled setting is not silently ignored.
-  const manifest = typia.assertEquals<BuildManifest>(json);
+  const checked = typia.validateEquals<BuildManifest>(json);
+  if (!checked.success) {
+    const problems = friendlyManifestIssues(checked.errors, buildManifestSchema());
+    throw new BuildManifestError(
+      problems.length === 1
+        ? (problems[0] ?? '')
+        : `${problems.length} problems:\n${problems.map((problem) => `  ${problem}`).join('\n')}`,
+    );
+  }
+  const manifest = checked.data;
   // No file system takes a NUL in a path; refuse it before anything is written.
   for (const path of [manifest.out, manifest.piecesDir, ...manifest.pieces.map((p) => p.input)]) {
     if (path?.includes('\0') === true) {

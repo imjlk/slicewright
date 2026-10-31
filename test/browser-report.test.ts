@@ -1,5 +1,5 @@
 import { deepStrictEqual, match, rejects, strictEqual } from 'node:assert/strict';
-import { cp, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -79,6 +79,20 @@ export async function writesBrowserHtmlReports(): Promise<void> {
       path: join(directory, 'passing.html'),
       ok: true,
     });
+    // A missing output folder is created; a missing or empty artifact folder is named.
+    const nested = join(directory, 'reports', 'nested', 'passing.html');
+    strictEqual((await writeBrowserReportHtml(moved, nested)).ok, true);
+    const empty = join(directory, 'empty');
+    await mkdir(empty);
+    await rejects(
+      writeBrowserReportHtml(empty, join(directory, 'none.html')),
+      /has no report\.json; pass the failure artifact directory/,
+    );
+    await rejects(
+      writeBrowserReportHtml(join(directory, 'missing'), join(directory, 'none.html')),
+      /does not exist; pass the failure artifact directory/,
+    );
+    await rejects(readFile(join(directory, 'none.html')), /ENOENT/);
     await writeBrowserArtifacts(moved, {
       actual,
       report: checkSnapshot(actual),

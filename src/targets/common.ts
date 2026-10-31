@@ -1,7 +1,7 @@
 import type { Finding } from '../inspect.js';
 import { axisTiles, layoutInsets, layoutShape, type SliceLayout } from '../layout.js';
 import type { SliceInsets } from '../slices.js';
-import type { SliceTarget } from './types.js';
+import type { ExportInput, SliceTarget } from './types.js';
 
 /**
  * Compares a layout with a target's capabilities: an unsupported shape and a
@@ -12,11 +12,15 @@ import type { SliceTarget } from './types.js';
  * @evidence docs/spec.md#targets Reports unsupported shapes as errors, emulation as info, and tiling gaps as warnings, from the declared capabilities.
  * @evidenceReview docs/spec.md#targets #2cdaf2d Checked this code against the section line by line and ran checksTargetCapabilities green with pnpm test.
  */
-export function capabilityFindings(target: SliceTarget, layout: SliceLayout): Finding[] {
+export function capabilityFindings(
+  target: SliceTarget,
+  layout: SliceLayout,
+  input?: ExportInput,
+): Finding[] {
   const findings: Finding[] = [];
   const shape = layoutShape(layout);
   const { capabilities } = target;
-  findings.push(...(target.check?.(layout) ?? []));
+  findings.push(...(target.check?.(layout, input) ?? []));
   if (target.status === 'experimental') {
     findings.push({
       code: 'target.experimental',

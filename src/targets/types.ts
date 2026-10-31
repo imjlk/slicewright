@@ -61,7 +61,7 @@ export interface SliceTarget {
   readonly status: 'verified' | 'experimental';
   readonly capabilities: TargetCapabilities;
   /** Target-specific limits the shared capabilities cannot express. */
-  readonly check?: (layout: SliceLayout) => Finding[];
+  readonly check?: (layout: SliceLayout, input?: ExportInput) => Finding[];
   /**
    * The file names an export named `name` may write, relative to the output
    * directory, so a caller can check them for collisions before writing.

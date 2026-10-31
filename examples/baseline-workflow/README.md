@@ -7,7 +7,7 @@ status each have explicit measured content regions. Both renderers expose a
 named button and a live status region; Canvas maintains those DOM semantics
 explicitly alongside its painted content.
 
-Use Node 24+ and Slicewright 0.5+. Copy this directory into your project, then:
+Use Node 22+ and Slicewright 0.5+. Copy this directory into your project, then:
 
 ```sh
 npm install
