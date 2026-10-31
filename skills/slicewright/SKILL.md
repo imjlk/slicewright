@@ -159,7 +159,7 @@ image generator for separate assets. Reuse the shared style in every `prompt` ca
 
 A dialog, button, and bar can share a look while keeping different sizes and
 slices. Normalize each stretchable piece to its intended scale before
-`compare --kind set`; this checks outline weight, so also review their color
+`compare --as set` (or `--kind set`); this checks outline weight, so also review their color
 and material together.
 
 States of one button swap in place: use the default `compare` instead and fix

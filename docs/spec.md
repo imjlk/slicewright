@@ -657,6 +657,13 @@ validates the value like any other. A number flag with nothing after it, or
 followed by another option, is refused with a message naming the flag. Other
 flags and everything after `--` are passed through unchanged.
 
+Some flags also answer to a clearer second name, and both stay supported:
+`key --keep-below` is `--keep` and `--drop-above` is `--drop` (the key
+dominance kept opaque and cleared), and `compare --as` is `--kind` (whether the
+PNGs are states or a set). The original name keeps its default when neither is
+given; giving both names of one flag is a usage error rather than one of the
+values being silently dropped.
+
 ## Generation prompts
 
 A prompt plan turns a UI kind (button, panel, dialog, bar, bar fill, tooltip,
