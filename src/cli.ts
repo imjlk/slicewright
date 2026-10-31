@@ -101,6 +101,10 @@ const sliceArgs = {
     type: 'boolean',
     description: 'Find the grid of upscaled pixel art; normalize snaps to it and resizes nearest',
   },
+  'pixel-scale': {
+    type: 'number',
+    description: 'Image pixels per art pixel when known, for flat art with too few edges to tell; implies --pixel-art',
+  },
   ...matchArgs,
 } as const;
 
@@ -131,6 +135,7 @@ interface SliceValues {
   readonly 'outlier-ratio': number;
   readonly noise: string;
   readonly 'pixel-art'?: boolean | undefined;
+  readonly 'pixel-scale'?: number | undefined;
   readonly layout?: string | undefined;
 }
 
@@ -566,6 +571,7 @@ const normalize = define({
       ...sizeRequest(ctx.values),
       ...(ctx.values.keep === undefined ? {} : { keep: ctx.values.keep }),
       pixelArt: ctx.values['pixel-art'] === true,
+      ...(ctx.values['pixel-scale'] === undefined ? {} : { pixelScale: ctx.values['pixel-scale'] }),
     });
     writeFileSync(out, encodePng(result.raster));
     let atlasOut: string | undefined;
@@ -982,6 +988,7 @@ function inspectOptions(values: SliceValues, raster: Raster | undefined): Inspec
     ...(insets === undefined ? {} : { insets }),
     ...(values.padding === undefined ? {} : { contentPadding: parseInsets(values.padding) }),
     ...(values['pixel-art'] === true ? { pixelArt: true } : {}),
+    ...(values['pixel-scale'] === undefined ? {} : { pixelScale: values['pixel-scale'] }),
     ...(values.layout === undefined ? {} : { layout: readLayout(values.layout) }),
   };
 }

@@ -1,4 +1,4 @@
-import { ok, strictEqual } from 'node:assert/strict';
+import { deepStrictEqual, ok, strictEqual, throws } from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { defaultInspectOptions, inspectRaster } from '../src/inspect.js';
@@ -49,7 +49,7 @@ function soften(raster: Raster): Raster {
 
 /**
  * @evidence docs/spec.md#pixel-grid Detects whole and fractional upscales, snaps them back exactly, flags blurred art as off the grid, reports only when inspection asks, and snaps before a nearest resize in normalization.
- * @evidenceReview docs/spec.md#pixel-grid #70f3d39 Checked this test against the section line by line and ran it green with pnpm test.
+ * @evidenceReview docs/spec.md#pixel-grid #cf46969 Reread the section with the sparse-axis, differing-lines, candidate and given-scale rules, checked this test's assertions against it, and ran it green with pnpm test.
  */
 export function detectsPixelGrid(): void {
   const source = art(16, 12);
@@ -114,3 +114,115 @@ export function detectsPixelGrid(): void {
 }
 
 void test('pixel grid', detectsPixelGrid);
+
+/** A flat panel: a 2-pixel dark frame around one fill color, `width` by `height` art pixels. */
+function flatPanel(width: number, height: number): Raster {
+  const raster = createRaster(width, height);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const inner = x >= 2 && x < width - 2 && y >= 2 && y < height - 2;
+      raster.data.set(inner ? [90, 160, 90, 255] : [20, 20, 40, 255], pixelOffset(raster, x, y));
+    }
+  }
+  return raster;
+}
+
+/**
+ * @evidence docs/spec.md#pixel-grid Reports a flat 6x panel as undetermined with its candidate scales instead of as not pixel art, fills a sparse axis from the other axis's whole scale, and snaps exactly at a given --pixel-scale.
+ * @evidenceReview docs/spec.md#pixel-grid #cf46969 Reread the section with the sparse-axis, differing-lines, candidate and given-scale rules, checked this test's assertions against it, and ran it green with pnpm test.
+ */
+export function judgesSparsePixelGrid(): void {
+  const panel = flatPanel(24, 16);
+  const sixfold = resizeRaster(panel, 144, 96, 'nearest');
+
+  // Two edges per axis cannot tell a 6x panel from a 12x or native one.
+  const sparse = detectPixelGrid(sixfold);
+  strictEqual(sparse.x.scale, 1);
+  strictEqual(sparse.x.basis, 'sparse');
+  strictEqual(sparse.y.basis, 'sparse');
+  strictEqual(sparse.candidate, 12);
+  const [undetermined, ...rest] = pixelGridFindings(sparse);
+  strictEqual(undetermined?.code, 'pixel.grid-undetermined');
+  strictEqual(rest.length, 0);
+  ok(undetermined.message.includes('12, 6, 4, 3 or 2'), undetermined.message);
+  ok(undetermined.message.includes('--pixel-scale'), undetermined.message);
+  deepStrictEqual(undetermined.details?.['candidate'], 12);
+
+  // The same panel inspected and normalized with --pixel-art: no snap, no "no grid".
+  const inspected = inspectRaster(sixfold, { ...defaultInspectOptions, pixelArt: true });
+  const pixelCodes = inspected.findings
+    .map((finding) => finding.code)
+    .filter((code) => code.startsWith('pixel.'));
+  deepStrictEqual(pixelCodes, ['pixel.grid-undetermined']);
+  const unsnapped = normalizeRaster(sixfold, { ...defaultNormalizeOptions, pixelArt: true });
+  ok(!unsnapped.steps.some((step) => step.step === 'snap'));
+
+  // A known scale places the grid and snaps the panel back exactly.
+  const given = detectPixelGrid(sixfold, undefined, { scale: 6 });
+  strictEqual(given.x.basis, 'given');
+  strictEqual(given.x.fit, 1);
+  ok(same(snapToPixelGrid(sixfold, given), panel));
+  const givenFinding = pixelGridFindings(given)[0];
+  strictEqual(givenFinding?.code, 'pixel.upscaled');
+  ok(givenFinding.message.includes('--pixel-scale 6 snaps it to 24x16'), givenFinding.message);
+  const snapped = normalizeRaster(sixfold, { ...defaultNormalizeOptions, pixelScale: 6, scale: 2 });
+  strictEqual(snapped.steps.map((step) => step.step).join(), 'snap,resize');
+  ok(same(snapped.raster, resizeRaster(panel, 48, 32, 'nearest')));
+  // The snapped art is not judged again for a grid.
+  strictEqual(
+    snapped.report.findings.filter((finding) => finding.code.startsWith('pixel.')).length,
+    1,
+  );
+  ok(
+    inspectRaster(sixfold, { ...defaultInspectOptions, pixelScale: 6 }).findings.some(
+      (finding) => finding.code === 'pixel.upscaled',
+    ),
+  );
+  // Scale 1 says the art is native: nothing to snap.
+  strictEqual(
+    pixelGridFindings(detectPixelGrid(panel, undefined, { scale: 1 }))[0]?.code,
+    'pixel.no-grid',
+  );
+  throws(() => detectPixelGrid(sixfold, undefined, { scale: 0 }), /--pixel-scale/);
+  throws(() => detectPixelGrid(sixfold, undefined, { scale: 200 }), /--pixel-scale/);
+
+  // One flat block has no edge to go by: no candidate.
+  const block = createRaster(48, 48);
+  block.data.fill(200);
+  strictEqual(detectPixelGrid(block).candidate, undefined);
+  strictEqual(pixelGridFindings(detectPixelGrid(block))[0]?.code, 'pixel.grid-undetermined');
+
+  // Detail across, flat down: the flat axis takes the scale found across.
+  const bar = createRaster(24, 6);
+  for (let y = 0; y < 6; y += 1) {
+    for (let x = 0; x < 24; x += 1) {
+      const frame = y < 2 || y >= 4;
+      const level = (x * 7) % 3 === 0 ? 40 : 200;
+      raster(bar, x, y, frame ? [20, 20, 40, 255] : [level, 255 - level, 100, 255]);
+    }
+  }
+  const fourfold = detectPixelGrid(resizeRaster(bar, 96, 24, 'nearest'));
+  strictEqual(fourfold.x.basis, 'fit');
+  strictEqual(fourfold.x.scale, 4);
+  strictEqual(fourfold.y.basis, 'spacing');
+  strictEqual(fourfold.y.scale, 4);
+  deepStrictEqual(fourfold.native, { width: 24, height: 6 });
+  ok(pixelGridFindings(fourfold)[0]?.message.includes('few color edges'));
+
+  // Random detail across and flat down is no grid on either axis.
+  const noisy = createRaster(97, 24);
+  for (let y = 0; y < 24; y += 1) {
+    for (let x = 0; x < 97; x += 1) {
+      raster(noisy, x, y, y < 8 ? [20, 20, 40, 255] : [(x * 37) % 256, (x * 91) % 256, 100, 255]);
+    }
+  }
+  const native = detectPixelGrid(noisy);
+  strictEqual(native.y.basis, 'none');
+  strictEqual(pixelGridFindings(native)[0]?.code, 'pixel.no-grid');
+}
+
+function raster(target: Raster, x: number, y: number, color: readonly number[]): void {
+  target.data.set(color, pixelOffset(target, x, y));
+}
+
+void test('sparse pixel grid', judgesSparsePixelGrid);

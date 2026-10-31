@@ -246,13 +246,28 @@ length of their mean unit vector). The largest period scoring at least 0.85
 is refined to its best score within the next half pixel, and a period within
 0.03 of a whole number becomes that number; the mean phase gives the offset.
 An axis with no such period has scale 1. A divisor of the true period also
-fits, which is why the largest one wins. When either axis has a grid, the
+fits, which is why the largest one wins. An axis with fewer than six
+boundaries has no grid when at least six pairs of adjacent lines differ
+(detail at every pixel merges into a few runs), and is otherwise sparse: when the other axis fit a whole scale, the sparse axis
+takes the greatest common divisor of that scale and the spacing between its
+own boundaries and the content's ends (art pixels are square), offset to the
+content's start, if every boundary is on a whole pixel and the divisor is at
+least 2, and otherwise stays at scale 1; when the other axis showed no grid,
+neither does the sparse one. When both axes are sparse the grid is
+undetermined (scale 1 on both), and the greatest common divisor of every
+spacing on both axes, from 2 to 32 and only when there is at least one
+boundary and every boundary is on a whole pixel, is reported as the candidate scale: the art
+may be upscaled by it or any divisor, or be at its native size. A known
+scale (`--pixel-scale`, from 1 to the content size, implying pixel art)
+skips the search and only places the grid at the boundaries' mean phase, or
+at the content's start when there are none. When either axis has a grid, the
 share of visible pixels differing by more than 24 from the center pixels of
 their cell and its neighbors (a fractional grid rounds its boundaries) is the
 off-grid share. Inspection with pixel art reports
 `pixel.upscaled` with the scale, offset, fit, and native size, adds a
 `pixel.off-grid` warning when more than 10% of pixels are off the grid, and
-reports `pixel.no-grid` when there is none. Normalization with pixel art
+reports `pixel.no-grid` when there is none, or `pixel.grid-undetermined`
+with the candidate scale and its divisors when both axes are sparse. Normalization with pixel art
 snaps the cropped image to one pixel per cell by sampling each cell's center
 (a `snap` step) before resizing, resizes with nearest sampling whatever the
 filter, reports the grid findings judged before the snap, and does not look

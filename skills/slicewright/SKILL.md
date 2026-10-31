@@ -78,7 +78,9 @@ every command exits 2 on bad input. `--help` works on each command.
    outline drawn at 1600 px is gone at 320 px (`resize.thin-lines`). Ask for line
    weights in proportion to the element ("an outline about 1/40 of the
    height") and check outlines in the preview. For pixel art, pick `--width`
-   so the factor is the generated pixel size, which keeps the grid even.
+   so the factor is the generated pixel size, which keeps the grid even, or
+   add `--pixel-art` to snap the grid first; when flat art reports
+   `pixel.grid-undetermined`, give the known scale with `--pixel-scale N`.
 5. **Read the findings** with the table in
    [references/findings.md](references/findings.md). Fix every `error`, and compare
    `minSize` with the smallest size the game uses (`insets.large` warns when
