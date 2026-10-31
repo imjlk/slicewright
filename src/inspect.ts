@@ -61,6 +61,8 @@ export interface InspectOptions extends MatchOptions {
   readonly contentPadding?: SliceInsets;
   /** Look for the grid of upscaled pixel art. */
   readonly pixelArt?: boolean;
+  /** Known pixel-art scale; places the grid instead of searching and implies `pixelArt`. */
+  readonly pixelScale?: number;
   /**
    * Caller-supplied layout, such as the one normalize reports for a
    * multi-region rebuild; verified instead of detected.
@@ -150,8 +152,9 @@ export function inspectRaster(
     findings.push(...marginFindings(raster, bounds));
     findings.push(...chromaSpillFindings(raster));
     findings.push(...interiorAlphaFindings(raster, bounds));
-    if (options.pixelArt === true) {
-      findings.push(...pixelGridFindings(detectPixelGrid(raster, bounds)));
+    if (options.pixelArt === true || options.pixelScale !== undefined) {
+      const given = options.pixelScale === undefined ? {} : { scale: options.pixelScale };
+      findings.push(...pixelGridFindings(detectPixelGrid(raster, bounds, given)));
     }
   }
 

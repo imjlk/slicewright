@@ -39,6 +39,8 @@ export interface NormalizeOptions {
   readonly keep?: number;
   /** Snap upscaled pixel art to one pixel per grid cell, then resize with nearest sampling. */
   readonly pixelArt?: boolean;
+  /** Known pixel-art scale; skips the grid search and implies `pixelArt`. */
+  readonly pixelScale?: number;
 }
 
 export interface NormalizeStep {
@@ -88,8 +90,13 @@ export function normalizeRaster(
   }
 
   let gridFindings: Finding[] = [];
-  if (options.pixelArt === true) {
-    const grid = detectPixelGrid(raster);
+  const pixelArt = options.pixelArt === true || options.pixelScale !== undefined;
+  if (pixelArt) {
+    const grid = detectPixelGrid(
+      raster,
+      undefined,
+      options.pixelScale === undefined ? {} : { scale: options.pixelScale },
+    );
     gridFindings = pixelGridFindings(grid);
     if (grid.x.scale !== 1 || grid.y.scale !== 1) {
       const snapped = snapToPixelGrid(raster, grid);
@@ -97,7 +104,7 @@ export function normalizeRaster(
       raster = snapped;
     }
   }
-  const filter = options.pixelArt === true ? 'nearest' : options.filter;
+  const filter = pixelArt ? 'nearest' : options.filter;
 
   const size = targetSize(raster.width, raster.height, options);
   let thinLines: Finding[] = [];
@@ -118,7 +125,8 @@ export function normalizeRaster(
   }
 
   // The grid was judged before snapping; the snapped art has none left to find.
-  const inspected = inspectRaster(raster, { ...options.inspect, pixelArt: false });
+  const { pixelScale: _judged, ...inspect } = options.inspect;
+  const inspected = inspectRaster(raster, { ...inspect, pixelArt: false });
   const report = {
     ...inspected,
     findings: [...inspected.findings, ...gridFindings, ...thinLines],
