@@ -564,14 +564,17 @@ A build manifest lists the pieces of a set in one JSON file so the whole set
 is rebuilt with one command: every piece is normalized, written with its
 one-frame atlas and any exports it asks for, and then all pieces are packed.
 The manifest's shape is validated before anything is read or written, with
-unknown keys refused so a misspelled setting is not ignored, and so is what the
+unknown keys refused so a misspelled setting is not ignored (a `$schema` key
+is allowed for editors and otherwise ignored), and so is what the
 shape cannot say: piece names, which default to the input's file
 name, and the pack name must be plain file names, piece names must be unique
 ignoring letter case, a piece gives a scale or a size but not both and not
 insets with multiple regions, insets and
 padding use the command-line syntax, every target exists, and no path or name
 holds a NUL character. A bad manifest
-is a usage error. Paths in the manifest are relative to it; the pieces go to a
+is a usage error. The package publishes the manifest's JSON Schema (draft
+2020-12) as `schema/build-manifest.schema.json`, generated from the same type
+that validates manifests. Paths in the manifest are relative to it; the pieces go to a
 `pieces` directory beside the packed PNG unless the manifest names another. A
 piece takes the same normalization settings as the normalize command. A build
 refuses to write over any piece's input or the manifest, and refuses two
@@ -656,6 +659,23 @@ a flag taking a number is joined to that flag first; the command then
 validates the value like any other. A number flag with nothing after it, or
 followed by another option, is refused with a message naming the flag. Other
 flags and everything after `--` are passed through unchanged.
+
+## Error messages
+
+A usage error names the fix rather than the parser's wording. A missing
+required flag or argument names the command and the flag (`normalize needs
+--out <value>`), a value outside a flag's choices lists the choices with the
+closest one when the value looks like a typo, a value of the wrong type names
+the type, an unknown option suggests the closest option of that command, and
+an unknown command suggests the closest command and lists them all; each
+flag error also points at the command's `--help`. A name counts as a typo of
+another within an edit distance of a third of the longer name (at least one
+edit), where swapping two neighboring letters is one edit, ignoring letter
+case. A build manifest reports every problem at once, each with its path:
+an unknown key with the closest allowed key at that place and the list of
+allowed keys, a missing required key, a value outside its choices with the
+choices, and any other mismatch with the expected type in words. Errors that
+are not parser or manifest-shape errors keep their own messages.
 
 ## Generation prompts
 

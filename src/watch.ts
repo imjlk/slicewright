@@ -191,7 +191,7 @@ export function watchRuns(
  * file it will point at is watched before it exists.
  *
  * @evidence docs/spec.md#build-manifest Watches a symlinked input where the link is and where it points, and a dangling one where it will point.
- * @evidenceReview docs/spec.md#build-manifest #81ef4f6 Read the watch rules in the section against this function and ran followsDanglingSymlinks green with pnpm test.
+ * @evidenceReview docs/spec.md#build-manifest #fe9a80d Reread the section after the $schema key and published-schema sentences were added; the watching rules this code implements are unchanged.
  */
 export function watchTargets(paths: readonly string[]): Set<string> {
   const all = new Set(paths);
