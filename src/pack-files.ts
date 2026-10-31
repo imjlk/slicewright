@@ -5,6 +5,7 @@ import type { Finding, InspectOptions } from './inspect.js';
 import { axisTiles, type SliceLayout } from './layout.js';
 import { packFrames, type PackedFrame, type PackOptions, type PackPiece } from './pack.js';
 import { frameLayout, inspectAtlas, readAtlas, type AtlasReport } from './phaser.js';
+import { relativeUrl } from './output-paths.js';
 import { decodePng, encodePng } from './png.js';
 import { cropRaster } from './raster.js';
 import { fixedAxisNote, urlFromPath } from './targets/common.js';
@@ -236,9 +237,18 @@ function packedCss(
       });
       continue;
     }
+    const imageRef = relativeUrl(outDir, wholeImage);
+    if (imageRef === undefined) {
+      findings.push({
+        code: 'pack.css-skipped',
+        severity: 'warning',
+        message: `Frame "${piece.name}" has its image on another drive than the stylesheet, so it has no CSS class. Pack from the same drive.`,
+      });
+      continue;
+    }
     const result = exportForTarget('css', {
       name: piece.name,
-      imageRef: urlPath(relative(resolve(outDir), wholeImage)),
+      imageRef,
       raster: piece.raster,
       layout,
     });

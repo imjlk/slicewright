@@ -3,7 +3,7 @@ name: slicewright
 description: Make and check stretchable game UI art, and verify rendered HTML/CSS or Canvas UI with explicit targets and approved visual baselines. Use for nine-slice assets, slice insets, smeared or seamed UI, atlas frames, or browser UI regression checks with Slicewright and Playwright.
 license: MIT
 metadata:
-  compatibility: Requires Node.js 24 or newer and npm (runs the slicewright CLI through npx).
+  compatibility: Requires Node.js 22 or newer and npm (runs the slicewright CLI through npx).
 ---
 
 # slicewright
@@ -22,17 +22,20 @@ art. Keep the asset workflow below for tasks that actually involve UI images.
 
 ## Run the CLI
 
-slicewright needs Node.js 24 or newer; check with `node --version` first and
-ask the user to upgrade when it is older.
+slicewright needs Node.js 22 or newer. Node 22, 24 and later all work, so do
+not suggest an upgrade unless `node --version` reports a major version below 22.
 Every `slicewright <command>` in this skill and its references means
 `npx -y slicewright <command>`. Leave the version off: npx then runs the
 project's installed copy, at whatever version the project pins, and downloads
 the latest release only when the project has none. From a clone of the
 repository, run `pnpm install && pnpm build` once there, then use
 `node <clone>/dist/cli.js <command>` instead. Every command prints JSON on
-stdout; `inspect`, `frame`, `normalize`, `export`, and `atlas` exit 1 when a
-finding is an error (for `export`, a layout the target cannot represent), and
-every command exits 2 on bad input. `--help` works on each command.
+stdout; `inspect`, `compare`, `frame`, `atlas`, `normalize`, `export`,
+`pack`, and `build` exit 1 when a finding is an error (for `export`, a layout
+the target cannot represent), `browser-report` exits 1 for a failing report,
+and every command exits 2 on bad input. `prompt`, `preview`, `key`, `resize`,
+and `targets` never exit 1: read their JSON. Output folders are created as
+needed. `--help` works on each command and ends with examples.
 
 ## Workflow
 
@@ -78,7 +81,9 @@ every command exits 2 on bad input. `--help` works on each command.
    outline drawn at 1600 px is gone at 320 px (`resize.thin-lines`). Ask for line
    weights in proportion to the element ("an outline about 1/40 of the
    height") and check outlines in the preview. For pixel art, pick `--width`
-   so the factor is the generated pixel size, which keeps the grid even.
+   so the factor is the generated pixel size, which keeps the grid even, or
+   add `--pixel-art` to snap the grid first; when flat art reports
+   `pixel.grid-undetermined`, give the known scale with `--pixel-scale N`.
 5. **Read the findings** with the table in
    [references/findings.md](references/findings.md). Fix every `error`, and compare
    `minSize` with the smallest size the game uses (`insets.large` warns when
@@ -89,8 +94,9 @@ every command exits 2 on bad input. `--help` works on each command.
    art (scroll bar tracks), `--tile x` when an edge should repeat, and
    `--regions multi` when fixed detail sits in the middle of an edge (a crest
    on a title plate). A multi-region `normalize --keep` texture is too small
-   to re-detect: save the normalize JSON and pass it to `inspect`, `preview`,
-   or `export` with `--layout report.json`. Pass `--padding l,r,t,b` when the detected content
+   to re-detect: save the normalize JSON (every normalize report carries its
+   `layout`) and pass it to `inspect`, `preview`, `frame`, or `export` with
+   `--layout report.json`; their reports then say `"insetsSource": "layout"`. Pass `--padding l,r,t,b` when the detected content
    padding (where text fits inside the frame) is wrong.
 6. **Look at the preview.** `slicewright preview ui/panel.png --out
    sheet.png`, then open `sheet.png`. Cells, in order: flexible segments

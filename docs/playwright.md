@@ -11,7 +11,7 @@ npm install --save-dev slicewright @playwright/test playwright-core
 npx playwright install chromium firefox webkit
 ```
 
-Use Node 24 or newer. `@playwright/test` is optional: the core CLI/library and
+Use Node 22 or newer. `@playwright/test` is optional: the core CLI/library and
 `slicewright/browser` do not import the test runner. Assertions from this entry
 point require an active Playwright Test.
 

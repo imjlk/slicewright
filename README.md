@@ -38,22 +38,29 @@ the full loop.
 
 ## Use
 
-Node 24 or newer.
+Node 22 or newer.
 
 ```bash
-npx slicewright prompt --kind panel --style "hand-painted fantasy wood"
-npx slicewright key generated.png --out keyed.png
-npx slicewright normalize keyed.png --width 480 --out ui/panel.png --name panel --target phaser,css
-npx slicewright preview ui/panel.png --out panel-sheet.png
-npx slicewright atlas ui/panel.json
-npx slicewright pack ui/panel.json ui/button.json --out ui/ui.png --css
+npx -y slicewright prompt --kind panel --style "hand-painted fantasy wood"
+npx -y slicewright key generated.png --out keyed.png
+npx -y slicewright normalize keyed.png --width 480 --out ui/panel.png --name panel --target phaser,css
+npx -y slicewright preview ui/panel.png --out panel-sheet.png
+npx -y slicewright atlas ui/panel.json
+npx -y slicewright pack ui/panel.json ui/button.json --out ui/ui.png --css
 ```
 
-Run `npx slicewright --help` for every option. Install it in a project with
+Run `npx -y slicewright --help` for every command, and `--help` after a
+command for its options and examples. Output folders are created as needed. Install it in a project with
 `npm install --save-dev slicewright` to pin the version; the same functions are
 importable as a library (`import { inspectRaster } from 'slicewright'`).
 
 From a clone, follow [Development](#development), then `node dist/cli.js`.
+
+Every command prints JSON on stdout. Exit codes: 0 when the command ran and
+found no error; 1 when a finding is an error (`inspect`, `compare`, `frame`,
+`atlas`, `normalize`, `export`, `pack`, `build`, and `browser-report` for a
+failing report); 2 for bad arguments or unreadable input. `prompt`, `preview`,
+`key`, `resize`, and `targets` exit 0 or 2.
 
 ### Browser E2E verification
 
@@ -122,7 +129,7 @@ piece's PNG changes and prints one JSON line per build.
 
 slicewright ships an [Agent Skills](https://agentskills.io) skill in
 [`skills/slicewright`](skills/slicewright/SKILL.md). The skill runs the CLI
-through `npx`, so it needs Node 24 or newer but no npm install of its own.
+through `npx`, so it needs Node 22 or newer but no npm install of its own.
 
 **Any agent**, with the [`skills`](https://github.com/vercel-labs/skills) CLI
 (Node 22.20 or newer). It installs into `.agents/skills/`, which Codex, Cursor,
@@ -191,7 +198,7 @@ stretched, and tiled segments.
 | Three-slice | Ends fixed; stretches horizontally; height fixed | `--mode three`, or rows that never repeat |
 | Vertical three-slice | Ends fixed; stretches vertically; width fixed | `--mode three-vertical`, or columns that never repeat |
 | Tiled axis | A span repeats instead of stretching | `--tile x/y/xy`, or edges that repeat a pattern |
-| Multiple regions | Several stretch spans per axis around fixed detail | `--regions multi` (preview only; no target exports it yet). After `normalize --keep`, pass the report back with `--layout report.json` |
+| Multiple regions | Several stretch spans per axis around fixed detail | `--regions multi` (preview only; no target exports it yet). Save any `normalize` report and pass it back with `--layout report.json` |
 
 | Target | Nine | Three | Vertical three | Multi | Tiling |
 | --- | --- | --- | --- | --- | --- |
@@ -312,7 +319,7 @@ CI runs the checks, tests, build, packed browser scenarios, and engine renders o
 Linux and native Windows.
 The repository's `.gitattributes` keeps text files at LF even when Windows Git
 uses `core.autocrlf=true`; CRLF compiler input otherwise fails the format check.
-Use Node 24 or newer in the shell running pnpm, including PowerShell.
+Use Node 22 or newer in the shell running pnpm, including PowerShell.
 
 The first compiler invocation builds native plugins and can take several
 minutes. Under mise it uses the pinned Go toolchain; otherwise ttsc defaults to

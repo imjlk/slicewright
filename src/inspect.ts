@@ -61,6 +61,8 @@ export interface InspectOptions extends MatchOptions {
   readonly contentPadding?: SliceInsets;
   /** Look for the grid of upscaled pixel art. */
   readonly pixelArt?: boolean;
+  /** Known pixel-art scale; places the grid instead of searching and implies `pixelArt`. */
+  readonly pixelScale?: number;
   /**
    * Caller-supplied layout, such as the one normalize reports for a
    * multi-region rebuild; verified instead of detected.
@@ -79,7 +81,8 @@ export interface InspectReport {
   readonly width: number;
   readonly height: number;
   readonly mode: SliceMode;
-  readonly insetsSource: 'detected' | 'given';
+  /** `layout` when a whole layout was given, `given` for given insets. */
+  readonly insetsSource: 'detected' | 'given' | 'layout';
   /** Insets of the layout; for a multi-region layout, its outermost flexible lines. */
   readonly insets: SliceInsets;
   readonly scale9Borders: Scale9Borders;
@@ -149,8 +152,9 @@ export function inspectRaster(
     findings.push(...marginFindings(raster, bounds));
     findings.push(...chromaSpillFindings(raster));
     findings.push(...interiorAlphaFindings(raster, bounds));
-    if (options.pixelArt === true) {
-      findings.push(...pixelGridFindings(detectPixelGrid(raster, bounds)));
+    if (options.pixelArt === true || options.pixelScale !== undefined) {
+      const given = options.pixelScale === undefined ? {} : { scale: options.pixelScale };
+      findings.push(...pixelGridFindings(detectPixelGrid(raster, bounds, given)));
     }
   }
 
@@ -200,7 +204,8 @@ export function inspectRaster(
     width: raster.width,
     height: raster.height,
     mode,
-    insetsSource: options.insets === undefined ? 'detected' : 'given',
+    insetsSource:
+      options.layout !== undefined ? 'layout' : options.insets === undefined ? 'detected' : 'given',
     insets,
     scale9Borders: insetsToScale9Borders(insets, raster.width, raster.height),
     layout: finalLayout,
@@ -376,7 +381,7 @@ export function pickAxisSpan(
  * @evidence docs/spec.md#vertical-three-slice Keeps the width when columns never match but rows do, or when the mode asks for it.
  * @evidenceReview docs/spec.md#vertical-three-slice #072e9af Checked this code against the section line by line and ran detectsVerticalThreeSlices green with pnpm test.
  * @evidence docs/spec.md#multiple-stretch-regions Builds a multi-region layout when asked and an axis has more than one long run.
- * @evidenceReview docs/spec.md#multiple-stretch-regions #d16fdde Checked this code against the section line by line and ran detectsMultipleRegions green with pnpm test.
+ * @evidenceReview docs/spec.md#multiple-stretch-regions #00b2534 Re-read the section after the normalize-reports-layout and insetsSource edit, checked this code against it, and ran readsBackMultiRegionLayouts green with pnpm test.
  */
 export function detectLayout(
   raster: Raster,
@@ -470,7 +475,7 @@ export function detectLayout(
  * only when an axis has more than one such run and does not tile.
  *
  * @evidence docs/spec.md#multiple-stretch-regions Keeps every long uniform run as a stretch segment, leaves tiled axes single, and records the counts.
- * @evidenceReview docs/spec.md#multiple-stretch-regions #d16fdde Checked this code against the section line by line and ran detectsMultipleRegions green with pnpm test.
+ * @evidenceReview docs/spec.md#multiple-stretch-regions #00b2534 Re-read the section after the normalize-reports-layout and insetsSource edit, checked this code against it, and ran readsBackMultiRegionLayouts green with pnpm test.
  */
 export function multiRegionLayout(
   raster: Raster,
@@ -528,7 +533,7 @@ export function multiRegionLayout(
  * stretch segment must be uniform.
  *
  * @evidence docs/spec.md#multiple-stretch-regions Verifies a given layout against the image size and the uniformity of each stretch segment instead of detecting one.
- * @evidenceReview docs/spec.md#multiple-stretch-regions #d16fdde Checked the layout-file paragraph against this code and ran readsBackMultiRegionLayouts green with pnpm test.
+ * @evidenceReview docs/spec.md#multiple-stretch-regions #00b2534 Re-read the section after the normalize-reports-layout and insetsSource edit, checked this code against it, and ran readsBackMultiRegionLayouts green with pnpm test.
  */
 export function verifyGivenLayout(
   raster: Raster,
