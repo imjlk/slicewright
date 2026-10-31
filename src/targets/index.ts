@@ -65,7 +65,7 @@ export function exportForTarget(id: string, input: ExportInput): ExportResult {
   if (contentProblem !== undefined) {
     throw new RangeError(contentProblem);
   }
-  const findings: Finding[] = capabilityFindings(target, input.layout);
+  const findings: Finding[] = capabilityFindings(target, input.layout, input);
   if (findings.some((finding) => finding.severity === 'error')) {
     return { target: id, files: [], usage: '', findings };
   }

@@ -27,19 +27,48 @@ const stretchMode = (axis: AxisLayout): number => (axisTiles(axis) ? 2 : 0);
  * count than the layout's rounding down.
  *
  * @evidence docs/spec.md#experimental-targets Warns that Godot's tile fit may pick another tile count.
- * @evidenceReview docs/spec.md#experimental-targets #de67bfb Checked this code against the section line by line and ran exportsExperimentalTargets green with pnpm test.
+ * @evidenceReview docs/spec.md#experimental-targets #6ad4f5b Re-read the section after adding the target.image-ref paragraph, checked this code against it, and ran exportsExperimentalTargets green with pnpm test.
  */
-export function checkGodotLayout(layout: SliceLayout): Finding[] {
-  return axisTiles(layout.x) || axisTiles(layout.y)
-    ? [
-        {
-          code: 'target.tile',
-          severity: 'warning',
-          message:
-            "Godot's tile fit scales the tiles so whole ones fit, which may show another tile count than the layout's rounding down.",
-        },
-      ]
-    : [];
+export function checkGodotLayout(layout: SliceLayout, input?: ExportInput): Finding[] {
+  const findings: Finding[] =
+    axisTiles(layout.x) || axisTiles(layout.y)
+      ? [
+          {
+            code: 'target.tile',
+            severity: 'warning',
+            message:
+              "Godot's tile fit scales the tiles so whole ones fit, which may show another tile count than the layout's rounding down.",
+          },
+        ]
+      : [];
+  const path = input === undefined ? undefined : godotTexturePath(input);
+  if (path !== undefined && !insideProject(path)) {
+    findings.push({
+      code: 'target.image-ref',
+      severity: 'warning',
+      message: `The texture path ${path} leaves the Godot project, which res:// cannot address. Run from the project root or pass --image-ref res://… with the image's project path.`,
+      details: { path },
+    });
+  }
+  return findings;
+}
+
+/**
+ * The `res://` path the resource loads: the image reference when it starts
+ * with `res://`, else `res://` plus the image's path from the working
+ * directory, taken as the project root.
+ */
+function godotTexturePath({ imageRef, loaderPaths }: ExportInput): string {
+  // res:// is the project root: take the image's path from where the CLI runs, not from the .tres.
+  return imageRef.startsWith('res://')
+    ? imageRef
+    : `res://${(loaderPaths?.image ?? imageRef).replace(/^\.\//, '')}`;
+}
+
+/** Whether a res:// path stays inside the project: no `..` segment, drive, or absolute path. */
+function insideProject(path: string): boolean {
+  const rest = path.slice('res://'.length);
+  return !rest.startsWith('/') && !/^[A-Za-z]:/.test(rest) && !rest.split(/[\\/]/).includes('..');
 }
 
 /**
@@ -50,22 +79,15 @@ export function checkGodotLayout(layout: SliceLayout): Finding[] {
  * from the working directory, taken as the project root.
  *
  * @evidence docs/spec.md#experimental-targets Writes the StyleBoxTexture .tres with margins and stretch modes and prints NinePatchRect properties.
- * @evidenceReview docs/spec.md#experimental-targets #de67bfb Checked this code against the section line by line and ran exportsExperimentalTargets green with pnpm test.
+ * @evidenceReview docs/spec.md#experimental-targets #6ad4f5b Re-read the section after adding the target.image-ref paragraph, checked this code against it, and ran exportsExperimentalTargets green with pnpm test.
  */
-export function exportGodot({
-  name,
-  imageRef,
-  layout,
-  loaderPaths,
-}: ExportInput): Omit<ExportResult, 'target' | 'findings'> {
+export function exportGodot(input: ExportInput): Omit<ExportResult, 'target' | 'findings'> {
+  const { name, layout } = input;
   const { left, right, top, bottom } = exportInsets(layout);
   const padding = layout.content;
   const horizontal = stretchMode(layout.x);
   const vertical = stretchMode(layout.y);
-  // res:// is the project root: take the image's path from where the CLI runs, not from the .tres.
-  const path = imageRef.startsWith('res://')
-    ? imageRef
-    : `res://${(loaderPaths?.image ?? imageRef).replace(/^\.\//, '')}`;
+  const path = godotTexturePath(input);
   const tres = [
     '[gd_resource type="StyleBoxTexture" load_steps=2 format=3]',
     '',

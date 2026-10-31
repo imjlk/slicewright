@@ -1,5 +1,5 @@
-import { lstat, readFile, writeFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { lstat, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { dirname, join, resolve } from 'node:path';
 
 import typia from 'typia';
 
@@ -47,6 +47,7 @@ export async function writeBrowserReportHtml(
   output: string,
 ): Promise<{ readonly path: string; readonly ok: boolean }> {
   const source = resolve(directory);
+  await requireArtifactDirectory(source, directory);
   const report = typia.assert<SavedReport>(
     JSON.parse((await artifact(source, 'report.json')).toString('utf8')),
   );
@@ -79,8 +80,25 @@ export async function writeBrowserReportHtml(
     }
   }
   const path = resolve(output);
+  await mkdir(dirname(path), { recursive: true });
   await writeFile(path, viewerHtml({ report, images }), { flag: 'wx' });
   return { path, ok: report.ok && report.assertion === undefined };
+}
+
+/** Names what to pass instead when the directory is missing or holds no report. */
+async function requireArtifactDirectory(source: string, given: string): Promise<void> {
+  const hint =
+    'pass the failure artifact directory that writeBrowserArtifacts or a failed Playwright assertion wrote (it holds report.json and actual.png).';
+  const stats = await stat(source).catch(() => undefined);
+  if (stats === undefined) {
+    throw new TypeError(`${given} does not exist; ${hint}`);
+  }
+  if (!stats.isDirectory()) {
+    throw new TypeError(`${given} is not a directory; ${hint}`);
+  }
+  if ((await lstat(join(source, 'report.json')).catch(() => undefined)) === undefined) {
+    throw new TypeError(`${given} has no report.json; ${hint}`);
+  }
 }
 
 async function artifact(directory: string, name: string): Promise<Buffer> {

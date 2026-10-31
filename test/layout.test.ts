@@ -210,7 +210,7 @@ export function detectsVerticalThreeSlices(): void {
 
 /**
  * @evidence docs/spec.md#multiple-stretch-regions Splits the top edge around a crest only when multiple regions are asked for.
- * @evidenceReview docs/spec.md#multiple-stretch-regions #d16fdde Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#multiple-stretch-regions #00b2534 Re-read the section after the normalize-reports-layout and insetsSource edit, checked the assertions against it, and ran this test green with pnpm test.
  */
 export function detectsMultipleRegions(): void {
   const art = crestPanel(96, 40);
@@ -367,7 +367,7 @@ void test('vertical three-slice', detectsVerticalThreeSlices);
 void test('multiple stretch regions', detectsMultipleRegions);
 /**
  * @evidence docs/spec.md#multiple-stretch-regions Reads back the layout normalization reports for a rebuilt multi-region texture, and rejects one of another size or over detail.
- * @evidenceReview docs/spec.md#multiple-stretch-regions #d16fdde Checked the assertions against the layout-file paragraph and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#multiple-stretch-regions #00b2534 Re-read the section after the normalize-reports-layout and insetsSource edit, checked the assertions against it, and ran this test green with pnpm test.
  */
 export function readsBackMultiRegionLayouts(): void {
   const art = crestPanel(240, 100);
@@ -383,6 +383,7 @@ export function readsBackMultiRegionLayouts(): void {
   const given = inspectRaster(normalized.raster, { ...defaultInspectOptions, layout });
   ok(given.ok, JSON.stringify(given.findings));
   strictEqual(given.mode, 'multi');
+  strictEqual(given.insetsSource, 'layout');
   deepStrictEqual(given.layout.x, layout.x);
   deepStrictEqual(given.layout.y, layout.y);
   // Its content padding is kept as given, not detected again.

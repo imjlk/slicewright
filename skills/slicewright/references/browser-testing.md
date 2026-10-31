@@ -16,13 +16,27 @@ observations and cannot predict an animation that starts later. Compare both the
 painted result and the relevant content/text/state expectations.
 
 ```ts
+import { test } from '@playwright/test';
+import { domTarget } from 'slicewright/browser';
 import { expect } from 'slicewright/playwright';
 
-await action.click();
-await expect(panel).toBeStableUI({ duration: 300 });
-await expect(panel).toMatchUIBaseline('quest-collected.slicewright.json', {
-  environment: approvedEnvironment,
-  checks: { contentFits: true, text: { status: 'Letter collected!' } },
+// The approved rendering assumptions this project controls.
+const approvedEnvironment = 'chromium-1280x720-dpr1-noto-sans';
+
+test('collecting the letter updates the quest panel', async ({ page }) => {
+  await page.goto('/quest');
+  const panel = domTarget(page, {
+    root: page.getByTestId('quest-panel'),
+    contentBox: page.getByTestId('quest-panel-content'),
+    content: { status: page.getByTestId('quest-status') },
+  });
+
+  await page.getByRole('button', { name: 'Collect letter' }).click();
+  await expect(panel).toBeStableUI({ duration: 300 });
+  await expect(panel).toMatchUIBaseline('quest-collected.slicewright.json', {
+    environment: approvedEnvironment,
+    checks: { contentFits: true, text: { status: 'Letter collected!' } },
+  });
 });
 ```
 
