@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import { cli, define } from 'gunshi';
@@ -26,6 +26,7 @@ import { defaultPackOptions } from './pack.js';
 import { inspectAtlas } from './phaser.js';
 import { inspectAsepriteSlices, isAsepriteSheet } from './aseprite.js';
 import { decodePng, encodePng } from './png.js';
+import { relativeUrl, writeOutputFile } from './output-paths.js';
 import { buildPromptPlan, promptBackgrounds, uiKinds } from './prompt.js';
 import { cropRaster, type Raster } from './raster.js';
 import {
@@ -95,11 +96,11 @@ const sliceArgs = {
   },
   layout: {
     type: 'string',
-    description: 'Verify SliceLayout JSON or a report containing layout; single-region normalize reports use --insets and any --mode, --tile, or --padding options',
+    description: 'Verify this SliceLayout JSON, or a report with a layout such as normalize prints, instead of detecting',
   },
   'pixel-art': {
     type: 'boolean',
-    description: 'Find the grid of upscaled pixel art; normalize snaps to it and resizes nearest',
+    description: 'Find the grid of upscaled pixel art and report detail off the grid',
   },
   ...matchArgs,
 } as const;
@@ -137,6 +138,9 @@ interface SliceValues {
 const prompt = define({
   name: 'prompt',
   description: 'Plan a generation prompt for stretchable UI art',
+  examples: `# Plan a prompt, then one that corrects the last attempt's findings
+slicewright prompt --kind panel --style "hand-painted fantasy wood"
+slicewright prompt --kind panel --style "hand-painted fantasy wood" --from report.json`,
   args: {
     // Checked in run, so a missing one gets a clear message even with --from.
     kind: { type: 'enum', choices: uiKinds, description: `UI element kind (required): ${uiKinds.join(', ')}` },
@@ -188,6 +192,9 @@ const prompt = define({
 const inspect = define({
   name: 'inspect',
   description: 'Detect or check slice insets and report what breaks when stretched',
+  examples: `slicewright inspect panel.png
+slicewright inspect bar.png --mode three
+slicewright inspect panel.png --insets 12,12,10,10`,
   args: {
     input: image,
     watch: {
@@ -215,6 +222,8 @@ const inspect = define({
 const compare = define({
   name: 'compare',
   description: 'Check that the states of one element, or the pieces of a matching set, agree',
+  examples: `slicewright compare button-normal.png button-hover.png button-pressed.png
+slicewright compare dialog.png button.png bar.png --kind set`,
   args: {
     inputs: {
       type: 'positional',
@@ -285,6 +294,8 @@ const compare = define({
 const preview = define({
   name: 'preview',
   description: 'Render the art at several stretched sizes on one PNG',
+  examples: `slicewright preview panel.png --out previews/panel-sheet.png
+slicewright preview bar.png --out previews/bar-sheet.png --mode three --zoom 2`,
   args: {
     input: image,
     out: { type: 'string', required: true, description: 'Preview sheet PNG to write' },
@@ -318,7 +329,7 @@ const preview = define({
         ...options,
         findings: report.findings,
       });
-      writeFileSync(ctx.values.out, encodePng(sheet.raster));
+      writeOutputFile(ctx.values.out, encodePng(sheet.raster));
       return {
         // A preview is written whatever the findings, so only an error fails it.
         status: 'ok',
@@ -346,6 +357,7 @@ const preview = define({
 const frame = define({
   name: 'frame',
   description: 'Write a one-frame Phaser JSON Hash atlas with scale9Borders',
+  examples: `slicewright frame panel.png --name panel --out ui/panel.json`,
   args: {
     input: image,
     name: { type: 'string', required: true, description: 'Frame name' },
@@ -382,6 +394,8 @@ const atlas = define({
   name: 'atlas',
   description:
     'Check the nine-slice frames of a Phaser JSON Hash or JSON Array atlas, or the slices of an Aseprite sheet',
+  examples: `slicewright atlas ui/panel.json
+slicewright atlas sheet.json --slice dialog`,
   args: {
     input: { type: 'positional', description: 'Atlas JSON' },
     image: { type: 'string', description: 'Atlas image; defaults to meta.image' },
@@ -424,6 +438,8 @@ const atlas = define({
 const key = define({
   name: 'key',
   description: 'Remove a green or magenta background and despill the edge',
+  examples: `slicewright key generated.png --out keyed.png
+slicewright key generated.png --out keyed.png --key magenta`,
   args: {
     input: image,
     out: { type: 'string', required: true, description: 'Keyed PNG to write' },
@@ -456,7 +472,7 @@ const key = define({
       drop: ctx.values.drop,
       despillRadius: ctx.values['despill-radius'],
     });
-    writeFileSync(ctx.values.out, encodePng(result.raster));
+    writeOutputFile(ctx.values.out, encodePng(result.raster));
     const { raster: _raster, ...stats } = result;
     print({ image: ctx.values.input, out: ctx.values.out, ...stats });
   },
@@ -465,6 +481,8 @@ const key = define({
 const resize = define({
   name: 'resize',
   description: 'Resize art to its in-game size',
+  examples: `slicewright resize keyed.png --out ui/panel.png --width 480 --crop
+slicewright resize tail.png --out ui/tail.png --match-outline ui/bubble.png`,
   args: {
     input: image,
     out: { type: 'string', required: true, description: 'Resized PNG to write' },
@@ -505,7 +523,7 @@ const resize = define({
     // Faint pixels kept by the first crop can average to nothing, as in normalize.
     const recrop = crop ? contentBounds(scaled) : undefined;
     const resized = recrop === undefined ? scaled : cropRaster(scaled, recrop);
-    writeFileSync(ctx.values.out, encodePng(resized));
+    writeOutputFile(ctx.values.out, encodePng(resized));
     print({
       image: ctx.values.input,
       out: ctx.values.out,
@@ -526,6 +544,9 @@ function round2(value: number): number {
 const normalize = define({
   name: 'normalize',
   description: 'Crop, resize, pick insets at the final size, and optionally rebuild a minimal texture',
+  examples: `slicewright normalize keyed.png --out ui/panel.png --width 480
+slicewright normalize keyed.png --out ui/panel.png --width 480 --target phaser,css
+slicewright normalize sprite.png --out ui/sprite.png --pixel-art --keep 4`,
   args: {
     input: image,
     out: { type: 'string', required: true, description: 'Normalized PNG to write' },
@@ -533,7 +554,11 @@ const normalize = define({
       type: 'number',
       description: 'Rebuild keeping this many pixels of each uniform stretch span',
     },
-    'no-crop': { type: 'boolean', description: 'Keep transparent margins' },
+    crop: {
+      type: 'boolean',
+      negatable: true,
+      description: 'Crop transparent margins first (the default); --no-crop keeps them',
+    },
     atlas: { type: 'string', description: 'Also write a one-frame atlas JSON here' },
     name: {
       type: 'string',
@@ -549,6 +574,10 @@ const normalize = define({
     },
     ...sizeArgs,
     ...sliceArgs,
+    'pixel-art': {
+      type: 'boolean',
+      description: 'Find the grid of upscaled pixel art, snap the size to it, and resize nearest',
+    },
   },
   run: (ctx) => {
     const { input, out } = ctx.values;
@@ -557,17 +586,21 @@ const normalize = define({
     const assetName = ctx.values.name ?? basename(out).replace(/\.png$/i, '');
     if (targetIds.length > 0) {
       insideDirectory(dirname(out), assetName);
+      imageReference(dirname(out), out, ctx.values['image-ref']);
+    }
+    if (ctx.values.atlas !== undefined) {
+      imageReference(dirname(ctx.values.atlas), out, ctx.values['image-ref']);
     }
     const source = readPng(input);
     const result = normalizeRaster(source, {
       inspect: inspectOptions(ctx.values, undefined),
-      crop: ctx.values['no-crop'] !== true,
+      crop: ctx.values.crop !== false,
       filter: ctx.values.filter,
       ...sizeRequest(ctx.values),
       ...(ctx.values.keep === undefined ? {} : { keep: ctx.values.keep }),
       pixelArt: ctx.values['pixel-art'] === true,
     });
-    writeFileSync(out, encodePng(result.raster));
+    writeOutputFile(out, encodePng(result.raster));
     let atlasOut: string | undefined;
     let atlasFindings: readonly Finding[] = [];
     let atlasOk = true;
@@ -601,8 +634,8 @@ const normalize = define({
       ...(atlasFindings.length === 0 ? {} : { atlasFindings }),
       steps: result.steps,
       ...summary(result.report),
-      // Several regions per axis have no insets form; this is what --layout reads back.
-      ...(result.report.mode === 'multi' ? { layout: result.report.layout } : {}),
+      // What --layout reads back; several regions per axis have no insets form.
+      layout: result.report.layout,
       ...(exports.length === 0 ? {} : { exports }),
     });
     failOnErrors(result.report.ok && atlasOk && exports.every((item) => item.ok));
@@ -612,6 +645,7 @@ const normalize = define({
 const pack = define({
   name: 'pack',
   description: 'Pack the frames of several atlases into one image and JSON Hash atlas',
+  examples: `slicewright pack ui/panel.json ui/button.json --out ui/ui.png --css`,
   args: {
     inputs: {
       type: 'positional',
@@ -662,9 +696,8 @@ const pack = define({
       // Loader calls resolve from where the game is served; assume the working directory.
       servedFrom: process.cwd(),
     });
-    mkdirSync(outDir, { recursive: true });
     for (const file of result.files) {
-      writeFileSync(file.path, file.contents);
+      writeOutputFile(file.path, file.contents);
     }
     print({
       inputs: ctx.values.inputs,
@@ -688,6 +721,8 @@ const pack = define({
 const build = define({
   name: 'build',
   description: 'Normalize, export, and pack every piece a manifest lists',
+  examples: `slicewright build ui.build.json
+slicewright build ui.build.json --watch`,
   args: {
     manifest: { type: 'positional', description: 'Build manifest JSON' },
     watch: {
@@ -754,6 +789,7 @@ function buildManifest(path: string): BuildManifest {
 const browserReport = define({
   name: 'browser-report',
   description: 'Create an offline HTML viewer from browser artifacts',
+  examples: `slicewright browser-report test-results/panel/slicewright-panel --out reports/panel.html`,
   args: {
     input: { type: 'positional', required: true, description: 'Artifact directory' },
     out: { type: 'string', required: true, description: 'New HTML output file (must not exist)' },
@@ -783,6 +819,7 @@ const targets = define({
 const exportCommand = define({
   name: 'export',
   description: 'Export the slice layout for one or more engine targets',
+  examples: `slicewright export ui/panel.png --target unity,godot --out-dir exports`,
   args: {
     input: image,
     target: {
@@ -831,10 +868,9 @@ function phaserAtlas(options: {
   readonly layout: SliceLayout;
 }): { ok: boolean; atlas: unknown; findings: readonly Finding[] } {
   const imageRef =
-    options.imageRef ??
-    (options.atlasPath === undefined
-      ? basename(options.imagePath)
-      : urlPath(relative(dirname(resolve(options.atlasPath)), resolve(options.imagePath))));
+    options.atlasPath === undefined
+      ? (options.imageRef ?? basename(options.imagePath))
+      : imageReference(dirname(options.atlasPath), options.imagePath, options.imageRef);
   const result = exportForTarget('phaser', {
     name: options.name,
     imageRef,
@@ -847,7 +883,7 @@ function phaserAtlas(options: {
     return { ok: false, atlas: undefined, findings: result.findings };
   }
   if (options.atlasPath !== undefined) {
-    writeFileSync(options.atlasPath, contents);
+    writeOutputFile(options.atlasPath, contents);
   }
   return {
     ok,
@@ -856,9 +892,22 @@ function phaserAtlas(options: {
   };
 }
 
-/** A path as a URL-style reference: forward slashes on every platform. */
-function urlPath(path: string): string {
-  return path.split(sep).join('/').replace(/\\/g, '/');
+/**
+ * How a file written in `directory` refers to the image: the given reference,
+ * else the image's path from there. Two Windows drives have no relative path,
+ * so that needs a given reference.
+ */
+function imageReference(directory: string, imagePath: string, given: string | undefined): string {
+  if (given !== undefined) {
+    return given;
+  }
+  const path = relativeUrl(directory, imagePath);
+  if (path === undefined) {
+    throw new UsageError(
+      `${imagePath} has no relative path from ${directory} (another drive); pass --image-ref with the path the engine should load.`,
+    );
+  }
+  return path || basename(imagePath);
 }
 
 /**
@@ -914,25 +963,23 @@ function writeExport(
     readonly layout: SliceLayout;
   },
 ): { target: string; ok: boolean; files: string[]; usage: string; findings: readonly Finding[] } {
-  mkdirSync(options.outDir, { recursive: true });
-  const imageRef =
-    options.imageRef ??
-    (urlPath(relative(resolve(options.outDir), resolve(options.imagePath))) ||
-      basename(options.imagePath));
+  const imageRef = imageReference(options.outDir, options.imagePath, options.imageRef);
+  // Loader calls resolve from where the game is served; assume the working directory.
+  const loaderImage = relativeUrl(process.cwd(), options.imagePath);
+  const loaderDirectory = relativeUrl(process.cwd(), options.outDir);
   const result = exportForTarget(id, {
     name: options.name,
     imageRef,
     raster: options.raster,
     layout: options.layout,
-    // Loader calls resolve from where the game is served; assume the working directory.
-    loaderPaths: {
-      image: urlPath(relative(process.cwd(), resolve(options.imagePath))),
-      directory: urlPath(relative(process.cwd(), resolve(options.outDir))),
-    },
+    // On another drive there is no loader-relative path; targets fall back to the reference.
+    ...(loaderImage === undefined || loaderDirectory === undefined
+      ? {}
+      : { loaderPaths: { image: loaderImage, directory: loaderDirectory } }),
   });
   const files = result.files.map((file) => {
     const path = insideDirectory(options.outDir, file.path);
-    writeFileSync(path, file.contents);
+    writeOutputFile(path, file.contents);
     return path;
   });
   return {

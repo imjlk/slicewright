@@ -30,9 +30,12 @@ project's installed copy, at whatever version the project pins, and downloads
 the latest release only when the project has none. From a clone of the
 repository, run `pnpm install && pnpm build` once there, then use
 `node <clone>/dist/cli.js <command>` instead. Every command prints JSON on
-stdout; `inspect`, `frame`, `normalize`, `export`, and `atlas` exit 1 when a
-finding is an error (for `export`, a layout the target cannot represent), and
-every command exits 2 on bad input. `--help` works on each command.
+stdout; `inspect`, `compare`, `frame`, `atlas`, `normalize`, `export`,
+`pack`, and `build` exit 1 when a finding is an error (for `export`, a layout
+the target cannot represent), `browser-report` exits 1 for a failing report,
+and every command exits 2 on bad input. `prompt`, `preview`, `key`, `resize`,
+and `targets` never exit 1: read their JSON. Output folders are created as
+needed. `--help` works on each command and ends with examples.
 
 ## Workflow
 
@@ -89,8 +92,9 @@ every command exits 2 on bad input. `--help` works on each command.
    art (scroll bar tracks), `--tile x` when an edge should repeat, and
    `--regions multi` when fixed detail sits in the middle of an edge (a crest
    on a title plate). A multi-region `normalize --keep` texture is too small
-   to re-detect: save the normalize JSON and pass it to `inspect`, `preview`,
-   or `export` with `--layout report.json`. Pass `--padding l,r,t,b` when the detected content
+   to re-detect: save the normalize JSON (every normalize report carries its
+   `layout`) and pass it to `inspect`, `preview`, `frame`, or `export` with
+   `--layout report.json`; their reports then say `"insetsSource": "layout"`. Pass `--padding l,r,t,b` when the detected content
    padding (where text fits inside the frame) is wrong.
 6. **Look at the preview.** `slicewright preview ui/panel.png --out
    sheet.png`, then open `sheet.png`. Cells, in order: flexible segments
