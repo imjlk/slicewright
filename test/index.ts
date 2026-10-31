@@ -18,4 +18,5 @@ import './browser-baseline.test.js';
 import './browser-report.test.js';
 import './browser-pixels.test.js';
 import './browser-stability.test.js';
+import './node-support.test.js';
 import './output-paths.test.js';

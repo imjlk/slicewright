@@ -1,7 +1,7 @@
 # Browser regression checks
 
 Use Slicewright's optional browser APIs for rendered HTML/CSS, Canvas or a custom
-browser target. Node 24+ and the project's installed Playwright browser engines
+browser target. Node 22+ and the project's installed Playwright browser engines
 are required. `toMatchUIBaseline` requires Slicewright 0.5+; older installations
 can explicitly load a baseline and pass it to `toMatchUI`.
 
