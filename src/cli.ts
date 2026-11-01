@@ -1,13 +1,18 @@
 #!/usr/bin/env node
-import { readFileSync, realpathSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { cli, define } from 'gunshi';
+import { cli, define, type CommandContext } from 'gunshi';
+import { getAgentProfile } from 'gunshi/agent';
+import { renderUsage } from 'gunshi/renderer';
 
+import { agentMode, conciseHelp, plain } from './agent-mode.js';
 import { writeBrowserReportHtml } from './browser-report.js';
 import { aliasedValue, joinNegativeNumbers } from './argv.js';
-import { friendlyCliErrors } from './friendly-errors.js';
+import { tidyUsage } from './help.js';
+import { describeCommands, type ExitCode } from './command-catalog.js';
+import { didYouMean, friendlyCliErrors, missingFile } from './friendly-errors.js';
 import { defaultChromaOptions, removeChroma } from './chroma.js';
 import { compareSet, defaultCompareSlack } from './compare.js';
 import {
@@ -22,7 +27,7 @@ import { normalizeRaster } from './normalize.js';
 import { outlineThickness } from './outline.js';
 import { readLayoutJson, type SliceLayout } from './layout.js';
 import { buildPack } from './pack-files.js';
-import { loadBuildManifest, runBuild, type BuildManifest } from './build.js';
+import { loadBuildManifest, relativeBuildReport, runBuild, type BuildManifest } from './build.js';
 import { watchBuild, watchRuns, type WatchRun, type WatchStatus } from './watch.js';
 import { defaultPackOptions } from './pack.js';
 import { inspectAtlas } from './phaser.js';
@@ -172,7 +177,9 @@ slicewright prompt --kind panel --style "hand-painted fantasy wood" --from repor
         .filter(Boolean)
         .join(' and ');
       throw new UsageError(
-        `prompt needs ${missing}, also with --from: the correction is added to a new plan for that kind (${uiKinds.join(', ')}) and style.`,
+        ctx.values.from === undefined
+          ? `prompt needs ${missing}: the kind of element (${uiKinds.join(', ')}) and its art direction.`
+          : `prompt needs ${missing}, also with --from: the correction is added to a new plan for that kind (${uiKinds.join(', ')}) and style.`,
       );
     }
     const plan = buildPromptPlan({
@@ -418,7 +425,13 @@ slicewright atlas sheet.json --slice dialog`,
   run: (ctx) => {
     const path = ctx.values.input;
     const json: unknown = JSON.parse(readFileSync(path, 'utf8'));
-    const imagePath = ctx.values.image ?? resolve(dirname(path), atlasImage(json, path));
+    // Shown as the atlas path was given, like every other command's paths.
+    const imagePath = ctx.values.image ?? atlasImagePath(path, atlasImage(json, path));
+    if (ctx.values.image === undefined && !existsSync(imagePath)) {
+      throw new UsageError(
+        `${imagePath} does not exist; ${path} names it as meta.image. Pass --image for another file.`,
+      );
+    }
     if (isAsepriteSheet(json)) {
       if (ctx.values.frame !== undefined) {
         throw new UsageError('--frame checks a Phaser atlas; pick an Aseprite slice with --slice.');
@@ -480,10 +493,26 @@ slicewright key generated.png --out keyed.png --key magenta`,
     },
   },
   run: (ctx) => {
+    const keep = aliasedValue<number>(ctx, 'keep', 'keep-below');
+    const drop = aliasedValue<number>(ctx, 'drop', 'drop-above');
+    // Name the thresholds as they were typed.
+    // Name each flag as it was typed; one not typed follows the other's naming.
+    const longNames =
+      ctx.explicit['keep-below'] === true ||
+      (ctx.explicit['drop-above'] === true && ctx.explicit.keep !== true);
+    const keepFlag =
+      ctx.explicit['keep-below'] === true || (longNames && ctx.explicit.keep !== true) ? '--keep-below' : '--keep';
+    const dropFlag =
+      ctx.explicit['drop-above'] === true || (longNames && ctx.explicit.drop !== true) ? '--drop-above' : '--drop';
+    if (!(keep >= 0 && drop > keep && drop <= 255)) {
+      throw new UsageError(
+        `${keepFlag} must be at least 0 and below ${dropFlag}, and ${dropFlag} at most 255; got ${keepFlag} ${keep} and ${dropFlag} ${drop}.`,
+      );
+    }
     const result = removeChroma(readPng(ctx.values.input), {
       key: ctx.values.key,
-      keep: aliasedValue<number>(ctx, 'keep', 'keep-below'),
-      drop: aliasedValue<number>(ctx, 'drop', 'drop-above'),
+      keep,
+      drop,
       despillRadius: ctx.values['despill-radius'],
     });
     writeOutputFile(ctx.values.out, encodePng(result.raster));
@@ -564,29 +593,29 @@ slicewright normalize sprite.png --out ui/sprite.png --pixel-art --keep 4`,
   args: {
     input: image,
     out: { type: 'string', required: true, description: 'Normalized PNG to write' },
+    ...sizeArgs,
+    crop: {
+      type: 'boolean',
+      negatable: true,
+      description: 'Crop transparent margins first (on by default)',
+    },
     keep: {
       type: 'number',
       description: 'Rebuild keeping this many pixels of each uniform stretch span',
     },
-    crop: {
-      type: 'boolean',
-      negatable: true,
-      description: 'Crop transparent margins first (the default); --no-crop keeps them',
+    target: {
+      type: 'string',
+      description: `Also export for these targets, comma separated: ${Object.keys(sliceTargets).join(', ')}`,
     },
     atlas: { type: 'string', description: 'Also write a one-frame atlas JSON here' },
     name: {
       type: 'string',
       description: 'Asset name for --atlas and --target; defaults to the file name',
     },
-    target: {
-      type: 'string',
-      description: `Also export for these targets, comma separated: ${Object.keys(sliceTargets).join(', ')}`,
-    },
     'image-ref': {
       type: 'string',
       description: 'How --target files refer to the image; defaults to its path from the output',
     },
-    ...sizeArgs,
     ...sliceArgs,
     'pixel-art': {
       type: 'boolean',
@@ -753,7 +782,7 @@ slicewright build ui.build.json --watch`,
     const baseDir = dirname(resolve(path));
     if (ctx.values.watch !== true) {
       const report = runBuild(buildManifest(path), baseDir, process.cwd(), [path]);
-      print({ manifest: path, ...report });
+      print({ manifest: path, ...relativeBuildReport(report, baseDir) });
       failOnErrors(report.ok);
       return;
     }
@@ -797,6 +826,9 @@ function buildManifest(path: string): BuildManifest {
   try {
     return loadBuildManifest(path);
   } catch (error) {
+    if (missingFile(error) !== undefined) {
+      throw new UsageError(`${path} does not exist.`);
+    }
     throw new UsageError(`${path}: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
@@ -819,14 +851,49 @@ const browserReport = define({
 const targets = define({
   name: 'targets',
   description: 'List export targets and what each can represent',
+  examples: `slicewright targets`,
   run: () => {
-    print(
-      Object.values(sliceTargets).map(({ id, label, status, capabilities }) => ({
+    // An object like every other command's output, so fields can be added.
+    print({
+      targets: Object.values(sliceTargets).map(({ id, label, status, capabilities }) => ({
         id,
         label,
         status,
         capabilities,
       })),
+    });
+  },
+});
+
+const commandsCommand = define({
+  name: 'commands',
+  description: 'Print every command with its options, exit codes, and examples as JSON',
+  examples: `slicewright commands
+slicewright commands normalize`,
+  args: {
+    command: { type: 'positional', required: false, description: 'Describe only this command' },
+  },
+  run: (ctx) => {
+    const only = ctx.values.command;
+    if (only !== undefined && !Object.hasOwn(subCommands, only)) {
+      const guess = didYouMean(only, Object.keys(subCommands));
+      throw new UsageError(
+        `Unknown command "${only}".${guess === undefined ? '' : ` Did you mean ${guess}?`} Commands: ${Object.keys(subCommands).join(', ')}.`,
+      );
+    }
+    print(
+      describeCommands(
+        {
+          name: 'slicewright',
+          version,
+          description: main.description ?? '',
+          commands: subCommands,
+          exits: commandExits,
+          aliases: flagAliases,
+          requiredInRun: { prompt: ['kind', 'style'] },
+        },
+        only,
+      ),
     );
   },
 });
@@ -959,8 +1026,9 @@ function targetList(value: string | undefined): string[] {
   }
   for (const id of ids) {
     if (findTarget(id) === undefined) {
+      const guess = didYouMean(id, Object.keys(sliceTargets));
       throw new UsageError(
-        `Unknown target "${id}". Known targets: ${Object.keys(sliceTargets).join(', ')}.`,
+        `Unknown target "${id}".${guess === undefined ? '' : ` Did you mean ${guess}?`} Known targets: ${Object.keys(sliceTargets).join(', ')}.`,
       );
     }
   }
@@ -1055,6 +1123,9 @@ function readLayout(path: string): SliceLayout {
   try {
     json = JSON.parse(readFileSync(path, 'utf8'));
   } catch (error) {
+    if (missingFile(error) !== undefined) {
+      throw new UsageError(`--layout ${path} does not exist.`);
+    }
     throw new UsageError(
       `--layout ${path}: ${error instanceof Error ? error.message : String(error)}`,
     );
@@ -1132,6 +1203,11 @@ function previewOptions(values: {
   return { cells, zoom, maxWidth };
 }
 
+/** The atlas image beside the atlas, as a path from where the atlas path was given. */
+function atlasImagePath(atlasPath: string, image: string): string {
+  return isAbsolute(image) ? image : join(dirname(atlasPath), image);
+}
+
 function atlasImage(json: unknown, path: string): string {
   if (typeof json === 'object' && json !== null && 'meta' in json) {
     const meta = (json as { meta?: { image?: unknown } }).meta;
@@ -1144,10 +1220,19 @@ function atlasImage(json: unknown, path: string): string {
 
 function summary(report: InspectReport): Pick<
   InspectReport,
-  'ok' | 'mode' | 'insets' | 'scale9Borders' | 'minSize' | 'tile' | 'contentPadding' | 'findings'
+  | 'ok'
+  | 'mode'
+  | 'insets'
+  | 'insetsSource'
+  | 'scale9Borders'
+  | 'minSize'
+  | 'tile'
+  | 'contentPadding'
+  | 'findings'
 > {
-  const { ok, mode, insets, scale9Borders, minSize, tile, contentPadding, findings } = report;
-  return { ok, mode, insets, scale9Borders, minSize, tile, contentPadding, findings };
+  const { ok, mode, insets, insetsSource, scale9Borders, minSize, tile, contentPadding, findings } =
+    report;
+  return { ok, mode, insets, insetsSource, scale9Borders, minSize, tile, contentPadding, findings };
 }
 
 function readPng(path: string | undefined): Raster {
@@ -1183,6 +1268,11 @@ const version = (
 export const main = define({
   name: 'slicewright',
   description: 'Prompt, inspect, and preview nine-slice and three-slice UI art. Every command prints JSON.',
+  examples: `# Key a generated image, normalize it with a Phaser atlas, then check it
+slicewright key generated.png --out keyed.png
+slicewright normalize keyed.png --width 480 --out ui/panel.png --target phaser
+slicewright preview ui/panel.png --out panel-sheet.png
+slicewright atlas ui/panel.json`,
   run: () => {
     process.stdout.write('Run slicewright --help for the commands.\n');
     process.exitCode = usageFailed;
@@ -1205,7 +1295,33 @@ export const subCommands = {
   build,
   export: exportCommand,
   targets,
+  commands: commandsCommand,
 };
+
+/** The exit codes each command can end with; 1 only where a finding or report can fail. */
+const commandExits: Record<keyof typeof subCommands, readonly ExitCode[]> = {
+  'browser-report': [0, 1, 2],
+  prompt: [0, 2],
+  inspect: [0, 1, 2],
+  compare: [0, 1, 2],
+  preview: [0, 2],
+  frame: [0, 1, 2],
+  atlas: [0, 1, 2],
+  key: [0, 2],
+  resize: [0, 2],
+  normalize: [0, 1, 2],
+  pack: [0, 1, 2],
+  build: [0, 1, 2],
+  export: [0, 1, 2],
+  targets: [0, 2],
+  commands: [0, 2],
+};
+
+/** Second names of flags, by command: each alias maps to the flag it stands for. */
+export const flagAliases = {
+  compare: { as: 'kind' },
+  key: { 'keep-below': 'keep', 'drop-above': 'drop' },
+} as const satisfies Partial<Record<keyof typeof subCommands, Record<string, string>>>;
 
 // Every flag that takes a number, so `--tolerance -1` reaches validation.
 const flagTypes = Object.values(subCommands).flatMap((command) =>
@@ -1230,20 +1346,43 @@ export const cliOptions = {
   // stdout carries JSON only: no banner, no validation text; errors go to stderr.
   renderHeader: null,
   renderValidationErrors: null,
+  renderUsage: async (ctx: CommandContext) =>
+    tidyUsage(await renderUsage(ctx), {
+      entry: ctx.callMode === 'entry',
+      negated: { crop: 'Keep transparent margins instead of cropping them' },
+    }),
   // Unknown or misspelled flags are errors, not silently ignored.
   strict: true,
 } as const;
 
 async function runCli(argv: readonly string[]): Promise<void> {
+  // Under an AI agent (or SLICEWRIGHT_AGENT=1) help is concise and messages are plain text.
+  const agent = agentMode(getAgentProfile(), process.env);
+  const program = {
+    name: cliOptions.name,
+    version,
+    description: main.description ?? '',
+    commands: subCommands,
+  };
   try {
-    await cli(joinNegativeNumbers(argv, numberFlags), main, cliOptions);
+    await cli(
+      joinNegativeNumbers(argv, numberFlags),
+      main,
+      agent.on
+        ? {
+            ...cliOptions,
+            renderUsage: (ctx) => Promise.resolve(conciseHelp(program, ctx.name)),
+          }
+        : cliOptions,
+    );
   } catch (error) {
     const named = argv.find((arg) => !arg.startsWith('-'));
     const messages = friendlyCliErrors(error, {
       command: named !== undefined && Object.hasOwn(subCommands, named) ? named : undefined,
       commands: Object.keys(subCommands),
     });
-    process.stderr.write(messages.map((message) => `slicewright: ${message}\n`).join(''));
+    const text = messages.map((message) => `slicewright: ${message}\n`).join('');
+    process.stderr.write(agent.on ? plain(text) : text);
     process.exitCode = usageFailed;
   }
 }

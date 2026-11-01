@@ -1,4 +1,5 @@
 import { isArgsValidationError, isCommandNotFoundError } from 'gunshi';
+import { isAbsolute, relative } from 'node:path';
 
 import { schemaAt, type JsonSchema } from './manifest-schema.js';
 
@@ -8,7 +9,7 @@ import { schemaAt, type JsonSchema } from './manifest-schema.js';
  * be a typo: at most a third of the longer word, and at least one edit.
  *
  * @evidence docs/spec.md#error-messages Suggests the closest known name within a third of its length, counting a transposition as one edit.
- * @evidenceReview docs/spec.md#error-messages #ed1adaa Checked this code against the section line by line and ran the error message tests green with pnpm test.
+ * @evidenceReview docs/spec.md#error-messages #157990f Reread the section after the missing-file, layout-file, target-typo and flag-name edit, checked this code against it, and ran pnpm test green.
  */
 export function didYouMean(input: string, candidates: Iterable<string>): string | undefined {
   let best: string | undefined;
@@ -69,7 +70,7 @@ export interface CommandHelp {
  * any other error keeps its own message.
  *
  * @evidence docs/spec.md#error-messages Rewrites a missing required flag or argument, an invalid choice or type, an unknown option and an unknown command into a message naming the fix, and keeps every other message.
- * @evidenceReview docs/spec.md#error-messages #ed1adaa Checked this code against the section line by line and ran the error message tests green with pnpm test.
+ * @evidenceReview docs/spec.md#error-messages #157990f Reread the section after the missing-file, layout-file, target-typo and flag-name edit, checked this code against it, and ran pnpm test green.
  */
 export function friendlyCliErrors(error: unknown, help: CommandHelp): string[] {
   const errors = error instanceof AggregateError ? (error.errors as unknown[]) : [error];
@@ -89,6 +90,10 @@ function friendlyCliError(error: unknown, help: CommandHelp): string {
     return `Unknown command "${name}".${guess === undefined ? '' : ` Did you mean ${guess}?`} Commands: ${help.commands.join(', ')}.`;
   }
   if (!isArgsValidationError(error)) {
+    const missing = missingFile(error);
+    if (missing !== undefined) {
+      return `${missing} does not exist.`;
+    }
     return error instanceof Error ? error.message : String(error);
   }
   const values = error.values as Record<string, unknown>;
@@ -154,6 +159,27 @@ function friendlyNewParseError(
   }
 }
 
+/**
+ * The path of a file a read did not find (an `ENOENT` error from `node:fs`),
+ * relative to the working directory when it lies inside it, as a command is
+ * usually given it; undefined for any other error.
+ *
+ * @evidence docs/spec.md#error-messages Names the input file a read did not find instead of the system error.
+ * @evidenceReview docs/spec.md#error-messages #157990f Reread the section after the missing-file, layout-file, target-typo and flag-name edit, checked this code against it, and ran pnpm test green.
+ */
+export function missingFile(error: unknown): string | undefined {
+  if (!(error instanceof Error)) {
+    return undefined;
+  }
+  const { code, path } = error as Error & { code?: unknown; path?: unknown };
+  if (code !== 'ENOENT' || typeof path !== 'string') {
+    return undefined;
+  }
+  // Windows reports the resolved path; show one inside the working directory as given.
+  const inside = isAbsolute(path) ? relative(process.cwd(), path) : path;
+  return inside === '' || inside.startsWith('..') || isAbsolute(inside) ? path : inside;
+}
+
 /** One problem typia found in a manifest. */
 export interface ManifestIssue {
   /** typia's path, such as `$input.pieces[0].widht`. */
@@ -169,7 +195,7 @@ export interface ManifestIssue {
  * choices with the choices, and anything else with what was expected.
  *
  * @evidence docs/spec.md#error-messages Explains an unknown manifest key with the closest allowed key, a missing key, a value outside its choices, and any other mismatch with what was expected.
- * @evidenceReview docs/spec.md#error-messages #ed1adaa Checked this code against the section line by line and ran the error message tests green with pnpm test.
+ * @evidenceReview docs/spec.md#error-messages #157990f Reread the section after the missing-file, layout-file, target-typo and flag-name edit, checked this code against it, and ran pnpm test green.
  */
 export function friendlyManifestIssues(issues: readonly ManifestIssue[], schema: JsonSchema): string[] {
   return issues.map((issue) => {
@@ -185,6 +211,36 @@ export function friendlyManifestIssues(issues: readonly ManifestIssue[], schema:
     }
     const node = schemaAt(schema, steps);
     const expected = (node === undefined ? undefined : describeSchema(node)) ?? describe(issue.expected);
+    if (issue.value === undefined) {
+      return `${where} is required: ${expected}.`;
+    }
+    const choices = literalChoices(issue.expected);
+    const shown = JSON.stringify(issue.value);
+    if (choices !== undefined) {
+      const guess = typeof issue.value === 'string' ? didYouMean(issue.value, choices) : undefined;
+      return `${where} must be one of ${choices.map((choice) => JSON.stringify(choice)).join(', ')}, not ${shown}.${guess === undefined ? '' : ` Did you mean "${guess}"?`}`;
+    }
+    return `${where} must be ${expected}, not ${shown}.`;
+  });
+}
+
+/**
+ * Explains typia validation errors for a JSON value without a schema, such as
+ * a layout file: each problem's path from `root` (empty for the value itself),
+ * with the choices for a value outside them and the expected type in words
+ * otherwise.
+ *
+ * @evidence docs/spec.md#error-messages Explains a layout file's shape errors with each path, the choices, or the expected type in words.
+ * @evidenceReview docs/spec.md#error-messages #157990f Reread the section after the missing-file, layout-file, target-typo and flag-name edit, checked this code against it, and ran pnpm test green.
+ */
+export function friendlyShapeIssues(issues: readonly ManifestIssue[], root: string): string[] {
+  return issues.map((issue) => {
+    const steps = [...(root === '' ? [] : [root]), ...pathSteps(issue.path)];
+    const where = steps.length === 0 ? 'The value' : formatPath(steps);
+    if (issue.expected === 'undefined') {
+      return `${where} is not an allowed key.`;
+    }
+    const expected = describe(issue.expected);
     if (issue.value === undefined) {
       return `${where} is required: ${expected}.`;
     }
@@ -294,7 +350,11 @@ function describe(expected: string): string {
           return `at least ${argument} ${argument === '1' ? 'entry' : 'entries'}`;
         case 'Array':
         case 'ReadonlyArray':
-          return argument === 'string' ? 'a list of strings' : 'a list';
+          return argument === 'string'
+            ? 'a list of strings'
+            : argument === 'Segment'
+              ? 'a list of segments'
+              : 'a list';
         case 'string':
         case 'number':
           return `a ${name}`;
@@ -304,6 +364,12 @@ function describe(expected: string): string {
           return 'a piece object';
         case 'BuildGroup':
           return 'a group object';
+        case 'AxisLayout':
+          return 'an axis object with length and segments';
+        case 'Segment':
+          return 'a segment object with start, end, and kind';
+        case 'SliceInsets':
+          return 'an object with left, right, top, and bottom';
         default:
           return /^[A-Z]/u.test(name) ? 'an object' : part;
       }

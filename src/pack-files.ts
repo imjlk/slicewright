@@ -170,6 +170,9 @@ function atlasSources(path: string): AtlasSource[] {
     throw new PackInputError(`${path} has no meta.image.`);
   }
   const imagePath = resolve(dirname(path), atlas.meta.image);
+  if (!existsSync(imagePath)) {
+    throw new PackInputError(`${path} names meta.image ${atlas.meta.image}, which does not exist.`);
+  }
   const raster = decodePng(readFileSync(imagePath));
   return entries.map(([name, frame]) => {
     const { x, y, w, h } = frame.frame;

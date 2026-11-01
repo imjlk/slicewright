@@ -10,10 +10,16 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import { test, type TestContext } from 'node:test';
 
-import { buildInputs, BuildManifestError, readBuildManifest, runBuild } from '../src/build.js';
+import {
+  buildInputs,
+  BuildManifestError,
+  readBuildManifest,
+  relativeBuildReport,
+  runBuild,
+} from '../src/build.js';
 import { buildManifestSchema, buildManifestSchemaUrl, schemaAt } from '../src/manifest-schema.js';
 import { encodePng } from '../src/png.js';
 import { watchTargets } from '../src/watch.js';
@@ -21,7 +27,7 @@ import { panel, shadedBar } from './fixtures.js';
 
 /**
  * @evidence docs/spec.md#build-manifest Builds a dialog and a bar from a manifest into pieces, exports, and one packed atlas, skips packing when a piece fails, and refuses manifests the shape or the rules reject.
- * @evidenceReview docs/spec.md#build-manifest #fe9a80d Reread the section with the $schema key and published schema, checked the assertions against it, and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#build-manifest #404bba1 Reread the section after the missing-input and relative-report-path edit, checked this test's assertions against it, and ran pnpm test green.
  */
 export function buildsManifests(): void {
   const dir = mkdtempSync(join(tmpdir(), 'slicewright-build-한글 경로-'));
@@ -428,7 +434,7 @@ export function buildsGroups(): void {
  * File symlinks need privileges on Windows, so they get their own test with an explicit skip.
  *
  * @evidence docs/spec.md#build-manifest Refuses a piece written through a dangling symlink onto the packed image, and watches where dangling input links will point; skips only when Windows denies creating the link.
- * @evidenceReview docs/spec.md#build-manifest #fe9a80d Reread the section with the $schema key and published schema, checked the assertions against it, and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#build-manifest #404bba1 Reread the section after the missing-input and relative-report-path edit, checked this test's assertions against it, and ran pnpm test green.
  */
 export function followsDanglingSymlinks(context: TestContext): void {
   const dir = mkdtempSync(join(tmpdir(), 'slicewright-build-link-'));
@@ -490,7 +496,7 @@ export function followsDanglingSymlinks(context: TestContext): void {
 
 /**
  * @evidence docs/spec.md#build-manifest Publishes a JSON Schema generated from the manifest type that matches the committed schema file, allows $schema, refuses unknown keys, and is exported by the package.
- * @evidenceReview docs/spec.md#build-manifest #fe9a80d Reread the section with the $schema key and published schema, checked the assertions against it, and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#build-manifest #404bba1 Reread the section after the missing-input and relative-report-path edit, checked this test's assertions against it, and ran pnpm test green.
  */
 export function publishesManifestSchema(): void {
   const schema = buildManifestSchema();
@@ -523,3 +529,46 @@ void test('build manifest', buildsManifests);
 void test('build groups', buildsGroups);
 void test('build follows dangling symlinks', followsDanglingSymlinks);
 void test('build manifest schema', publishesManifestSchema);
+
+/**
+ * @evidence docs/spec.md#build-manifest Refuses a piece whose input does not exist by naming the piece, suggests the closest target for a typo, and reports every path relative to the manifest's directory.
+ * @evidenceReview docs/spec.md#build-manifest #404bba1 Reread the section after the missing-input and relative-report-path edit, checked this test's assertions against it, and ran pnpm test green.
+ */
+export function reportsRelativePaths(): void {
+  const dir = mkdtempSync(join(tmpdir(), 'slicewright-build-relative-'));
+  try {
+    writeFileSync(join(dir, 'bar.png'), encodePng(shadedBar(48, 12)));
+    throws(
+      () =>
+        runBuild(readBuildManifest({ out: 'ui.png', pieces: [{ input: 'missing.png' }] }), dir, dir),
+      {
+        message: /pieces\[0\]\.input missing\.png does not exist/u,
+      },
+    );
+    throws(
+      () => readBuildManifest({ out: 'ui.png', pieces: [{ input: 'bar.png', targets: ['phasr'] }] }),
+      { message: /Did you mean phaser\?/u },
+    );
+    const report = runBuild(
+      readBuildManifest({
+        out: 'out/ui.png',
+        pieces: [{ input: 'bar.png', mode: 'three', targets: ['css'] }],
+      }),
+      dir,
+      dir,
+    );
+    const relativeReport = relativeBuildReport(report, dir);
+    const piece = relativeReport.pieces[0];
+    strictEqual(piece?.input, 'bar.png');
+    strictEqual(piece.image, join('out', 'pieces', 'bar.png'));
+    ok(relativeReport.files.length > 0);
+    ok(
+      [...relativeReport.files, ...piece.exports.flatMap((exported) => exported.files)].every(
+        (file) => !isAbsolute(file),
+      ),
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+void test('build report paths', reportsRelativePaths);

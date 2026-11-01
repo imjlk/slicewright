@@ -1,4 +1,5 @@
 import './detect.test.js';
+import './commands.test.js';
 import './compare.test.js';
 import './output.test.js';
 import './prepare.test.js';
@@ -11,6 +12,7 @@ import './argv.test.js';
 import './targets.test.js';
 import './watch.test.js';
 import './diagnostics.test.js';
+import './agent-mode.test.js';
 import './prompt-corrections.test.js';
 import './pixel-grid.test.js';
 import './browser.test.js';
