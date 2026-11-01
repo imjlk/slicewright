@@ -56,6 +56,11 @@ EXAMPLES:
   slicewright normalize keyed.png --width 480 --out ui/panel.png --target phaser
   slicewright preview ui/panel.png --out panel-sheet.png
   slicewright atlas ui/panel.json
+
+EXIT CODES:
+  0  ok
+  1  an error finding (the JSON report says which)
+  2  usage or input failure (message on stderr)
 ```
 
 ## slicewright browser-report
@@ -64,18 +69,23 @@ EXAMPLES:
 Create an offline HTML viewer from browser artifacts
 
 USAGE:
-  slicewright browser-report <OPTIONS> <input>
+  slicewright browser-report [options] <input>
 
 ARGUMENTS:
   input           Artifact directory
 
 OPTIONS:
-  --out <out>            New HTML output file (must not exist)
+  --out <out>            New HTML output file (must not exist) (required)
   -h, --help             Display this help message
   -v, --version          Display this version
 
 EXAMPLES:
   slicewright browser-report test-results/panel/slicewright-panel --out reports/panel.html
+
+EXIT CODES:
+  0  ok
+  1  an error finding (the JSON report says which)
+  2  usage or input failure (message on stderr)
 ```
 
 ## slicewright prompt
@@ -84,10 +94,10 @@ EXAMPLES:
 Plan a generation prompt for stretchable UI art
 
 USAGE:
-  slicewright prompt <OPTIONS>
+  slicewright prompt [options]
 
 OPTIONS:
-  --kind <kind>                      UI element kind (required): button, panel, dialog, bar, bar-fill, tooltip, bubble, bubble-tail, frame (choices: button | panel | dialog | bar | bar-fill | tooltip | bubble | bubble-tail | frame)
+  --kind <kind>                      UI element kind: button, panel, dialog, bar, bar-fill, tooltip, bubble, bubble-tail, frame (choices: button | panel | dialog | bar | bar-fill | tooltip | bubble | bubble-tail | frame) (required)
   --style <style>                    Art direction in the user's words (required)
   --background [background]          Background the generator should paint (default: transparent, choices: transparent | chroma-green | chroma-magenta)
   --pixel-art                        Ask for crisp pixel art
@@ -100,6 +110,10 @@ EXAMPLES:
   # Plan a prompt, then one that corrects the last attempt's findings
   slicewright prompt --kind panel --style "hand-painted fantasy wood"
   slicewright prompt --kind panel --style "hand-painted fantasy wood" --from report.json
+
+EXIT CODES:
+  0  ok
+  2  usage or input failure (message on stderr)
 ```
 
 ## slicewright inspect
@@ -108,7 +122,7 @@ EXAMPLES:
 Detect or check slice insets and report what breaks when stretched
 
 USAGE:
-  slicewright inspect <OPTIONS> <input>
+  slicewright inspect [options] <input>
 
 ARGUMENTS:
   input           PNG image
@@ -134,6 +148,11 @@ EXAMPLES:
   slicewright inspect panel.png
   slicewright inspect bar.png --mode three
   slicewright inspect panel.png --insets 12,12,10,10
+
+EXIT CODES:
+  0  ok
+  1  an error finding (the JSON report says which)
+  2  usage or input failure (message on stderr)
 ```
 
 ## slicewright compare
@@ -142,7 +161,7 @@ EXAMPLES:
 Check that the states of one element, or the pieces of a matching set, agree
 
 USAGE:
-  slicewright compare <OPTIONS> <inputs> [<inputs> ...]
+  slicewright compare [options] <inputs> [<inputs> ...]
 
 ARGUMENTS:
   inputs           Two or more PNGs: states such as normal, hover, pressed, or a set such as dialog, button, bar
@@ -162,6 +181,11 @@ OPTIONS:
 EXAMPLES:
   slicewright compare button-normal.png button-hover.png button-pressed.png
   slicewright compare dialog.png button.png bar.png --kind set
+
+EXIT CODES:
+  0  ok
+  1  an error finding (the JSON report says which)
+  2  usage or input failure (message on stderr)
 ```
 
 ## slicewright preview
@@ -170,13 +194,13 @@ EXAMPLES:
 Render the art at several stretched sizes on one PNG
 
 USAGE:
-  slicewright preview <OPTIONS> <input>
+  slicewright preview [options] <input>
 
 ARGUMENTS:
   input           PNG image
 
 OPTIONS:
-  --out <out>                              Preview sheet PNG to write
+  --out <out>                              Preview sheet PNG to write (required)
   --cells <cells>                          Cells to show, comma-separated: guides,source,min,wide,tall,double,diagnostics
   --zoom [zoom]                            Scale every cell by this whole number (1-8), nearest-neighbor (default: 1)
   --max-width [max-width]                  Wrap cells to a new row past this sheet width (default: 2048)
@@ -199,6 +223,10 @@ OPTIONS:
 EXAMPLES:
   slicewright preview panel.png --out previews/panel-sheet.png
   slicewright preview bar.png --out previews/bar-sheet.png --mode three --zoom 2
+
+EXIT CODES:
+  0  ok
+  2  usage or input failure (message on stderr)
 ```
 
 ## slicewright frame
@@ -207,13 +235,13 @@ EXAMPLES:
 Write a one-frame Phaser JSON Hash atlas with scale9Borders
 
 USAGE:
-  slicewright frame <OPTIONS> <input>
+  slicewright frame [options] <input>
 
 ARGUMENTS:
   input           PNG image
 
 OPTIONS:
-  --name <name>                            Frame name
+  --name <name>                            Frame name (required)
   --out <out>                              Atlas JSON to write; printed when omitted
   --image-ref <image-ref>                  How the atlas refers to the image; defaults to its path from the atlas
   --insets <insets>                        Give insets instead of detecting them: l,r,t,b or h,v or n
@@ -233,6 +261,11 @@ OPTIONS:
 
 EXAMPLES:
   slicewright frame panel.png --name panel --out ui/panel.json
+
+EXIT CODES:
+  0  ok
+  1  an error finding (the JSON report says which)
+  2  usage or input failure (message on stderr)
 ```
 
 ## slicewright atlas
@@ -241,7 +274,7 @@ EXAMPLES:
 Check the nine-slice frames of a Phaser JSON Hash or JSON Array atlas, or the slices of an Aseprite sheet
 
 USAGE:
-  slicewright atlas <OPTIONS> <input>
+  slicewright atlas [options] <input>
 
 ARGUMENTS:
   input           Atlas JSON
@@ -259,6 +292,11 @@ OPTIONS:
 EXAMPLES:
   slicewright atlas ui/panel.json
   slicewright atlas sheet.json --slice dialog
+
+EXIT CODES:
+  0  ok
+  1  an error finding (the JSON report says which)
+  2  usage or input failure (message on stderr)
 ```
 
 ## slicewright key
@@ -267,13 +305,13 @@ EXAMPLES:
 Remove a green or magenta background and despill the edge
 
 USAGE:
-  slicewright key <OPTIONS> <input>
+  slicewright key [options] <input>
 
 ARGUMENTS:
   input           PNG image
 
 OPTIONS:
-  --out <out>                                Keyed PNG to write
+  --out <out>                                Keyed PNG to write (required)
   --key [key]                                Key color; auto reads the image border (default: auto, choices: auto | green | magenta)
   --keep [keep]                              Key dominance at or below this stays opaque (also --keep-below) (default: 40)
   --keep-below <keep-below>                  Same as --keep
@@ -286,6 +324,10 @@ OPTIONS:
 EXAMPLES:
   slicewright key generated.png --out keyed.png
   slicewright key generated.png --out keyed.png --key magenta
+
+EXIT CODES:
+  0  ok
+  2  usage or input failure (message on stderr)
 ```
 
 ## slicewright resize
@@ -294,13 +336,13 @@ EXAMPLES:
 Resize art to its in-game size
 
 USAGE:
-  slicewright resize <OPTIONS> <input>
+  slicewright resize [options] <input>
 
 ARGUMENTS:
   input           PNG image
 
 OPTIONS:
-  --out <out>                              Resized PNG to write
+  --out <out>                              Resized PNG to write (required)
   --crop                                   Crop transparent margins first
   --match-outline <match-outline>          Scale so the outline is as thick as this PNG's (a bubble body for its tail)
   --width <width>                          Target width in pixels
@@ -313,6 +355,10 @@ OPTIONS:
 EXAMPLES:
   slicewright resize keyed.png --out ui/panel.png --width 480 --crop
   slicewright resize tail.png --out ui/tail.png --match-outline ui/bubble.png
+
+EXIT CODES:
+  0  ok
+  2  usage or input failure (message on stderr)
 ```
 
 ## slicewright normalize
@@ -321,13 +367,13 @@ EXAMPLES:
 Crop, resize, pick insets at the final size, and optionally rebuild a minimal texture
 
 USAGE:
-  slicewright normalize <OPTIONS> <input>
+  slicewright normalize [options] <input>
 
 ARGUMENTS:
   input           PNG image
 
 OPTIONS:
-  --out <out>                              Normalized PNG to write
+  --out <out>                              Normalized PNG to write (required)
   --width <width>                          Target width in pixels
   --height <height>                        Target height in pixels
   --scale <scale>                          Target scale instead of a size
@@ -358,6 +404,11 @@ EXAMPLES:
   slicewright normalize keyed.png --out ui/panel.png --width 480
   slicewright normalize keyed.png --out ui/panel.png --width 480 --target phaser,css
   slicewright normalize sprite.png --out ui/sprite.png --pixel-art --keep 4
+
+EXIT CODES:
+  0  ok
+  1  an error finding (the JSON report says which)
+  2  usage or input failure (message on stderr)
 ```
 
 ## slicewright pack
@@ -366,13 +417,13 @@ EXAMPLES:
 Pack the frames of several atlases into one image and JSON Hash atlas
 
 USAGE:
-  slicewright pack <OPTIONS> <inputs> [<inputs> ...]
+  slicewright pack [options] <inputs> [<inputs> ...]
 
 ARGUMENTS:
   inputs           Atlas JSON files, such as the one-frame atlases normalize and export write, or plain PNGs
 
 OPTIONS:
-  --out <out>                              Packed PNG to write; the atlas goes next to it
+  --out <out>                              Packed PNG to write; the atlas goes next to it (required)
   --name <name>                            Texture key and file name for the atlas and stylesheet; defaults to the PNG name
   --spacing [spacing]                      Transparent pixels between frames (default: 2)
   --extrude [extrude]                      Pixels of each frame's edge repeated outward (default: 1)
@@ -385,6 +436,11 @@ OPTIONS:
 
 EXAMPLES:
   slicewright pack ui/panel.json ui/button.json --out ui/ui.png --css
+
+EXIT CODES:
+  0  ok
+  1  an error finding (the JSON report says which)
+  2  usage or input failure (message on stderr)
 ```
 
 ## slicewright build
@@ -393,7 +449,7 @@ EXAMPLES:
 Normalize, export, and pack every piece a manifest lists
 
 USAGE:
-  slicewright build <OPTIONS> <manifest>
+  slicewright build [options] <manifest>
 
 ARGUMENTS:
   manifest           Build manifest JSON
@@ -406,6 +462,11 @@ OPTIONS:
 EXAMPLES:
   slicewright build ui.build.json
   slicewright build ui.build.json --watch
+
+EXIT CODES:
+  0  ok
+  1  an error finding (the JSON report says which)
+  2  usage or input failure (message on stderr)
 ```
 
 ## slicewright export
@@ -414,13 +475,13 @@ EXAMPLES:
 Export the slice layout for one or more engine targets
 
 USAGE:
-  slicewright export <OPTIONS> <input>
+  slicewright export [options] <input>
 
 ARGUMENTS:
   input           PNG image
 
 OPTIONS:
-  --target <target>                        Targets, comma separated: phaser, css, unity, defold, godot
+  --target <target>                        Targets, comma separated: phaser, css, unity, defold, godot (required)
   --out-dir [out-dir]                      Directory for the exported files (default: .)
   --image-ref <image-ref>                  How the exported files refer to the image; defaults to its path from --out-dir
   --name <name>                            Asset name; defaults to the file name
@@ -441,6 +502,11 @@ OPTIONS:
 
 EXAMPLES:
   slicewright export ui/panel.png --target unity,godot --out-dir exports
+
+EXIT CODES:
+  0  ok
+  1  an error finding (the JSON report says which)
+  2  usage or input failure (message on stderr)
 ```
 
 ## slicewright targets
@@ -449,7 +515,7 @@ EXAMPLES:
 List export targets and what each can represent
 
 USAGE:
-  slicewright targets <OPTIONS>
+  slicewright targets [options]
 
 OPTIONS:
   -h, --help             Display this help message
@@ -457,6 +523,10 @@ OPTIONS:
 
 EXAMPLES:
   slicewright targets
+
+EXIT CODES:
+  0  ok
+  2  usage or input failure (message on stderr)
 ```
 
 ## slicewright commands
@@ -465,7 +535,7 @@ EXAMPLES:
 Print every command with its options, exit codes, and examples as JSON
 
 USAGE:
-  slicewright commands <OPTIONS> [<command>]
+  slicewright commands [options] [<command>]
 
 ARGUMENTS:
   command           Describe only this command
@@ -477,4 +547,8 @@ OPTIONS:
 EXAMPLES:
   slicewright commands
   slicewright commands normalize
+
+EXIT CODES:
+  0  ok
+  2  usage or input failure (message on stderr)
 ```

@@ -56,8 +56,14 @@ difference in pixels (1 by default).
 
 - Grouped pieces give no `insets`, `padding`, or `"regions": "multi"`: states
   are compared by their detected single-region geometry.
-- After normalizing, the states are compared like `compare`; a mismatch
-  (`compare.*`, `build.group-layout`) fails the build and nothing is packed.
+- After normalizing, the states are compared like `compare`. Only
+  error-level findings fail the build, and then nothing is packed: a different
+  size, slice mode, or tiling (`compare.size`, `compare.mode`, `compare.tile`),
+  states that no one set of insets fits (`compare.shared-insets`), a state
+  whose own inspection has an error, and `build.group-layout`. Insets or
+  padding that differ by more than `slack` (`compare.insets`,
+  `compare.padding`) are warnings: the build still packs, so read the group's
+  findings, or set `"sharedInsets": true` to make the states agree.
 - With `"sharedInsets": true`, every state is normalized again with the
   largest inset on each side, and that is what gets packed. Members of such a
   group give no `width`, `height`, or `scale` (a usage error otherwise),

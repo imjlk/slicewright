@@ -97,8 +97,9 @@ export function normalizeRaster(
       undefined,
       options.pixelScale === undefined ? {} : { scale: options.pixelScale },
     );
-    gridFindings = pixelGridFindings(grid);
-    if (grid.x.scale !== 1 || grid.y.scale !== 1) {
+    const snaps = grid.x.scale !== 1 || grid.y.scale !== 1;
+    gridFindings = pixelGridFindings(grid, snaps);
+    if (snaps) {
       const snapped = snapToPixelGrid(raster, grid);
       steps.push(step('snap', raster, snapped));
       raster = snapped;

@@ -191,7 +191,7 @@ export function watchRuns(
  * file it will point at is watched before it exists.
  *
  * @evidence docs/spec.md#build-manifest Watches a symlinked input where the link is and where it points, and a dangling one where it will point.
- * @evidenceReview docs/spec.md#build-manifest #404bba1 Reread the section after the missing-input and relative-report-path edit, checked this code against it, and ran pnpm test green.
+ * @evidenceReview docs/spec.md#build-manifest #1995b96 Reread the section after the export-usage edit (each piece export carries the target's usage text), checked this host against it, and ran pnpm test green.
  */
 export function watchTargets(paths: readonly string[]): Set<string> {
   const all = new Set(paths);

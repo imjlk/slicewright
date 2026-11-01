@@ -13,8 +13,14 @@ import { writeBrowserReportHtml } from './browser-report.js';
 import { aliasedValue, joinNegativeNumbers } from './argv.js';
 import { completeUsageProblem, completionConfig, completionShells } from './completion.js';
 import { tidyUsage } from './help.js';
-import { describeCommands, type ExitCode } from './command-catalog.js';
-import { didYouMean, friendlyCliErrors, missingFile } from './friendly-errors.js';
+import { describeCommands, exitCodeMeanings, type ExitCode } from './command-catalog.js';
+import {
+  didYouMean,
+  friendlyCliErrors,
+  InvalidJsonError,
+  missingFile,
+  parseJsonFile,
+} from './friendly-errors.js';
 import { defaultChromaOptions, removeChroma } from './chroma.js';
 import { compareSet, defaultCompareSlack } from './compare.js';
 import {
@@ -157,8 +163,8 @@ slicewright prompt --kind panel --style "hand-painted fantasy wood"
 slicewright prompt --kind panel --style "hand-painted fantasy wood" --from report.json`,
   args: {
     // Checked in run, so a missing one gets a clear message even with --from.
-    kind: { type: 'enum', choices: uiKinds, description: `UI element kind (required): ${uiKinds.join(', ')}` },
-    style: { type: 'string', description: "Art direction in the user's words (required)" },
+    kind: { type: 'enum', choices: uiKinds, description: `UI element kind: ${uiKinds.join(', ')}` },
+    style: { type: 'string', description: "Art direction in the user's words" },
     background: {
       type: 'enum',
       choices: promptBackgrounds,
@@ -175,13 +181,15 @@ slicewright prompt --kind panel --style "hand-painted fantasy wood" --from repor
   run: (ctx) => {
     const { kind, style, background } = ctx.values;
     if (kind === undefined || style === undefined) {
-      const missing = [kind === undefined ? '--kind' : '', style === undefined ? '--style' : '']
-        .filter(Boolean)
-        .join(' and ');
+      // Name only what is missing; the kinds are listed only when --kind is.
+      const needs = [
+        ...(kind === undefined ? [`--kind, the kind of element (${uiKinds.join(', ')})`] : []),
+        ...(style === undefined ? ["--style, the art direction in the user's words"] : []),
+      ].join(', and ');
       throw new UsageError(
         ctx.values.from === undefined
-          ? `prompt needs ${missing}: the kind of element (${uiKinds.join(', ')}) and its art direction.`
-          : `prompt needs ${missing}, also with --from: the correction is added to a new plan for that kind (${uiKinds.join(', ')}) and style.`,
+          ? `prompt needs ${needs}.`
+          : `prompt needs ${needs}, also with --from: the correction is added to a new plan of that kind and style.`,
       );
     }
     const plan = buildPromptPlan({
@@ -198,7 +206,7 @@ slicewright prompt --kind panel --style "hand-painted fantasy wood" --from repor
       return;
     }
     const report = readFindingsReport(
-      JSON.parse(readFileSync(ctx.values.from, 'utf8')),
+      parseJsonFile(readFileSync(ctx.values.from, 'utf8'), `--from ${ctx.values.from}`),
       ctx.values.piece,
     );
     print(correctPromptPlan(plan, promptCorrections(report)));
@@ -426,7 +434,7 @@ slicewright atlas sheet.json --slice dialog`,
   },
   run: (ctx) => {
     const path = ctx.values.input;
-    const json: unknown = JSON.parse(readFileSync(path, 'utf8'));
+    const json = parseJsonFile(readFileSync(path, 'utf8'), path);
     // Shown as the atlas path was given, like every other command's paths.
     const imagePath = ctx.values.image ?? atlasImagePath(path, atlasImage(json, path));
     if (ctx.values.image === undefined && !existsSync(imagePath)) {
@@ -877,10 +885,10 @@ slicewright commands normalize`,
   },
   run: (ctx) => {
     const only = ctx.values.command;
-    if (only !== undefined && !Object.hasOwn(subCommands, only)) {
-      const guess = didYouMean(only, Object.keys(subCommands));
+    if (only !== undefined && !Object.hasOwn(describedCommands, only)) {
+      const guess = didYouMean(only, Object.keys(describedCommands));
       throw new UsageError(
-        `Unknown command "${only}".${guess === undefined ? '' : ` Did you mean ${guess}?`} Commands: ${Object.keys(subCommands).join(', ')}.`,
+        `Unknown command "${only}".${guess === undefined ? '' : ` Did you mean ${guess}?`} Commands: ${Object.keys(describedCommands).join(', ')}.`,
       );
     }
     print(
@@ -889,10 +897,10 @@ slicewright commands normalize`,
           name: 'slicewright',
           version,
           description: main.description ?? '',
-          commands: subCommands,
-          exits: commandExits,
+          commands: describedCommands,
+          exits: describedExits,
           aliases: flagAliases,
-          requiredInRun: { prompt: ['kind', 'style'] },
+          requiredInRun,
         },
         only,
       ),
@@ -1123,10 +1131,13 @@ function inspectOptions(values: SliceValues, raster: Raster | undefined): Inspec
 function readLayout(path: string): SliceLayout {
   let json: unknown;
   try {
-    json = JSON.parse(readFileSync(path, 'utf8'));
+    json = parseJsonFile(readFileSync(path, 'utf8'), `--layout ${path}`);
   } catch (error) {
     if (missingFile(error) !== undefined) {
       throw new UsageError(`--layout ${path} does not exist.`);
+    }
+    if (error instanceof InvalidJsonError) {
+      throw new UsageError(error.message);
     }
     throw new UsageError(
       `--layout ${path}: ${error instanceof Error ? error.message : String(error)}`,
@@ -1319,6 +1330,34 @@ const commandExits: Record<keyof typeof subCommands, readonly ExitCode[]> = {
   commands: [0, 2],
 };
 
+/** Flags a command's handler insists on although the parser does not, by command. */
+const requiredInRun: Readonly<Record<string, readonly string[]>> = { prompt: ['kind', 'style'] };
+
+/** The options `name` needs: those the parser requires and those its handler does. */
+function requiredOptions(name: string | undefined): string[] {
+  const command =
+    name !== undefined && Object.hasOwn(subCommands, name)
+      ? subCommands[name as keyof typeof subCommands]
+      : undefined;
+  if (command === undefined) {
+    return [];
+  }
+  const args = (command.args ?? {}) as Readonly<Record<string, { readonly type: string; readonly required?: boolean }>>;
+  return [
+    ...Object.entries(args)
+      .filter(([, arg]) => arg.type !== 'positional' && arg.required === true)
+      .map(([key]) => key),
+    ...(requiredInRun[name ?? ''] ?? []),
+  ];
+}
+
+/** The exit codes `name` can end with and their meanings; every code for the program. */
+function exitCodeRows(name: string | undefined): Array<readonly [number, string]> {
+  const codes: readonly ExitCode[] =
+    name === undefined ? [0, 1, 2] : (commandExits[name as keyof typeof commandExits] ?? [0, 2]);
+  return codes.map((code) => [code, exitCodeMeanings[code]] as const);
+}
+
 /** Second names of flags, by command: each alias maps to the flag it stands for. */
 export const flagAliases = {
   compare: { as: 'kind' },
@@ -1387,7 +1426,32 @@ The script goes to stdout. See README.md#shell-completion for where to put it.
 
 EXAMPLES:
   slicewright complete bash > ~/.local/share/bash-completion/completions/slicewright
+
+EXIT CODES:
+  0  ${exitCodeMeanings[0]}
+  2  ${exitCodeMeanings[2]}
 `;
+
+/**
+ * `complete` as the command catalog and agent help describe it; the completion
+ * plugin runs it, so it is not one of the parser's subcommands.
+ */
+const completeCommand = {
+  description: 'Print a shell completion script; its stdout is the script, not JSON',
+  examples: 'slicewright complete bash > ~/.local/share/bash-completion/completions/slicewright',
+  args: {
+    shell: { type: 'positional', description: `Shell: ${completionShells.join(', ')}` },
+  },
+} as const;
+
+/** Every command the catalog and agent help describe: the subcommands and `complete`. */
+const describedCommands = { ...subCommands, complete: completeCommand };
+
+/** The exit codes of every described command. */
+const describedExits = { ...commandExits, complete: [0, 2] } as const satisfies Record<
+  keyof typeof describedCommands,
+  readonly ExitCode[]
+>;
 
 /** Plugins the program runs with: `complete <shell>` prints a shell completion script. */
 const plugins: Plugin[] = [completion({ config: { subCommands: shellCompletion } })];
@@ -1406,21 +1470,28 @@ export const cliOptions = {
       : tidyUsage(await renderUsage(ctx), {
           entry: ctx.callMode === 'entry',
           negated: { crop: 'Keep transparent margins instead of cropping them' },
+          required: requiredOptions(ctx.callMode === 'entry' ? undefined : ctx.name),
+          exitCodes: exitCodeRows(ctx.callMode === 'entry' ? undefined : ctx.name),
         }),
   // Unknown or misspelled flags are errors, not silently ignored.
   strict: true,
   plugins,
 } as const;
 
+/** What agent-mode help describes: every command, `complete` included. */
+export const helpProgram = {
+  name: cliOptions.name,
+  version,
+  description: main.description ?? '',
+  commands: describedCommands,
+  requiredInRun,
+  exits: describedExits,
+  stdout: { complete: 'the completion script' },
+};
+
 async function runCli(argv: readonly string[]): Promise<void> {
   // Under an AI agent (or SLICEWRIGHT_AGENT=1) help is concise and messages are plain text.
   const agent = agentMode(getAgentProfile(), process.env);
-  const program = {
-    name: cliOptions.name,
-    version,
-    description: main.description ?? '',
-    commands: subCommands,
-  };
   try {
     const completeProblem = completeUsageProblem(argv);
     if (completeProblem !== undefined) {
@@ -1432,7 +1503,7 @@ async function runCli(argv: readonly string[]): Promise<void> {
       agent.on
         ? {
             ...cliOptions,
-            renderUsage: (ctx) => Promise.resolve(conciseHelp(program, ctx.name)),
+            renderUsage: (ctx) => Promise.resolve(conciseHelp(helpProgram, ctx.name)),
           }
         : cliOptions,
     );

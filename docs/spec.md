@@ -277,8 +277,9 @@ reports `pixel.no-grid` when there is none, or `pixel.grid-undetermined`
 with the candidate scale and its divisors when both axes are sparse. Normalization with pixel art
 snaps the cropped image to one pixel per cell by sampling each cell's center
 (a `snap` step) before resizing, resizes with nearest sampling whatever the
-filter, reports the grid findings judged before the snap, and does not look
-for a grid again in the snapped image.
+filter, reports the grid findings judged before the snap, with
+`pixel.upscaled` saying the art was snapped rather than naming the flag that
+snaps it, and does not look for a grid again in the snapped image.
 
 ## Normalization
 
@@ -621,7 +622,9 @@ manifest anew each time, and keeps watching after a failed build. A piece's
 input that does not exist is a build error naming the piece before anything is
 written. The build report gives every file path relative to the manifest's
 directory, as the manifest gives them, keeping a path on another drive
-absolute. A piece in a
+absolute. Each piece's export in the report carries the target's
+usage text with its files, so a target that writes no file, such as Unity or
+Defold, still reports its values. A piece in a
 directory that does not exist yet is watched through its nearest existing
 ancestor until the directory appears, and an event that names no file rebuilds
 only when a watched file's modification time changed. A watched file that
@@ -710,7 +713,12 @@ values being silently dropped.
 Help lists a command's own options first and `--help` and `--version` last,
 gives a negated flag such as `--no-crop` its own description, and shows
 examples for the program and for every command. The program's help lists the
-commands without a row for itself.
+commands without a row for itself. A command's usage line reads
+`slicewright <command> [options] <input>`, since options are optional to name
+the command, and an option the command needs, by the parser or by the command
+itself (`prompt --kind` and `--style`), ends with `(required)`, as in agent
+mode. Help ends with the exit codes the command can end with (every code for
+the program), the same ones the command catalog lists.
 
 The `targets` command prints an object whose `targets` field lists every
 target, so the report can grow fields as the other commands' reports do.
@@ -723,7 +731,11 @@ required flag or argument names the command and the flag (`normalize needs
 closest one when the value looks like a typo, a value of the wrong type names
 the type, an unknown option suggests the closest option of that command, and
 an unknown command suggests the closest command and lists them all; each
-flag error also points at the command's `--help`. A name counts as a typo of
+flag error also points at the command's `--help`. An unknown option takes the
+next word as its value, so when a known command is named, an unknown option is
+the only message: the word it took is not also reported as an unknown command
+or a missing argument (`slicewright --bogus inspect x.png` says only `Unknown
+option --bogus for inspect`). A name counts as a typo of
 another within an edit distance of a third of the longer name (at least one
 edit), where swapping two neighboring letters is one edit, ignoring letter
 case. A build manifest reports every problem at once, each with its path:
@@ -731,7 +743,11 @@ an unknown key with the closest allowed key at that place and the list of
 allowed keys, a missing required key, a value outside its choices with the
 choices, and any other mismatch with the expected type in words. A layout file
 that is neither a layout nor a report holding one says what it should be and
-lists its first three problems the same way. An input file that does not exist
+lists its first three problems the same way. A JSON file that does not parse
+(a layout, a `--from` report, an atlas, or a build manifest) is named with the
+parser's reason (`--layout x.json is not valid JSON (<reason>).`). `prompt`
+without `--kind` or `--style` names only what is missing, listing the element
+kinds only when `--kind` is. An input file that does not exist
 is named as such (`<path> does not exist.`): a build names the piece
 (`pieces[0].input`), a layout file names `--layout`, and an atlas whose image
 is missing names its `meta.image`. A target name that is not a target suggests
@@ -760,7 +776,10 @@ is marked optional or has a default, a repeated one only when marked), options,
 the exit codes it can end with, and its example command lines; `slicewright
 commands <name>` prints only that command, and an unknown name is a usage error
 that suggests the closest command. The catalog is built from the same command
-definitions the argument parser runs, so it cannot drift from the CLI. Each
+definitions the argument parser runs, so it cannot drift from the CLI. It also
+describes `complete`, which the completion plugin runs: its one argument is
+the shell, it exits 0 or 2, and its stdout is a script, not JSON, as the
+catalog's top-level output note says. Each
 option lists its flag (`--tolerance`), its key, type (`string`, `number`,
 `boolean`, `enum`), whether it is required (by the parser or, like `prompt
 --kind` and `--style`, by the command itself), its default (`null` when it has
@@ -768,7 +787,7 @@ none), its choices (`null` unless it is an enum), its description, whether
 `--no-<key>` turns it off, its one-letter short form, and its second names: a
 flag such as `--keep-below` names the flag it stands for in `aliasOf`, and that
 flag lists it in `aliases`. The top level gives the program version, the meaning
-of exit codes 0, 1, and 2, and the rule that stdout carries JSON only. Exit code
+of exit codes 0, 1, and 2, and the rule that stdout carries JSON only (a script for `complete`). Exit code
 1 is listed only for the commands where a finding or a failing report can
 produce it.
 
@@ -821,8 +840,11 @@ the program's help is its version and description, a usage line, one line per
 command, and a note that stdout is JSON only with exit codes 0, 1, and 2. A
 command's help is its description, a usage line, one line per positional
 argument, one line per option with its value type or enum choices, whether it is
-required, its default, and `--[no-]<key>` for a negatable flag, then its example
-command lines and the same note; it has no banner and no `-h`/`-v` rows. Help and
+required (by the parser or by the command itself, as for `prompt --kind`), its
+default, and `--[no-]<key>` for a negatable flag, then its example command lines
+and the note with only the exit codes that command can end with; it has no
+banner and no `-h`/`-v` rows. The command list and command help include
+`complete`, whose note says its stdout is the completion script. Help and
 error messages on stderr carry no ANSI escape codes in agent mode. Command
 output, the JSON on stdout, and exit codes are the same in both modes.
 
@@ -843,8 +865,8 @@ and manifests, both for `pack` inputs); `browser-report <input>` and `export
 to. Hidden entries appear only when the typed name starts with a
 dot. Other arguments, such as numbers, get no candidates. `complete` without a
 shell, with an unknown shell, or with more than one word is a usage error (exit
-2) that lists the shells. Completion is for people at a shell: `complete` is not
-in the command catalog or the agent-mode help.
+2) that lists the shells. `complete` is listed in the command catalog and the
+agent-mode help like the other commands, marked as printing a script.
 
 ## Browser UI verification
 

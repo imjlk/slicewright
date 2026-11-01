@@ -9,7 +9,7 @@ import { schemaAt, type JsonSchema } from './manifest-schema.js';
  * be a typo: at most a third of the longer word, and at least one edit.
  *
  * @evidence docs/spec.md#error-messages Suggests the closest known name within a third of its length, counting a transposition as one edit.
- * @evidenceReview docs/spec.md#error-messages #157990f Reread the section after the missing-file, layout-file, target-typo and flag-name edit, checked this code against it, and ran pnpm test green.
+ * @evidenceReview docs/spec.md#error-messages #2655dd4 Reread the section after the unknown-option, invalid-JSON, and prompt missing-flag edits, checked this host against it, and ran pnpm test green.
  */
 export function didYouMean(input: string, candidates: Iterable<string>): string | undefined {
   let best: string | undefined;
@@ -70,18 +70,40 @@ export interface CommandHelp {
  * any other error keeps its own message.
  *
  * @evidence docs/spec.md#error-messages Rewrites a missing required flag or argument, an invalid choice or type, an unknown option and an unknown command into a message naming the fix, and keeps every other message.
- * @evidenceReview docs/spec.md#error-messages #157990f Reread the section after the missing-file, layout-file, target-typo and flag-name edit, checked this code against it, and ran pnpm test green.
+ * @evidenceReview docs/spec.md#error-messages #2655dd4 Reread the section after the unknown-option, invalid-JSON, and prompt missing-flag edits, checked this host against it, and ran pnpm test green.
  */
 export function friendlyCliErrors(error: unknown, help: CommandHelp): string[] {
-  const errors = error instanceof AggregateError ? (error.errors as unknown[]) : [error];
+  const all = error instanceof AggregateError ? (error.errors as unknown[]) : [error];
+  // An unknown option takes the next word as its value, so with a known command
+  // given (`--bogus inspect x.png`, `inspect --bogus x.png`) the word after it
+  // shows up again as an unknown command or a missing argument. Only the
+  // unknown option is the mistake.
+  const unknownOption = all.some(
+    (item) => isArgsValidationError(item) && item.code === 'err:arg:unknown-option',
+  );
+  const errors =
+    unknownOption && help.command !== undefined
+      ? all.filter((item) => !isCommandNotFound(item) && !isMissingPositional(item))
+      : all;
   const messages = errors.map((item) => friendlyCliError(item, help));
   // gunshi reports a missing value both as itself and as a type error; keep one.
   return [...new Set(messages)];
 }
 
+function isCommandNotFound(error: unknown): boolean {
+  return (
+    isCommandNotFoundError(error) ||
+    (error instanceof Error && /^Command not found: /u.test(error.message))
+  );
+}
+
+function isMissingPositional(error: unknown): boolean {
+  return isArgsValidationError(error) && error.code === 'err:arg:required-positional';
+}
+
 function friendlyCliError(error: unknown, help: CommandHelp): string {
   const seeHelp = `Run \`slicewright${help.command === undefined ? '' : ` ${help.command}`} --help\` for the options.`;
-  if (isCommandNotFoundError(error) || (error instanceof Error && /^Command not found: /u.test(error.message))) {
+  if (isCommandNotFound(error)) {
     const name =
       isCommandNotFoundError(error)
         ? error.commandName
@@ -158,13 +180,34 @@ function friendlyNewParseError(
   }
 }
 
+/** A JSON file that does not parse; its message names the file and the parser's reason. */
+export class InvalidJsonError extends Error {}
+
+/**
+ * Parses `text` read from a JSON file, refusing a syntax error as `<label> is
+ * not valid JSON (<reason>)` rather than the parser's bare message.
+ *
+ * @evidence docs/spec.md#error-messages Names the JSON file that does not parse and keeps the parser's reason in parentheses.
+ * @evidenceReview docs/spec.md#error-messages #2655dd4 Reread the section after the unknown-option, invalid-JSON, and prompt missing-flag edits, checked this host against it, and ran pnpm test green.
+ */
+export function parseJsonFile(text: string, label: string): unknown {
+  try {
+    return JSON.parse(text) as unknown;
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      throw new InvalidJsonError(`${label} is not valid JSON (${error.message}).`);
+    }
+    throw error;
+  }
+}
+
 /**
  * The path of a file a read did not find (an `ENOENT` error from `node:fs`),
  * relative to the working directory when it lies inside it, as a command is
  * usually given it; undefined for any other error.
  *
  * @evidence docs/spec.md#error-messages Names the input file a read did not find instead of the system error.
- * @evidenceReview docs/spec.md#error-messages #157990f Reread the section after the missing-file, layout-file, target-typo and flag-name edit, checked this code against it, and ran pnpm test green.
+ * @evidenceReview docs/spec.md#error-messages #2655dd4 Reread the section after the unknown-option, invalid-JSON, and prompt missing-flag edits, checked this host against it, and ran pnpm test green.
  */
 export function missingFile(error: unknown): string | undefined {
   if (!(error instanceof Error)) {
@@ -194,7 +237,7 @@ export interface ManifestIssue {
  * choices with the choices, and anything else with what was expected.
  *
  * @evidence docs/spec.md#error-messages Explains an unknown manifest key with the closest allowed key, a missing key, a value outside its choices, and any other mismatch with what was expected.
- * @evidenceReview docs/spec.md#error-messages #157990f Reread the section after the missing-file, layout-file, target-typo and flag-name edit, checked this code against it, and ran pnpm test green.
+ * @evidenceReview docs/spec.md#error-messages #2655dd4 Reread the section after the unknown-option, invalid-JSON, and prompt missing-flag edits, checked this host against it, and ran pnpm test green.
  */
 export function friendlyManifestIssues(issues: readonly ManifestIssue[], schema: JsonSchema): string[] {
   return issues.map((issue) => {
@@ -230,7 +273,7 @@ export function friendlyManifestIssues(issues: readonly ManifestIssue[], schema:
  * otherwise.
  *
  * @evidence docs/spec.md#error-messages Explains a layout file's shape errors with each path, the choices, or the expected type in words.
- * @evidenceReview docs/spec.md#error-messages #157990f Reread the section after the missing-file, layout-file, target-typo and flag-name edit, checked this code against it, and ran pnpm test green.
+ * @evidenceReview docs/spec.md#error-messages #2655dd4 Reread the section after the unknown-option, invalid-JSON, and prompt missing-flag edits, checked this host against it, and ran pnpm test green.
  */
 export function friendlyShapeIssues(issues: readonly ManifestIssue[], root: string): string[] {
   return issues.map((issue) => {

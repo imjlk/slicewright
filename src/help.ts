@@ -4,18 +4,24 @@ export interface UsageTidying {
   readonly entry: boolean;
   /** Descriptions for `--no-<flag>`, by flag name, instead of the parser's "Negatable of". */
   readonly negated?: Readonly<Record<string, string>>;
+  /** Option keys the command needs, marked `(required)` in its option rows. */
+  readonly required?: readonly string[];
+  /** The exit codes the command or program can end with and what each means, listed last. */
+  readonly exitCodes?: ReadonlyArray<readonly [code: number, meaning: string]>;
 }
 
 const optionsPlaceholder = ' <OPTIONS>';
 
 /**
  * Tidies the argument parser's help text: the program's help drops its own
- * `[slicewright] <OPTIONS>` row and the `<OPTIONS>` after every command,
- * negated flags get their own description, and `--help` and `--version` move
- * to the end of the options so a command's own options come first.
+ * `[slicewright] <OPTIONS>` row and the `<OPTIONS>` after every command, a
+ * command's usage line reads `[options]` since no option is needed to name
+ * the command, required options say `(required)`, negated flags get their own
+ * description, `--help` and `--version` move to the end of the options so a
+ * command's own options come first, and the exit codes close the help.
  *
  * @evidence docs/spec.md#command-line-arguments Lists commands without the program's own row, describes negated flags, and puts a command's own options before --help and --version.
- * @evidenceReview docs/spec.md#command-line-arguments #f21cb56 Reread the section after the help-layout and targets-object edit, checked this code against it, and ran pnpm test green.
+ * @evidenceReview docs/spec.md#command-line-arguments #d7f096a Reread the section after the [options] usage line, (required) marker, and exit-code edit, checked this host against it, and ran pnpm test green.
  */
 export function tidyUsage(text: string, tidying: UsageTidying): string {
   const lines = text.split('\n');
@@ -34,8 +40,12 @@ export function tidyUsage(text: string, tidying: UsageTidying): string {
       out.push(line);
       continue;
     }
-    if (tidying.entry && section === 'USAGE') {
-      out.push(line.replace(/\[COMMANDS\] <OPTIONS>/u, '<command> [options]'));
+    if (section === 'USAGE') {
+      out.push(
+        tidying.entry
+          ? line.replace(/\[COMMANDS\] <OPTIONS>/u, '<command> [options]')
+          : line.replace(optionsPlaceholder, ' [options]'),
+      );
       continue;
     }
     if (tidying.entry && section === 'COMMANDS') {
@@ -68,13 +78,31 @@ export function tidyUsage(text: string, tidying: UsageTidying): string {
       }
       const negated = /^(\s+--no-([\w-]+)\s+)Negatable of --[\w-]+$/u.exec(line);
       const description = negated === null ? undefined : tidying.negated?.[negated[2] ?? ''];
+      const flag = /^\s+(?:-\w, )?--([\w-]+)[\s=]/u.exec(line)?.[1];
+      const required =
+        negated === null && flag !== undefined && tidying.required?.includes(flag) === true;
       out.push(
-        negated !== null && description !== undefined ? `${negated[1] ?? ''}${description}` : line,
+        negated !== null && description !== undefined
+          ? `${negated[1] ?? ''}${description}`
+          : required
+            ? `${line.trimEnd()} (required)`
+            : line,
       );
       continue;
     }
     out.push(line);
   }
   flush();
+  if (tidying.exitCodes !== undefined && tidying.exitCodes.length > 0) {
+    while (out.length > 0 && out.at(-1)?.trim() === '') {
+      out.pop();
+    }
+    out.push(
+      '',
+      'EXIT CODES:',
+      ...tidying.exitCodes.map(([code, meaning]) => `  ${String(code)}  ${meaning}`),
+      '',
+    );
+  }
   return out.join('\n');
 }

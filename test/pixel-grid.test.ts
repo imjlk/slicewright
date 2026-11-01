@@ -49,7 +49,7 @@ function soften(raster: Raster): Raster {
 
 /**
  * @evidence docs/spec.md#pixel-grid Detects whole and fractional upscales, snaps them back exactly, flags blurred art as off the grid, reports only when inspection asks, and snaps before a nearest resize in normalization.
- * @evidenceReview docs/spec.md#pixel-grid #e6fc6fc Reread the section after the scale-mismatch warning edit, checked this test's assertions against it, and ran pnpm test green.
+ * @evidenceReview docs/spec.md#pixel-grid #d15d19c Reread the section after the snapped-note edit (normalize says the art was snapped instead of naming --pixel-art), checked this host against it, and ran pnpm test green.
  */
 export function detectsPixelGrid(): void {
   const source = art(16, 12);
@@ -111,6 +111,12 @@ export function detectsPixelGrid(): void {
     normalized.report.findings.filter((finding) => finding.code.startsWith('pixel.')).length,
     1,
   );
+  // Normalization already snapped: the note says so instead of asking for --pixel-art.
+  const snappedNote = normalized.report.findings.find(
+    (finding) => finding.code === 'pixel.upscaled',
+  )?.message;
+  ok(snappedNote?.includes('it was snapped to 16x12') === true, snappedNote);
+  ok(!snappedNote.includes('--pixel-art'), snappedNote);
 }
 
 void test('pixel grid', detectsPixelGrid);
@@ -129,7 +135,7 @@ function flatPanel(width: number, height: number): Raster {
 
 /**
  * @evidence docs/spec.md#pixel-grid Reports a flat 6x panel as undetermined with its candidate scales instead of as not pixel art, fills a sparse axis from the other axis's whole scale, and snaps exactly at a given --pixel-scale.
- * @evidenceReview docs/spec.md#pixel-grid #e6fc6fc Reread the section after the scale-mismatch warning edit, checked this test's assertions against it, and ran pnpm test green.
+ * @evidenceReview docs/spec.md#pixel-grid #d15d19c Reread the section after the snapped-note edit (normalize says the art was snapped instead of naming --pixel-art), checked this host against it, and ran pnpm test green.
  */
 export function judgesSparsePixelGrid(): void {
   const panel = flatPanel(24, 16);
@@ -229,7 +235,7 @@ void test('sparse pixel grid', judgesSparsePixelGrid);
 
 /**
  * @evidence docs/spec.md#pixel-grid Warns when a given --pixel-scale fits the boundaries poorly and suggests the whole scales that fit, largest first, and stays quiet for a scale that fits.
- * @evidenceReview docs/spec.md#pixel-grid #e6fc6fc Reread the section after the scale-mismatch warning edit, checked this test's assertions against it, and ran pnpm test green.
+ * @evidenceReview docs/spec.md#pixel-grid #d15d19c Reread the section after the snapped-note edit (normalize says the art was snapped instead of naming --pixel-art), checked this host against it, and ran pnpm test green.
  */
 export function warnsOfScaleMismatch(): void {
   const sixfold = resizeRaster(art(24, 16, 3), 144, 96, 'nearest');

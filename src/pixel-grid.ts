@@ -76,7 +76,7 @@ export const offGridWarning = 0.1;
  * fit is the scale. Cells are then compared with their center pixel.
  *
  * @evidence docs/spec.md#pixel-grid Finds boundaries between lines, fits the largest period they agree on per axis, fills a sparse axis from the other axis's whole scale, leaves two sparse axes undetermined with a candidate scale, places a given scale, and measures off-grid pixels against each cell's center.
- * @evidenceReview docs/spec.md#pixel-grid #e6fc6fc Reread the section after the scale-mismatch warning edit, checked this code against it, and ran pnpm test green.
+ * @evidenceReview docs/spec.md#pixel-grid #d15d19c Reread the section after the snapped-note edit (normalize says the art was snapped instead of naming --pixel-art), checked this host against it, and ran pnpm test green.
  */
 export function detectPixelGrid(
   raster: Raster,
@@ -147,7 +147,7 @@ function wholeFits(edgesX: readonly number[], edgesY: readonly number[], area: R
  * so a fractional or offset grid still lands each art pixel exactly.
  *
  * @evidence docs/spec.md#pixel-grid Samples each cell's center pixel to rebuild the art at one pixel per cell.
- * @evidenceReview docs/spec.md#pixel-grid #e6fc6fc Reread the section after the scale-mismatch warning edit, checked this code against it, and ran pnpm test green.
+ * @evidenceReview docs/spec.md#pixel-grid #d15d19c Reread the section after the snapped-note edit (normalize says the art was snapped instead of naming --pixel-art), checked this host against it, and ran pnpm test green.
  */
 export function snapToPixelGrid(raster: Raster, grid: PixelGrid): Raster {
   const xs = cellCenters(grid.x, 0, raster.width);
@@ -164,12 +164,13 @@ export function snapToPixelGrid(raster: Raster, grid: PixelGrid): Raster {
 
 /**
  * Findings for art that should be pixel art: an upscaled grid to snap, and
- * cells that are not one flat color.
+ * cells that are not one flat color. With `snapped`, normalization already
+ * snapped the art, so the upscale note says so instead of naming the flag.
  *
  * @evidence docs/spec.md#pixel-grid Reports an upscaled grid with its snap command, off-grid pixels as a warning, no grid as a note, and an undetermined grid with its candidate scales.
- * @evidenceReview docs/spec.md#pixel-grid #e6fc6fc Reread the section after the scale-mismatch warning edit, checked this code against it, and ran pnpm test green.
+ * @evidenceReview docs/spec.md#pixel-grid #d15d19c Reread the section after the snapped-note edit (normalize says the art was snapped instead of naming --pixel-art), checked this host against it, and ran pnpm test green.
  */
-export function pixelGridFindings(grid: PixelGrid): Finding[] {
+export function pixelGridFindings(grid: PixelGrid, snapped = false): Finding[] {
   const findings: Finding[] = [];
   const details = {
     scale: { x: round(grid.x.scale), y: round(grid.y.scale) },
@@ -205,7 +206,11 @@ export function pixelGridFindings(grid: PixelGrid): Finding[] {
   findings.push({
     code: 'pixel.upscaled',
     severity: 'info',
-    message: `The art is upscaled about ${round(grid.x.scale)}x by ${round(grid.y.scale)}x; normalize ${basis.x === 'given' ? `--pixel-scale ${round(grid.x.scale)}` : '--pixel-art'} snaps it to ${grid.native.width}x${grid.native.height}, or resize with --filter nearest.${
+    message: `The art is upscaled about ${round(grid.x.scale)}x by ${round(grid.y.scale)}x; ${
+      snapped
+        ? `it was snapped to ${grid.native.width}x${grid.native.height}, one pixel per art pixel.`
+        : `normalize ${basis.x === 'given' ? `--pixel-scale ${round(grid.x.scale)}` : '--pixel-art'} snaps it to ${grid.native.width}x${grid.native.height}, or resize with --filter nearest.`
+    }${
       basis.x === 'spacing' || basis.y === 'spacing'
         ? ' One axis has few color edges, so its scale is the largest they and the other axis agree on; if the art pixels are smaller, give --pixel-scale.'
         : ''

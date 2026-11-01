@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import { cli } from 'gunshi';
 
 import { agentMode, conciseHelp, plain } from '../src/agent-mode.js';
-import { cliOptions, main, subCommands } from '../src/cli.js';
+import { cliOptions, helpProgram, main, subCommands } from '../src/cli.js';
 
 const program = {
   name: 'slicewright',
@@ -53,7 +53,7 @@ function detectedWith(env: Record<string, string>): { isAgent: boolean; name?: s
 
 /**
  * @evidence docs/spec.md#agent-mode Checks detection and both overrides (AI_AGENT through gunshi, SLICEWRIGHT_AGENT on and off), and that agent help lists every command, every argument and option with choices, defaults, and --[no-] form, the examples, no help/version rows, and no ANSI codes, and is shorter than gunshi's help.
- * @evidenceReview docs/spec.md#agent-mode #c7f2a40 Reread the new section; this checks AI_AGENT through gunshi in a fresh process, both overrides, every command and argument in the concise help, no help/version rows, no ANSI, and that it is shorter than gunshi's help. Ran green with pnpm test.
+ * @evidenceReview docs/spec.md#agent-mode #041b6fe Reread the section after the handler-required options, per-command exit codes, and complete edits, checked this host against it, and ran pnpm test green.
  */
 export async function agentModeHelp(): Promise<void> {
   // Detection and overrides.
@@ -110,6 +110,27 @@ export async function agentModeHelp(): Promise<void> {
   ok(normalize.includes('Examples:\n  slicewright normalize '), normalize);
   ok(conciseHelp(program, 'key').includes('--out <string>  Keyed PNG to write (required)'));
   ok(conciseHelp(program, 'key').includes('--key <auto|green|magenta>'));
+
+  // The CLI's own program: complete is listed, handler-required flags and per-command exit codes.
+  ok(/^ {2}complete {2,}Print a shell completion script/mu.test(conciseHelp(helpProgram)));
+  const complete = conciseHelp(helpProgram, 'complete');
+  ok(complete.startsWith('slicewright complete: '), complete);
+  ok(complete.includes('Usage: slicewright complete <shell>'), complete);
+  ok(
+    complete.endsWith(
+      'stdout is the completion script; errors go to stderr. Exit 0 ok, 2 usage or input failure.',
+    ),
+    complete,
+  );
+  const prompt = conciseHelp(helpProgram, 'prompt');
+  ok(/--kind <[a-z|-]+>  UI element kind: .* \(required\)/u.test(prompt), prompt);
+  ok(/--style <string>  .* \(required\)/u.test(prompt), prompt);
+  ok(prompt.endsWith('Exit 0 ok, 2 usage or input failure.'), prompt);
+  ok(
+    conciseHelp(helpProgram, 'inspect').endsWith(
+      'Exit 0 ok, 1 an error finding, 2 usage or input failure.',
+    ),
+  );
 
   // Shorter than gunshi's help, and plain.
   for (const argv of [['--help'], ['inspect', '--help'], ['normalize', '--help']]) {

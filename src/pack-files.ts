@@ -12,6 +12,7 @@ import { fixedAxisNote, urlFromPath } from './targets/common.js';
 import { cssIdentifier } from './targets/css.js';
 import { exportForTarget } from './targets/index.js';
 import { phaserUsage } from './targets/phaser.js';
+import { parseJsonFile } from './friendly-errors.js';
 
 export interface PackFilesOptions extends PackOptions {
   /** Atlas JSON files whose frames are packed, in order. */
@@ -164,7 +165,7 @@ function atlasSources(path: string): AtlasSource[] {
       },
     ];
   }
-  const json: unknown = JSON.parse(readFileSync(path, 'utf8'));
+  const json = parseJsonFile(readFileSync(path, 'utf8'), path);
   const { atlas, entries } = readAtlas(json);
   if (atlas.meta?.image === undefined) {
     throw new PackInputError(`${path} has no meta.image.`);
