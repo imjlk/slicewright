@@ -680,6 +680,16 @@ members that then differ in size add a `build.group-size` error. The report list
 applied, and findings. A group that fails fails the build, and nothing is
 packed, as when a piece fails.
 
+## Command reference
+
+`docs/commands.md` is the help of the program and of every command, in the order
+the program defines them, as gunshi's `generate()` renders it with the options
+the CLI runs with, so the page reads exactly like `--help` outside agent mode.
+`pnpm docs:commands` rewrites it from the definitions, and a test fails while
+the page differs from what that would write, ignoring line endings. The page
+names no version, so a release alone does not make it stale; a change to a
+command, an option, or the help format does.
+
 ## Command-line arguments
 
 A number option takes a negative value written either as `--tolerance=-1` or

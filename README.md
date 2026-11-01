@@ -319,6 +319,10 @@ activation or a manually exported `GOROOT`; pnpm uses the version in
 `TTSC_GO_BINARY=go` selects mise's Go from `PATH`, keeping it aligned with
 `GOROOT` for native plugin compilation.
 
+[docs/commands.md](docs/commands.md) is every command's `--help`, generated
+from the definitions by gunshi's `generate()`. After changing a command or an
+option, run `pnpm docs:commands`; `pnpm test` fails while the page is stale.
+
 The checked-in `.mcp.json` starts `ttsc-graph` through `mise exec -- pnpm exec`,
 using the installed `@ttsc/graph` and `ttsc` versions from the lockfile. Complete
 the install above before starting the MCP client, launch it with this clone as
