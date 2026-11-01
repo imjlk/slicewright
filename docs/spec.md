@@ -717,6 +717,26 @@ broken reference the command refuses with a usage error asking for
 `--image-ref`, before writing anything, and a packed stylesheet gives that
 frame no class, with a `pack.css-skipped` warning.
 
+## Command catalog
+
+`slicewright commands` prints, as JSON, every command with its usage line,
+positional arguments (required as the parser treats them: a single one unless it
+is marked optional or has a default, a repeated one only when marked), options,
+the exit codes it can end with, and its example command lines; `slicewright
+commands <name>` prints only that command, and an unknown name is a usage error
+that suggests the closest command. The catalog is built from the same command
+definitions the argument parser runs, so it cannot drift from the CLI. Each
+option lists its flag (`--tolerance`), its key, type (`string`, `number`,
+`boolean`, `enum`), whether it is required (by the parser or, like `prompt
+--kind` and `--style`, by the command itself), its default (`null` when it has
+none), its choices (`null` unless it is an enum), its description, whether
+`--no-<key>` turns it off, its one-letter short form, and its second names: a
+flag such as `--keep-below` names the flag it stands for in `aliasOf`, and that
+flag lists it in `aliases`. The top level gives the program version, the meaning
+of exit codes 0, 1, and 2, and the rule that stdout carries JSON only. Exit code
+1 is listed only for the commands where a finding or a failing report can
+produce it.
+
 ## Generation prompts
 
 A prompt plan turns a UI kind (button, panel, dialog, bar, bar fill, tooltip,

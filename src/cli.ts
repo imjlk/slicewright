@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 import { readFileSync, realpathSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { cli, define } from 'gunshi';
 
 import { writeBrowserReportHtml } from './browser-report.js';
 import { aliasedValue, joinNegativeNumbers } from './argv.js';
-import { friendlyCliErrors } from './friendly-errors.js';
+import { describeCommands, type ExitCode } from './command-catalog.js';
+import { didYouMean, friendlyCliErrors } from './friendly-errors.js';
 import { defaultChromaOptions, removeChroma } from './chroma.js';
 import { compareSet, defaultCompareSlack } from './compare.js';
 import {
@@ -830,6 +832,39 @@ const targets = define({
   },
 });
 
+const commandsCommand = define({
+  name: 'commands',
+  description: 'Print every command with its options, exit codes, and examples as JSON',
+  examples: `slicewright commands
+slicewright commands normalize`,
+  args: {
+    command: { type: 'positional', required: false, description: 'Describe only this command' },
+  },
+  run: (ctx) => {
+    const only = ctx.values.command;
+    if (only !== undefined && !Object.hasOwn(subCommands, only)) {
+      const guess = didYouMean(only, Object.keys(subCommands));
+      throw new UsageError(
+        `Unknown command "${only}".${guess === undefined ? '' : ` Did you mean ${guess}?`} Commands: ${Object.keys(subCommands).join(', ')}.`,
+      );
+    }
+    print(
+      describeCommands(
+        {
+          name: 'slicewright',
+          version,
+          description: main.description ?? '',
+          commands: subCommands,
+          exits: commandExits,
+          aliases: flagAliases,
+          requiredInRun: { prompt: ['kind', 'style'] },
+        },
+        only,
+      ),
+    );
+  },
+});
+
 const exportCommand = define({
   name: 'export',
   description: 'Export the slice layout for one or more engine targets',
@@ -1178,7 +1213,8 @@ const version = (
   ) as { version: string }
 ).version;
 
-const main = define({
+/** The program's own command, run without a subcommand. */
+export const main = define({
   name: 'slicewright',
   description: 'Prompt, inspect, and preview nine-slice and three-slice UI art. Every command prints JSON.',
   run: () => {
@@ -1187,7 +1223,8 @@ const main = define({
   },
 });
 
-const subCommands = {
+/** Every subcommand by name; `commands`, help, and docs read their definitions from here. */
+export const subCommands = {
   'browser-report': browserReport,
   prompt,
   inspect,
@@ -1202,7 +1239,33 @@ const subCommands = {
   build,
   export: exportCommand,
   targets,
+  commands: commandsCommand,
 };
+
+/** The exit codes each command can end with; 1 only where a finding or report can fail. */
+const commandExits: Record<keyof typeof subCommands, readonly ExitCode[]> = {
+  'browser-report': [0, 1, 2],
+  prompt: [0, 2],
+  inspect: [0, 1, 2],
+  compare: [0, 1, 2],
+  preview: [0, 2],
+  frame: [0, 1, 2],
+  atlas: [0, 1, 2],
+  key: [0, 2],
+  resize: [0, 2],
+  normalize: [0, 1, 2],
+  pack: [0, 1, 2],
+  build: [0, 1, 2],
+  export: [0, 1, 2],
+  targets: [0, 2],
+  commands: [0, 2],
+};
+
+/** Second names of flags, by command: each alias maps to the flag it stands for. */
+export const flagAliases = {
+  compare: { as: 'kind' },
+  key: { 'keep-below': 'keep', 'drop-above': 'drop' },
+} as const satisfies Partial<Record<keyof typeof subCommands, Record<string, string>>>;
 
 // Every flag that takes a number, so `--tolerance -1` reaches validation.
 const flagTypes = Object.values(subCommands).flatMap((command) =>
@@ -1219,23 +1282,45 @@ if (clashes.length > 0) {
   );
 }
 
-try {
-  await cli(joinNegativeNumbers(process.argv.slice(2), numberFlags), main, {
-    name: 'slicewright',
-    version,
-    subCommands,
-    // stdout carries JSON only: no banner, no validation text; errors go to stderr.
-    renderHeader: null,
-    renderValidationErrors: null,
-    // Unknown or misspelled flags are errors, not silently ignored.
-    strict: true,
-  });
-} catch (error) {
-  const named = process.argv.slice(2).find((arg) => !arg.startsWith('-'));
-  const messages = friendlyCliErrors(error, {
-    command: named !== undefined && Object.hasOwn(subCommands, named) ? named : undefined,
-    commands: Object.keys(subCommands),
-  });
-  process.stderr.write(messages.map((message) => `slicewright: ${message}\n`).join(''));
-  process.exitCode = usageFailed;
+/** How the program runs its commands; shared by the CLI and the generated command reference. */
+export const cliOptions = {
+  name: 'slicewright',
+  version,
+  subCommands,
+  // stdout carries JSON only: no banner, no validation text; errors go to stderr.
+  renderHeader: null,
+  renderValidationErrors: null,
+  // Unknown or misspelled flags are errors, not silently ignored.
+  strict: true,
+} as const;
+
+async function runCli(argv: readonly string[]): Promise<void> {
+  try {
+    await cli(joinNegativeNumbers(argv, numberFlags), main, cliOptions);
+  } catch (error) {
+    const named = argv.find((arg) => !arg.startsWith('-'));
+    const messages = friendlyCliErrors(error, {
+      command: named !== undefined && Object.hasOwn(subCommands, named) ? named : undefined,
+      commands: Object.keys(subCommands),
+    });
+    process.stderr.write(messages.map((message) => `slicewright: ${message}\n`).join(''));
+    process.exitCode = usageFailed;
+  }
+}
+
+/** True when Node started this file as the program, not when a test imports it. */
+function startedAsProgram(): boolean {
+  const entry = process.argv[1];
+  if (entry === undefined) {
+    return false;
+  }
+  try {
+    return realpathSync(entry) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
+if (startedAsProgram()) {
+  await runCli(process.argv.slice(2));
 }

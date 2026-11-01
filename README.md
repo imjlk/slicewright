@@ -63,7 +63,10 @@ Every command prints JSON on stdout. Exit codes: 0 when the command ran and
 found no error; 1 when a finding is an error (`inspect`, `compare`, `frame`,
 `atlas`, `normalize`, `export`, `pack`, `build`, and `browser-report` for a
 failing report); 2 for bad arguments or unreadable input. `prompt`, `preview`,
-`key`, `resize`, and `targets` exit 0 or 2.
+`key`, `resize`, `targets`, and `commands` exit 0 or 2. `slicewright commands`
+prints every command's arguments, options (type, default, choices, required,
+negatable, aliases), exit codes, and examples as JSON, read from the same
+definitions the parser runs; `slicewright commands <name>` prints one.
 
 ### Browser E2E verification
 
