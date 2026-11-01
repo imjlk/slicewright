@@ -134,14 +134,16 @@ for the version npx runs even where this skill lags behind.
    relative to the directory you run from, as if the game were served from
    there; run it from the game's served root or pass `--image-ref`. Prefix
    `--name` (`ui-button`) so CSS class names do not collide in a page. It
-   prints how to use them; `slicewright targets` lists what each target
-   can represent. Phaser and CSS are verified in the real engine. `unity`
+   prints how to use them; `slicewright targets` prints `{"targets": [...]}`
+   with what each target can represent. Phaser and CSS are verified in the real engine. `unity`
    (spriteBorder values, no files, never `.meta`), `defold` (`slice9` values),
    and `godot` (a `StyleBoxTexture` `.tres`; pass `--image-ref res://…`) are
    experimental: they follow the documented formats but are untested in the
    engine, so check them there before shipping.
 8. **Pack a set.** `slicewright pack ui/dialog.json ui/button.json ui/bar.json
-   --out ui/ui.png` puts every piece in one image and atlas, so the game loads
+   --out ui/ui.png` takes the atlas JSON beside each piece, so normalize every
+   piece with `--target phaser` or `--atlas <file>.json` first (a PNG alone
+   cannot be packed). It puts every piece in one image and atlas, so the game loads
    them with one `this.load.atlas`; it prints a `nineslice` call per frame,
    with tiling flags. Add `--css` for one stylesheet with a class per piece.
    Once the settings per piece are settled, write them into a manifest

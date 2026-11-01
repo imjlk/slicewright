@@ -1,4 +1,5 @@
 import {
+  existsSync,
   mkdirSync,
   readFileSync,
   readlinkSync,
@@ -6,7 +7,7 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { basename, dirname, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import typia, { type tags } from 'typia';
 
@@ -17,7 +18,7 @@ import { buildPack, type PackFilesResult } from './pack-files.js';
 import { defaultPackOptions } from './pack.js';
 import { decodePng, encodePng } from './png.js';
 import type { Raster } from './raster.js';
-import { friendlyManifestIssues } from './friendly-errors.js';
+import { didYouMean, friendlyManifestIssues } from './friendly-errors.js';
 import { buildManifestSchema } from './manifest-schema.js';
 import { parseInsets, type SliceInsets, type SliceMode } from './slices.js';
 import { exportForTarget, findTarget, sliceTargets } from './targets/index.js';
@@ -144,7 +145,7 @@ export interface BuildReport {
  * scale or a size, and every target must exist.
  *
  * @evidence docs/spec.md#build-manifest Validates the manifest shape (allowing $schema, reporting every shape problem at once), unique plain piece names, size or scale, insets syntax, and known targets before anything is built.
- * @evidenceReview docs/spec.md#build-manifest #fe9a80d Reread the section with the $schema key and published schema and checked this code against it line by line; ran buildsManifests and the manifest error tests green with pnpm test.
+ * @evidenceReview docs/spec.md#build-manifest #404bba1 Reread the section after the missing-input and relative-report-path edit, checked this code against it, and ran pnpm test green.
  */
 export function readBuildManifest(json: unknown): BuildManifest {
   // Unknown keys are refused, so a misspelled setting is not silently ignored.
@@ -240,8 +241,9 @@ export function readBuildManifest(json: unknown): BuildManifest {
     }
     for (const target of piece.targets ?? []) {
       if (findTarget(target) === undefined) {
+        const guess = didYouMean(target, Object.keys(sliceTargets));
         throw new BuildManifestError(
-          `Piece "${label}" names unknown target "${target}". Known targets: ${Object.keys(sliceTargets).join(', ')}.`,
+          `Piece "${label}" names unknown target "${target}".${guess === undefined ? '' : ` Did you mean ${guess}?`} Known targets: ${Object.keys(sliceTargets).join(', ')}.`,
         );
       }
     }
@@ -272,6 +274,14 @@ export function runBuild(
   /** More files the build must never write over, such as the manifest itself. */
   protect: readonly string[] = [],
 ): BuildReport {
+  // A missing input is named by its place in the manifest, before anything is written.
+  manifest.pieces.forEach((piece, index) => {
+    if (!existsSync(resolve(baseDir, piece.input))) {
+      throw new BuildManifestError(
+        `pieces[${index}].input ${piece.input} does not exist (paths are relative to the manifest).`,
+      );
+    }
+  });
   const out = resolve(baseDir, manifest.out);
   const piecesDir = resolve(baseDir, manifest.piecesDir ?? join(dirname(manifest.out), 'pieces'));
   const packName = manifest.name ?? stem(manifest.out);
@@ -447,6 +457,33 @@ export function runBuild(
       usage: packed.usage,
     },
     files,
+  };
+}
+
+/**
+ * The report with every file path relative to `baseDir`, the manifest's
+ * directory, as the manifest's own paths are; a path on another drive stays
+ * absolute.
+ *
+ * @evidence docs/spec.md#build-manifest Reports the input, written files, and pack files relative to the manifest, like the paths in it.
+ * @evidenceReview docs/spec.md#build-manifest #404bba1 Reread the section after the missing-input and relative-report-path edit, checked this code against it, and ran pnpm test green.
+ */
+export function relativeBuildReport(report: BuildReport, baseDir: string): BuildReport {
+  const from = (path: string): string => {
+    const relativePath = relative(baseDir, path);
+    return relativePath === '' || isAbsolute(relativePath) ? path : relativePath;
+  };
+  return {
+    ...report,
+    pieces: report.pieces.map((piece) => ({
+      ...piece,
+      input: from(piece.input),
+      image: from(piece.image),
+      atlas: piece.atlas === undefined ? undefined : from(piece.atlas),
+      exports: piece.exports.map((item) => ({ ...item, files: item.files.map(from) })),
+    })),
+    pack: report.pack === null ? null : { ...report.pack, files: report.pack.files.map(from) },
+    files: report.files.map(from),
   };
 }
 

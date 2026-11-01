@@ -93,7 +93,7 @@ export function renderSlices(
  * flexible keeps its source length.
  *
  * @evidence docs/spec.md#preview-sheet Keeps fixed segments unscaled, shares the rest among flexible segments, and tiles whole tiles with nearest sampling.
- * @evidenceReview docs/spec.md#preview-sheet #c9ed895 Checked this code against the section line by line and ran rendersSlicesAndPreviewSheets green with pnpm test.
+ * @evidenceReview docs/spec.md#preview-sheet #2b81f78 Reread the section after the missing-diagnostics-cell wording edit, checked this code against it, and ran pnpm test green.
  * @evidence docs/spec.md#slice-layouts Renders any number of fixed, stretched, and tiled segments per axis.
  * @evidenceReview docs/spec.md#slice-layouts #fc52f65 Checked this code against the section line by line and ran describesSliceLayouts green with pnpm test.
  */
@@ -137,7 +137,7 @@ export function renderLayout(
  * cell by a whole number with nearest sampling.
  *
  * @evidence docs/spec.md#preview-sheet Builds the guides, source, minimum, wide, tall, and doubled cells, lets the caller pick and zoom them, and wraps rows at the maximum width.
- * @evidenceReview docs/spec.md#preview-sheet #c9ed895 Checked this code against the section line by line and ran rendersSlicesAndPreviewSheets green with pnpm test.
+ * @evidenceReview docs/spec.md#preview-sheet #2b81f78 Reread the section after the missing-diagnostics-cell wording edit, checked this code against it, and ran pnpm test green.
  */
 export function renderPreviewSheet(
   source: Raster,
@@ -190,10 +190,12 @@ export function renderPreviewSheet(
   if (unavailable.length > 0) {
     const reasons = unavailable.map((label) =>
       label === 'diagnostics'
-        ? 'diagnostics (no finding marks a place)'
-        : `${label} (the ${label === 'wide' ? 'width' : 'height'} does not resize)`,
+        ? 'There is no diagnostics cell: no finding marks a place in this image.'
+        : `There is no ${label} cell: this layout's ${label === 'wide' ? 'width' : 'height'} does not resize.`,
     );
-    throw new RangeError(`This layout has no ${reasons.join(' or ')} cell.`);
+    throw new RangeError(
+      `${reasons.join(' ')} Leave ${unavailable.length === 1 ? 'it' : 'them'} out of the cells.`,
+    );
   }
   const labels = previewCellLabels.filter((label) => requested.includes(label));
   if (labels.length === 0) {
