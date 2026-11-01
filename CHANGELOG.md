@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.7.0 — 2026-11-01
+
+### Minor changes
+
+- [2924500](https://github.com/imjlk/slicewright/commit/29245009900cdb808265936db08761542d570861) Developer experience follow-ups to 0.6.0:
+  
+  - A missing input file is reported as `<path> does not exist.` instead of a system error, for every command; a build names the piece (`pieces[0].input`), `--layout` names the flag, and an atlas whose image is missing names its `meta.image`.
+  - A layout file that is not a layout now says what it should hold and lists its first problems in words, instead of typia's text and the outdated `--insets` advice.
+  - `--pixel-scale` that fits the art's edges poorly (below 0.85) adds a `pixel.scale-mismatch` warning suggesting the whole scales that fit.
+  - `--target` typos (on the command line and in a manifest) suggest the closest target; `key` threshold errors name the flags as you typed them; `prompt` mentions `--from` only when you used it; the missing diagnostics cell error reads plainly.
+  - Preview, frame, export, and normalize reports include `insetsSource`.
+  - Help: examples for the program and `targets`, no `[slicewright] <OPTIONS>` row, a real description for `--no-crop`, and each command's own options before `--help` and `--version`.
+  - The README quickstart now creates the button it packs, and the skill notes that `pack` takes the atlas JSON from `normalize --target phaser` or `--atlas`.
+  
+  Compatibility: `slicewright targets` now prints `{"targets": [...]}` instead of a bare array; read `.targets`. Paths in `build` reports (and `build --watch`) are now relative to the manifest's directory, as the manifest gives them, instead of absolute; a path on another drive stays absolute. — Thanks @imjlk!
+- [ba49012](https://github.com/imjlk/slicewright/commit/ba490123c687e6cba8e4efe6d3c996f504d8850c) The browser regression guidance is now its own agent skill, `slicewright-browser`, scoped to `slicewright/browser` and `slicewright/playwright`. The `slicewright` skill's description now covers only nine-slice and three-slice game UI art, so general browser or Playwright tasks no longer trigger it. `npx skills add imjlk/slicewright` offers both (`--skill` picks one), the Claude Code marketplace lists each as its own plugin, and both skills declare `compatibility` as a top-level field. Manual installs that linked `skills/slicewright` for browser checks should also link `skills/slicewright-browser`. — Thanks @imjlk!
+- [5c0b498](https://github.com/imjlk/slicewright/commit/5c0b498def099c5c835c9897110a64ead2b3ade2) Agent mode: when gunshi's `getAgentProfile()` detects an AI coding agent (or `AI_AGENT=<name>` is set), `--help` is concise and plain. It gives one line per command, or per argument and option with its type, choices, default and `--[no-]` form, then the examples, with no ANSI codes in help or error messages. `SLICEWRIGHT_AGENT=1` forces agent mode and `SLICEWRIGHT_AGENT=0` turns it off. Command output and exit codes are unchanged. — Thanks @imjlk!
+- [a16941c](https://github.com/imjlk/slicewright/commit/a16941c02fbe688ffbed4c9c0044896664c0ddd0) New `slicewright commands [name]` prints every command as JSON: its usage line, arguments, options (type, required, default, choices, description, negatable, short form, second names), the exit codes it can end with, and its examples. It reads the same definitions the parser runs, so agents can trust it over docs for the installed version. — Thanks @imjlk!
+- [b0f8bdf](https://github.com/imjlk/slicewright/commit/b0f8bdfd58d9fd2e9195a922e6c2b39a0dde7b08) Shell completion: `slicewright complete <bash|zsh|fish|powershell>` prints a completion script (through `@gunshi/plugin-completion`). Commands, options, enum choices, `--target` names, `commands <name>`, and image, JSON, or directory paths complete with Tab. A missing or unknown shell is a usage error (exit 2). Every other command still prints JSON only, and `complete` stays out of the command catalog and agent-mode help. — Thanks @imjlk!
+
+### Patch changes
+
+- [23427ef](https://github.com/imjlk/slicewright/commit/23427ef51d552fe6d04bb064e16c0d23bf558e1e) `docs/commands.md` lists every command's `--help`, generated from the command definitions by gunshi's `generate()` (`pnpm docs:commands`), and a test keeps it current. Parse errors that gunshi 1.0 introduces (a flag given without its value, or a value given to `--no-<flag>`) get the same plain usage messages as the rest. — Thanks @imjlk!
+
 ## 0.6.0 — 2026-11-01
 
 ### Fixed
