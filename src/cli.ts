@@ -7,7 +7,8 @@ import { cli, define } from 'gunshi';
 
 import { writeBrowserReportHtml } from './browser-report.js';
 import { aliasedValue, joinNegativeNumbers } from './argv.js';
-import { friendlyCliErrors } from './friendly-errors.js';
+import { describeCommands, type ExitCode } from './command-catalog.js';
+import { didYouMean, friendlyCliErrors } from './friendly-errors.js';
 import { defaultChromaOptions, removeChroma } from './chroma.js';
 import { compareSet, defaultCompareSlack } from './compare.js';
 import {
@@ -831,6 +832,38 @@ const targets = define({
   },
 });
 
+const commandsCommand = define({
+  name: 'commands',
+  description: 'Print every command with its options, exit codes, and examples as JSON',
+  examples: `slicewright commands
+slicewright commands normalize`,
+  args: {
+    command: { type: 'positional', required: false, description: 'Describe only this command' },
+  },
+  run: (ctx) => {
+    const only = ctx.values.command;
+    if (only !== undefined && !Object.hasOwn(subCommands, only)) {
+      const guess = didYouMean(only, Object.keys(subCommands));
+      throw new UsageError(
+        `Unknown command "${only}".${guess === undefined ? '' : ` Did you mean ${guess}?`} Commands: ${Object.keys(subCommands).join(', ')}.`,
+      );
+    }
+    print(
+      describeCommands(
+        {
+          name: 'slicewright',
+          version,
+          description: main.description ?? '',
+          commands: subCommands,
+          exits: commandExits,
+          aliases: flagAliases,
+        },
+        only,
+      ),
+    );
+  },
+});
+
 const exportCommand = define({
   name: 'export',
   description: 'Export the slice layout for one or more engine targets',
@@ -1205,7 +1238,33 @@ export const subCommands = {
   build,
   export: exportCommand,
   targets,
+  commands: commandsCommand,
 };
+
+/** The exit codes each command can end with; 1 only where a finding or report can fail. */
+const commandExits: Record<keyof typeof subCommands, readonly ExitCode[]> = {
+  'browser-report': [0, 1, 2],
+  prompt: [0, 2],
+  inspect: [0, 1, 2],
+  compare: [0, 1, 2],
+  preview: [0, 2],
+  frame: [0, 1, 2],
+  atlas: [0, 1, 2],
+  key: [0, 2],
+  resize: [0, 2],
+  normalize: [0, 1, 2],
+  pack: [0, 1, 2],
+  build: [0, 1, 2],
+  export: [0, 1, 2],
+  targets: [0, 2],
+  commands: [0, 2],
+};
+
+/** Second names of flags, by command: each alias maps to the flag it stands for. */
+export const flagAliases = {
+  compare: { as: 'kind' },
+  key: { 'keep-below': 'keep', 'drop-above': 'drop' },
+} as const satisfies Partial<Record<keyof typeof subCommands, Record<string, string>>>;
 
 // Every flag that takes a number, so `--tolerance -1` reaches validation.
 const flagTypes = Object.values(subCommands).flatMap((command) =>
