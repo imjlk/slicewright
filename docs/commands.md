@@ -8,30 +8,30 @@ Every command prints JSON on stdout. This page is `slicewright --help` and `slic
 
 ```text
 USAGE:
-  slicewright [COMMANDS] <OPTIONS>
+  slicewright <command> [options]
 
 COMMANDS:
-  [slicewright] <OPTIONS>          Prompt, inspect, and preview nine-slice and three-slice UI art. Every command prints JSON.
-  atlas <OPTIONS>                  Check the nine-slice frames of a Phaser JSON Hash or JSON Array atlas, or the slices of an Aseprite sheet
-  browser-report <OPTIONS>         Create an offline HTML viewer from browser artifacts
-  build <OPTIONS>                  Normalize, export, and pack every piece a manifest lists
-  compare <OPTIONS>                Check that the states of one element, or the pieces of a matching set, agree
-  export <OPTIONS>                 Export the slice layout for one or more engine targets
-  frame <OPTIONS>                  Write a one-frame Phaser JSON Hash atlas with scale9Borders
-  inspect <OPTIONS>                Detect or check slice insets and report what breaks when stretched
-  key <OPTIONS>                    Remove a green or magenta background and despill the edge
-  normalize <OPTIONS>              Crop, resize, pick insets at the final size, and optionally rebuild a minimal texture
-  pack <OPTIONS>                   Pack the frames of several atlases into one image and JSON Hash atlas
-  preview <OPTIONS>                Render the art at several stretched sizes on one PNG
-  prompt <OPTIONS>                 Plan a generation prompt for stretchable UI art
-  resize <OPTIONS>                 Resize art to its in-game size
-  targets <OPTIONS>                List export targets and what each can represent
+  atlas                            Check the nine-slice frames of a Phaser JSON Hash or JSON Array atlas, or the slices of an Aseprite sheet
+  browser-report                   Create an offline HTML viewer from browser artifacts
+  build                            Normalize, export, and pack every piece a manifest lists
+  commands                         Print every command with its options, exit codes, and examples as JSON
+  compare                          Check that the states of one element, or the pieces of a matching set, agree
+  export                           Export the slice layout for one or more engine targets
+  frame                            Write a one-frame Phaser JSON Hash atlas with scale9Borders
+  inspect                          Detect or check slice insets and report what breaks when stretched
+  key                              Remove a green or magenta background and despill the edge
+  normalize                        Crop, resize, pick insets at the final size, and optionally rebuild a minimal texture
+  pack                             Pack the frames of several atlases into one image and JSON Hash atlas
+  preview                          Render the art at several stretched sizes on one PNG
+  prompt                           Plan a generation prompt for stretchable UI art
+  resize                           Resize art to its in-game size
+  targets                          List export targets and what each can represent
 
 For more info, run any command with the `--help` flag:
-  slicewright --help
   slicewright atlas --help
   slicewright browser-report --help
   slicewright build --help
+  slicewright commands --help
   slicewright compare --help
   slicewright export --help
   slicewright frame --help
@@ -47,6 +47,13 @@ For more info, run any command with the `--help` flag:
 OPTIONS:
   -h, --help             Display this help message
   -v, --version          Display this version
+
+EXAMPLES:
+  # Key a generated image, normalize it with a Phaser atlas, then check it
+  slicewright key generated.png --out keyed.png
+  slicewright normalize keyed.png --width 480 --out ui/panel.png --target phaser
+  slicewright preview ui/panel.png --out panel-sheet.png
+  slicewright atlas ui/panel.json
 ```
 
 ## slicewright browser-report
@@ -61,9 +68,9 @@ ARGUMENTS:
   input           Artifact directory
 
 OPTIONS:
+  --out <out>            New HTML output file (must not exist)
   -h, --help             Display this help message
   -v, --version          Display this version
-  --out <out>            New HTML output file (must not exist)
 
 EXAMPLES:
   slicewright browser-report test-results/panel/slicewright-panel --out reports/panel.html
@@ -78,14 +85,14 @@ USAGE:
   slicewright prompt <OPTIONS>
 
 OPTIONS:
-  -h, --help                         Display this help message
-  -v, --version                      Display this version
   --kind <kind>                      UI element kind (required): button, panel, dialog, bar, bar-fill, tooltip, bubble, bubble-tail, frame (choices: button | panel | dialog | bar | bar-fill | tooltip | bubble | bubble-tail | frame)
   --style <style>                    Art direction in the user's words (required)
   --background [background]          Background the generator should paint (default: transparent, choices: transparent | chroma-green | chroma-magenta)
   --pixel-art                        Ask for crisp pixel art
   --from <from>                      Report JSON of the last attempt; adds a correction for each finding
   --piece <piece>                    With a build report for --from, the piece to correct
+  -h, --help                         Display this help message
+  -v, --version                      Display this version
 
 EXAMPLES:
   # Plan a prompt, then one that corrects the last attempt's findings
@@ -105,8 +112,6 @@ ARGUMENTS:
   input           PNG image
 
 OPTIONS:
-  -h, --help                               Display this help message
-  -v, --version                            Display this version
   --watch                                  Inspect again when the image changes; prints one JSON line per run
   --insets <insets>                        Give insets instead of detecting them: l,r,t,b or h,v or n
   --borders <borders>                      Give Phaser scale9Borders x,y,w,h instead of insets
@@ -120,6 +125,8 @@ OPTIONS:
   --tolerance [tolerance]                  Largest premultiplied channel difference, 0-255, that still matches (default: 4)
   --outlier-ratio <outlier-ratio>          Fraction of pixels per line allowed to exceed the tolerance (default: 0)
   --noise [noise]                          auto raises the tolerance to the noise floor of generated art (default: auto, choices: auto | off)
+  -h, --help                               Display this help message
+  -v, --version                            Display this version
 
 EXAMPLES:
   slicewright inspect panel.png
@@ -139,8 +146,6 @@ ARGUMENTS:
   inputs           Two or more PNGs: states such as normal, hover, pressed, or a set such as dialog, button, bar
 
 OPTIONS:
-  -h, --help                               Display this help message
-  -v, --version                            Display this version
   --kind [kind]                            states share one size and slices; a set only shares its line weight (also --as) (default: states, choices: states | set)
   --as <as>                                Same as --kind: compare the PNGs as states or as a set (choices: states | set)
   --slack [slack]                          Pixels insets and content padding may differ by between states (default: 1)
@@ -149,6 +154,8 @@ OPTIONS:
   --tolerance [tolerance]                  Largest premultiplied channel difference, 0-255, that still matches (default: 4)
   --outlier-ratio <outlier-ratio>          Fraction of pixels per line allowed to exceed the tolerance (default: 0)
   --noise [noise]                          auto raises the tolerance to the noise floor of generated art (default: auto, choices: auto | off)
+  -h, --help                               Display this help message
+  -v, --version                            Display this version
 
 EXAMPLES:
   slicewright compare button-normal.png button-hover.png button-pressed.png
@@ -167,8 +174,6 @@ ARGUMENTS:
   input           PNG image
 
 OPTIONS:
-  -h, --help                               Display this help message
-  -v, --version                            Display this version
   --out <out>                              Preview sheet PNG to write
   --cells <cells>                          Cells to show, comma-separated: guides,source,min,wide,tall,double,diagnostics
   --zoom [zoom]                            Scale every cell by this whole number (1-8), nearest-neighbor (default: 1)
@@ -186,6 +191,8 @@ OPTIONS:
   --tolerance [tolerance]                  Largest premultiplied channel difference, 0-255, that still matches (default: 4)
   --outlier-ratio <outlier-ratio>          Fraction of pixels per line allowed to exceed the tolerance (default: 0)
   --noise [noise]                          auto raises the tolerance to the noise floor of generated art (default: auto, choices: auto | off)
+  -h, --help                               Display this help message
+  -v, --version                            Display this version
 
 EXAMPLES:
   slicewright preview panel.png --out previews/panel-sheet.png
@@ -204,8 +211,6 @@ ARGUMENTS:
   input           PNG image
 
 OPTIONS:
-  -h, --help                               Display this help message
-  -v, --version                            Display this version
   --name <name>                            Frame name
   --out <out>                              Atlas JSON to write; printed when omitted
   --image-ref <image-ref>                  How the atlas refers to the image; defaults to its path from the atlas
@@ -221,6 +226,8 @@ OPTIONS:
   --tolerance [tolerance]                  Largest premultiplied channel difference, 0-255, that still matches (default: 4)
   --outlier-ratio <outlier-ratio>          Fraction of pixels per line allowed to exceed the tolerance (default: 0)
   --noise [noise]                          auto raises the tolerance to the noise floor of generated art (default: auto, choices: auto | off)
+  -h, --help                               Display this help message
+  -v, --version                            Display this version
 
 EXAMPLES:
   slicewright frame panel.png --name panel --out ui/panel.json
@@ -238,14 +245,14 @@ ARGUMENTS:
   input           Atlas JSON
 
 OPTIONS:
-  -h, --help                               Display this help message
-  -v, --version                            Display this version
   --image <image>                          Atlas image; defaults to meta.image
   --frame <frame>                          Check only this frame
   --slice <slice>                          Check only this Aseprite slice
   --tolerance [tolerance]                  Largest premultiplied channel difference, 0-255, that still matches (default: 4)
   --outlier-ratio <outlier-ratio>          Fraction of pixels per line allowed to exceed the tolerance (default: 0)
   --noise [noise]                          auto raises the tolerance to the noise floor of generated art (default: auto, choices: auto | off)
+  -h, --help                               Display this help message
+  -v, --version                            Display this version
 
 EXAMPLES:
   slicewright atlas ui/panel.json
@@ -264,8 +271,6 @@ ARGUMENTS:
   input           PNG image
 
 OPTIONS:
-  -h, --help                                 Display this help message
-  -v, --version                              Display this version
   --out <out>                                Keyed PNG to write
   --key [key]                                Key color; auto reads the image border (default: auto, choices: auto | green | magenta)
   --keep [keep]                              Key dominance at or below this stays opaque (also --keep-below) (default: 40)
@@ -273,6 +278,8 @@ OPTIONS:
   --drop [drop]                              Key dominance at or above this is cleared (also --drop-above) (default: 120)
   --drop-above <drop-above>                  Same as --drop
   --despill-radius [despill-radius]          Despill pixels this close to transparency (default: 2)
+  -h, --help                                 Display this help message
+  -v, --version                              Display this version
 
 EXAMPLES:
   slicewright key generated.png --out keyed.png
@@ -291,8 +298,6 @@ ARGUMENTS:
   input           PNG image
 
 OPTIONS:
-  -h, --help                               Display this help message
-  -v, --version                            Display this version
   --out <out>                              Resized PNG to write
   --crop                                   Crop transparent margins first
   --match-outline <match-outline>          Scale so the outline is as thick as this PNG's (a bubble body for its tail)
@@ -300,6 +305,8 @@ OPTIONS:
   --height <height>                        Target height in pixels
   --scale <scale>                          Target scale instead of a size
   --filter [filter]                        area for painted art, nearest for pixel art (default: area, choices: area | nearest)
+  -h, --help                               Display this help message
+  -v, --version                            Display this version
 
 EXAMPLES:
   slicewright resize keyed.png --out ui/panel.png --width 480 --crop
@@ -318,20 +325,18 @@ ARGUMENTS:
   input           PNG image
 
 OPTIONS:
-  -h, --help                               Display this help message
-  -v, --version                            Display this version
   --out <out>                              Normalized PNG to write
-  --keep <keep>                            Rebuild keeping this many pixels of each uniform stretch span
-  --crop                                   Crop transparent margins first (the default); --no-crop keeps them
-  --no-crop                                Negatable of --crop
-  --atlas <atlas>                          Also write a one-frame atlas JSON here
-  --name <name>                            Asset name for --atlas and --target; defaults to the file name
-  --target <target>                        Also export for these targets, comma separated: phaser, css, unity, defold, godot
-  --image-ref <image-ref>                  How --target files refer to the image; defaults to its path from the output
   --width <width>                          Target width in pixels
   --height <height>                        Target height in pixels
   --scale <scale>                          Target scale instead of a size
   --filter [filter]                        area for painted art, nearest for pixel art (default: area, choices: area | nearest)
+  --crop                                   Crop transparent margins first (on by default)
+  --no-crop                                Keep transparent margins instead of cropping them
+  --keep <keep>                            Rebuild keeping this many pixels of each uniform stretch span
+  --target <target>                        Also export for these targets, comma separated: phaser, css, unity, defold, godot
+  --atlas <atlas>                          Also write a one-frame atlas JSON here
+  --name <name>                            Asset name for --atlas and --target; defaults to the file name
+  --image-ref <image-ref>                  How --target files refer to the image; defaults to its path from the output
   --insets <insets>                        Give insets instead of detecting them: l,r,t,b or h,v or n
   --borders <borders>                      Give Phaser scale9Borders x,y,w,h instead of insets
   --mode [mode]                            Slice mode: three keeps the height, three-vertical keeps the width (default: auto, choices: auto | nine | three | three-vertical)
@@ -344,6 +349,8 @@ OPTIONS:
   --tolerance [tolerance]                  Largest premultiplied channel difference, 0-255, that still matches (default: 4)
   --outlier-ratio <outlier-ratio>          Fraction of pixels per line allowed to exceed the tolerance (default: 0)
   --noise [noise]                          auto raises the tolerance to the noise floor of generated art (default: auto, choices: auto | off)
+  -h, --help                               Display this help message
+  -v, --version                            Display this version
 
 EXAMPLES:
   slicewright normalize keyed.png --out ui/panel.png --width 480
@@ -363,8 +370,6 @@ ARGUMENTS:
   inputs           Atlas JSON files, such as the one-frame atlases normalize and export write, or plain PNGs
 
 OPTIONS:
-  -h, --help                               Display this help message
-  -v, --version                            Display this version
   --out <out>                              Packed PNG to write; the atlas goes next to it
   --name <name>                            Texture key and file name for the atlas and stylesheet; defaults to the PNG name
   --spacing [spacing]                      Transparent pixels between frames (default: 2)
@@ -373,6 +378,8 @@ OPTIONS:
   --tolerance [tolerance]                  Largest premultiplied channel difference, 0-255, that still matches (default: 4)
   --outlier-ratio <outlier-ratio>          Fraction of pixels per line allowed to exceed the tolerance (default: 0)
   --noise [noise]                          auto raises the tolerance to the noise floor of generated art (default: auto, choices: auto | off)
+  -h, --help                               Display this help message
+  -v, --version                            Display this version
 
 EXAMPLES:
   slicewright pack ui/panel.json ui/button.json --out ui/ui.png --css
@@ -390,9 +397,9 @@ ARGUMENTS:
   manifest           Build manifest JSON
 
 OPTIONS:
+  --watch                Build again when the manifest or a piece changes; prints one JSON line per build
   -h, --help             Display this help message
   -v, --version          Display this version
-  --watch                Build again when the manifest or a piece changes; prints one JSON line per build
 
 EXAMPLES:
   slicewright build ui.build.json
@@ -411,8 +418,6 @@ ARGUMENTS:
   input           PNG image
 
 OPTIONS:
-  -h, --help                               Display this help message
-  -v, --version                            Display this version
   --target <target>                        Targets, comma separated: phaser, css, unity, defold, godot
   --out-dir [out-dir]                      Directory for the exported files (default: .)
   --image-ref <image-ref>                  How the exported files refer to the image; defaults to its path from --out-dir
@@ -429,6 +434,8 @@ OPTIONS:
   --tolerance [tolerance]                  Largest premultiplied channel difference, 0-255, that still matches (default: 4)
   --outlier-ratio <outlier-ratio>          Fraction of pixels per line allowed to exceed the tolerance (default: 0)
   --noise [noise]                          auto raises the tolerance to the noise floor of generated art (default: auto, choices: auto | off)
+  -h, --help                               Display this help message
+  -v, --version                            Display this version
 
 EXAMPLES:
   slicewright export ui/panel.png --target unity,godot --out-dir exports
@@ -445,4 +452,27 @@ USAGE:
 OPTIONS:
   -h, --help             Display this help message
   -v, --version          Display this version
+
+EXAMPLES:
+  slicewright targets
+```
+
+## slicewright commands
+
+```text
+Print every command with its options, exit codes, and examples as JSON
+
+USAGE:
+  slicewright commands <OPTIONS> [<command>]
+
+ARGUMENTS:
+  command           Describe only this command
+
+OPTIONS:
+  -h, --help             Display this help message
+  -v, --version          Display this version
+
+EXAMPLES:
+  slicewright commands
+  slicewright commands normalize
 ```
