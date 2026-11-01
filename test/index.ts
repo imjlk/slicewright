@@ -23,3 +23,4 @@ import './browser-stability.test.js';
 import './friendly-errors.test.js';
 import './node-support.test.js';
 import './output-paths.test.js';
+import './skills.test.js';
