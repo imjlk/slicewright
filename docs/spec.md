@@ -727,7 +727,8 @@ commands <name>` prints only that command, and an unknown name is a usage error
 that suggests the closest command. The catalog is built from the same command
 definitions the argument parser runs, so it cannot drift from the CLI. Each
 option lists its flag (`--tolerance`), its key, type (`string`, `number`,
-`boolean`, `enum`), whether it is required, its default (`null` when it has
+`boolean`, `enum`), whether it is required (by the parser or, like `prompt
+--kind` and `--style`, by the command itself), its default (`null` when it has
 none), its choices (`null` unless it is an enum), its description, whether
 `--no-<key>` turns it off, its one-letter short form, and its second names: a
 flag such as `--keep-below` names the flag it stands for in `aliasOf`, and that

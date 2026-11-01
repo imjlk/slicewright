@@ -28,7 +28,7 @@ async function stdoutOf(argv: readonly string[]): Promise<string> {
 
 /**
  * @evidence docs/spec.md#command-catalog Checks every command and every argument of the definitions against the printed catalog: type, required, default, choices, negatable, short form, second names, exit codes, and examples, and that an unknown name is refused with a suggestion.
- * @evidenceReview docs/spec.md#command-catalog #5077c4c Reread the new section; this asserts every definition field it lists (type, required, default, choices, negatable, short, second names), the exit codes, examples, one-command output, and the unknown-name suggestion. Ran green with pnpm test.
+ * @evidenceReview docs/spec.md#command-catalog #14c5656 Reread the section with handler-required flags (prompt --kind/--style); this asserts every definition field it lists (type, required, default, choices, negatable, short, second names), the exit codes, examples, one-command output, and the unknown-name suggestion. Ran green with pnpm test.
  */
 export async function catalogMatchesDefinitions(): Promise<void> {
   // slicewright commands describes every definition as it is
@@ -77,7 +77,11 @@ export async function catalogMatchesDefinitions(): Promise<void> {
         ok(option, `${name} --${key}`);
         strictEqual(option.name, `--${key}`);
         strictEqual(option.type, arg['type']);
-        strictEqual(option.required, arg['required'] === true);
+        strictEqual(
+          option.required,
+          arg['required'] === true || (name === 'prompt' && (key === 'kind' || key === 'style')),
+          `${name} --${key} required`,
+        );
         deepStrictEqual(option.default, arg['default'] ?? null, `${name} --${key} default`);
         deepStrictEqual(option.choices, arg['choices'] ?? null, `${name} --${key} choices`);
         strictEqual(option.description, arg['description'] ?? '');
