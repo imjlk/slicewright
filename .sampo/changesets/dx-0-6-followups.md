@@ -1,5 +1,5 @@
 ---
-npm/slicewright: patch
+npm/slicewright: minor
 ---
 
 Developer experience follow-ups to 0.6.0:
