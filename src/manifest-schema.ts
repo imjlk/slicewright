@@ -21,7 +21,7 @@ export interface JsonSchema {
  * that names it in `$schema`. Published as `schema/build-manifest.schema.json`.
  *
  * @evidence docs/spec.md#build-manifest Generates the published JSON Schema from the same type that validates manifests, refusing unknown keys and allowing $schema.
- * @evidenceReview docs/spec.md#build-manifest #fe9a80d Reread the section with the $schema key and published schema and checked this code against it line by line; ran buildsManifests and the manifest error tests green with pnpm test.
+ * @evidenceReview docs/spec.md#build-manifest #404bba1 Reread the section after the missing-input and relative-report-path edit, checked this code against it, and ran pnpm test green.
  */
 export function buildManifestSchema(): JsonSchema {
   const unit = typia.json.schema<BuildManifest>();

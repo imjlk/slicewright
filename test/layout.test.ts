@@ -210,7 +210,7 @@ export function detectsVerticalThreeSlices(): void {
 
 /**
  * @evidence docs/spec.md#multiple-stretch-regions Splits the top edge around a crest only when multiple regions are asked for.
- * @evidenceReview docs/spec.md#multiple-stretch-regions #00b2534 Re-read the section after the normalize-reports-layout and insetsSource edit, checked the assertions against it, and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#multiple-stretch-regions #25c1980 Reread the section after the insetsSource-in-every-report edit, checked this test's assertions against it, and ran pnpm test green.
  */
 export function detectsMultipleRegions(): void {
   const art = crestPanel(96, 40);
@@ -367,7 +367,7 @@ void test('vertical three-slice', detectsVerticalThreeSlices);
 void test('multiple stretch regions', detectsMultipleRegions);
 /**
  * @evidence docs/spec.md#multiple-stretch-regions Reads back the layout normalization reports for a rebuilt multi-region texture, and rejects one of another size or over detail.
- * @evidenceReview docs/spec.md#multiple-stretch-regions #00b2534 Re-read the section after the normalize-reports-layout and insetsSource edit, checked the assertions against it, and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#multiple-stretch-regions #25c1980 Reread the section after the insetsSource-in-every-report edit, checked this test's assertions against it, and ran pnpm test green.
  */
 export function readsBackMultiRegionLayouts(): void {
   const art = crestPanel(240, 100);
@@ -410,7 +410,7 @@ export function readsBackMultiRegionLayouts(): void {
   deepStrictEqual(readLayoutJson(layout), layout);
   throws(() => readLayoutJson({ layout: { ...layout, content: { left: 0 } } }));
   throws(() => readLayoutJson({ x: layout.x }));
-  // A single-region CLI summary is not a layout; explain how to reuse its geometry.
+  // A summary without its layout is not a layout; say what a layout file holds.
   const single = inspectRaster(panel(96, 40), defaultInspectOptions);
   throws(
     () =>
@@ -422,7 +422,7 @@ export function readsBackMultiRegionLayouts(): void {
       }),
     {
       name: 'RangeError',
-      message: /single-region normalize report.*--insets.*--mode.*--tile.*--padding/,
+      message: /^No valid layout: give a SliceLayout with "x" and "y" axes, or a report with a "layout" field.* x is required: an axis object with length and segments\./u,
     },
   );
 

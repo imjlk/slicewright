@@ -123,7 +123,9 @@ A rebuilt multi-region texture is too small for detection to find its regions
 again, so normalization reports the full `layout` for every result, single- or
 multi-region, and the report can be given back as a layout file as it is.
 Given back as a layout file, a layout replaces detection and insets, and the
-report's `insetsSource` is `layout`: each axis
+report's `insetsSource` is `layout` (every report that describes a layout,
+including preview, frame, export, and normalize, says where its insets came
+from: `detected`, `given`, or `layout`): each axis
 must cover the image in order (a `layout.size` error otherwise), every stretch
 segment must be uniform (a `stretch.<axis>.nonuniform` error otherwise), and the
 insets are the outermost flexible lines. The layout's `content` padding, when
@@ -262,7 +264,10 @@ boundary and every boundary is on a whole pixel, is reported as the candidate sc
 may be upscaled by it or any divisor, or be at its native size. A known
 scale (`--pixel-scale`, from 1 to the content size, implying pixel art)
 skips the search and only places the grid at the boundaries' mean phase, or
-at the content's start when there are none. When either axis has a grid, the
+at the content's start when there are none. When the boundaries fit a known
+scale below 0.85 on either axis, a `pixel.scale-mismatch` warning lists the
+whole scales from 32 down to 2 that every boundary on both axes fits at 0.99 or
+better, largest first, or says that none does. When either axis has a grid, the
 share of visible pixels differing by more than 24 from the center pixels of
 their cell and its neighbors (a fractional grid rounds its boundaries) is the
 off-grid share. Inspection with pixel art reports
@@ -382,7 +387,8 @@ cross the maximum width (2048 px by default); a cell wider than that sits alone
 in its row. The caller can choose cells, which keep this order, and zoom every
 cell by a whole number from 1 to 8, repeating each pixel, so small art stays
 inspectable in an image viewer. Asking for a cell the layout cannot show (wide
-when the width never resizes, tall when the height never does) is an error, and
+when the width never resizes, tall when the height never does, diagnostics
+when no finding marks a place) is an error saying why each is missing, and
 so is a sheet over 16384 px on a side or 64 megapixels, which is refused before
 anything renders. Rendering samples the nearest source pixel. Fixed
 segments keep their size and the flexible segments share the rest in proportion
@@ -611,7 +617,11 @@ copies its pixels exactly, and its stylesheet findings are reported. When a
 piece fails its inspection or export, nothing is packed and the build fails;
 otherwise the build fails exactly when the pack fails. Watching builds once,
 then again whenever the manifest or a piece's input changes, reading the
-manifest anew each time, and keeps watching after a failed build. A piece in a
+manifest anew each time, and keeps watching after a failed build. A piece's
+input that does not exist is a build error naming the piece before anything is
+written. The build report gives every file path relative to the manifest's
+directory, as the manifest gives them, keeping a path on another drive
+absolute. A piece in a
 directory that does not exist yet is watched through its nearest existing
 ancestor until the directory appears, and an event that names no file rebuilds
 only when a watched file's modification time changed. A watched file that
@@ -687,6 +697,14 @@ PNGs are states or a set). The original name keeps its default when neither is
 given; giving both names of one flag is a usage error rather than one of the
 values being silently dropped.
 
+Help lists a command's own options first and `--help` and `--version` last,
+gives a negated flag such as `--no-crop` its own description, and shows
+examples for the program and for every command. The program's help lists the
+commands without a row for itself.
+
+The `targets` command prints an object whose `targets` field lists every
+target, so the report can grow fields as the other commands' reports do.
+
 ## Error messages
 
 A usage error names the fix rather than the parser's wording. A missing
@@ -701,8 +719,15 @@ edit), where swapping two neighboring letters is one edit, ignoring letter
 case. A build manifest reports every problem at once, each with its path:
 an unknown key with the closest allowed key at that place and the list of
 allowed keys, a missing required key, a value outside its choices with the
-choices, and any other mismatch with the expected type in words. Errors that
-are not parser or manifest-shape errors keep their own messages.
+choices, and any other mismatch with the expected type in words. A layout file
+that is neither a layout nor a report holding one says what it should be and
+lists its first three problems the same way. An input file that does not exist
+is named as such (`<path> does not exist.`): a build names the piece
+(`pieces[0].input`), a layout file names `--layout`, and an atlas whose image
+is missing names its `meta.image`. A target name that is not a target suggests
+the closest one, on the command line and in a manifest, and a flag with a
+second name is named as it was given. Errors that are not parser,
+manifest-shape, or missing-file errors keep their own messages.
 
 ## Output files
 
