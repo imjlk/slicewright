@@ -9,6 +9,9 @@ When using Playwright Test, the optional [matcher integration](playwright.md)
 handles repeated observations and failure attachments for you. The lower-level
 API below remains available to other runners and scripts.
 
+Coding agents can load this workflow as the `slicewright-browser` agent skill:
+`npx skills add imjlk/slicewright --skill slicewright-browser`.
+
 ## Install
 
 Use Node 22 or newer. In a project using Playwright Test:

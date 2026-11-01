@@ -1,7 +1,9 @@
 # Agent Instructions
 
 slicewright prompts, inspects, and previews nine-slice and three-slice game UI
-art. It is a CLI, a library, and an agent skill (`skills/slicewright`).
+art. It is a CLI, a library, and two agent skills: `skills/slicewright` for the
+art workflow and `skills/slicewright-browser` for the browser/Playwright
+regression APIs.
 
 ## Toolchain
 

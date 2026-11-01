@@ -143,9 +143,16 @@ piece's PNG changes and prints one JSON line per build.
 
 ### Agent skill
 
-slicewright ships an [Agent Skills](https://agentskills.io) skill in
-[`skills/slicewright`](skills/slicewright/SKILL.md). The skill runs the CLI
-through `npx`, so it needs Node 22 or newer but no npm install of its own.
+slicewright ships two [Agent Skills](https://agentskills.io) skills. Both
+need Node 22 or newer.
+
+| Skill | Use it for |
+| --- | --- |
+| [`slicewright`](skills/slicewright/SKILL.md) | Making and checking nine-slice and three-slice art (buttons, panels, bars, frames) and exporting it. Runs the CLI through `npx`, so it needs no npm install of its own. |
+| [`slicewright-browser`](skills/slicewright-browser/SKILL.md) | Checking rendered HTML/CSS or Canvas UI against approved baselines with `slicewright/browser` and `slicewright/playwright`. Needs the package and Playwright installed in the project under test. |
+
+Keeping them apart means a general browser-testing task does not pull in the
+art workflow, and an art task does not load the Playwright guidance.
 
 **Any agent**, with the [`skills`](https://github.com/vercel-labs/skills) CLI
 (Node 22.20 or newer). It installs into `.agents/skills/`, which Codex, Cursor,
@@ -157,8 +164,14 @@ npx skills add imjlk/slicewright                    # this project, detected age
 npx skills add imjlk/slicewright -g                 # every project (user scope)
 npx skills add imjlk/slicewright -a claude-code -a codex -a cursor -y
 npx skills add imjlk/slicewright --agent '*' -y     # every supported agent
-npx skills update slicewright                       # later, to update
+npx skills add imjlk/slicewright --list             # show the skills without installing
+npx skills add imjlk/slicewright --skill slicewright -y          # art workflow only
+npx skills add imjlk/slicewright --skill slicewright-browser -y  # browser checks only
+npx skills update                                   # later, to update
 ```
+
+Without `--skill`, the CLI asks which skills to install; with `-y` it installs
+both.
 
 `--agent '*'` skips agents whose skill directory does not exist in the project
 yet; `--all` is short for `--skill '*' --agent '*' -y`.
@@ -168,12 +181,15 @@ yet; `--all` is short for `--skill '*' --agent '*' -y`.
 ```text
 /plugin marketplace add imjlk/slicewright
 /plugin install slicewright@slicewright
+/plugin install slicewright-browser@slicewright
 ```
 
-On Claude Code 2.1.275 or newer, one step also works:
+Each skill is its own plugin; install the ones you need. On Claude Code
+2.1.275 or newer, one step also works:
 `/plugin install slicewright --marketplace imjlk/slicewright`.
 
-**Manual:** copy or link the folder into your agent's skill directory. Create
+**Manual:** copy or link each skill folder you want into your agent's skill
+directory. Create
 the directory first; `ln -sfn` replaces an older link instead of nesting one.
 
 ```bash
@@ -181,10 +197,11 @@ git clone https://github.com/imjlk/slicewright ~/.local/share/slicewright
 mkdir -p ~/.claude/skills ~/.agents/skills
 ln -sfn ~/.local/share/slicewright/skills/slicewright ~/.claude/skills/slicewright  # Claude Code
 ln -sfn ~/.local/share/slicewright/skills/slicewright ~/.agents/skills/slicewright  # Codex, Cursor, …
+# The same for skills/slicewright-browser, if you use the browser APIs.
 ```
 
 A project that installed the package can link
-`"$PWD/node_modules/slicewright/skills/slicewright"` the same way; the link
+`"$PWD/node_modules/slicewright/skills/<skill>"` the same way; the link
 breaks when `node_modules` is removed.
 
 | Agent | User scope | Project scope |

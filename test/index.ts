@@ -24,3 +24,4 @@ import './friendly-errors.test.js';
 import './command-reference.test.js';
 import './node-support.test.js';
 import './output-paths.test.js';
+import './skills.test.js';
