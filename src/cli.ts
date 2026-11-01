@@ -4,7 +4,9 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'nod
 import { fileURLToPath } from 'node:url';
 
 import { cli, define } from 'gunshi';
+import { getAgentProfile } from 'gunshi/agent';
 
+import { agentMode, conciseHelp, plain } from './agent-mode.js';
 import { writeBrowserReportHtml } from './browser-report.js';
 import { aliasedValue, joinNegativeNumbers } from './argv.js';
 import { describeCommands, type ExitCode } from './command-catalog.js';
@@ -1295,15 +1297,33 @@ export const cliOptions = {
 } as const;
 
 async function runCli(argv: readonly string[]): Promise<void> {
+  // Under an AI agent (or SLICEWRIGHT_AGENT=1) help is concise and messages are plain text.
+  const agent = agentMode(getAgentProfile(), process.env);
+  const program = {
+    name: cliOptions.name,
+    version,
+    description: main.description ?? '',
+    commands: subCommands,
+  };
   try {
-    await cli(joinNegativeNumbers(argv, numberFlags), main, cliOptions);
+    await cli(
+      joinNegativeNumbers(argv, numberFlags),
+      main,
+      agent.on
+        ? {
+            ...cliOptions,
+            renderUsage: (ctx) => Promise.resolve(conciseHelp(program, ctx.name)),
+          }
+        : cliOptions,
+    );
   } catch (error) {
     const named = argv.find((arg) => !arg.startsWith('-'));
     const messages = friendlyCliErrors(error, {
       command: named !== undefined && Object.hasOwn(subCommands, named) ? named : undefined,
       commands: Object.keys(subCommands),
     });
-    process.stderr.write(messages.map((message) => `slicewright: ${message}\n`).join(''));
+    const text = messages.map((message) => `slicewright: ${message}\n`).join('');
+    process.stderr.write(agent.on ? plain(text) : text);
     process.exitCode = usageFailed;
   }
 }

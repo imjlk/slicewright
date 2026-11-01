@@ -59,6 +59,13 @@ importable as a library (`import { inspectRaster } from 'slicewright'`).
 
 From a clone, follow [Development](#development), then `node dist/cli.js`.
 
+Under an AI coding agent (Claude Code, Codex, Cursor, Gemini CLI, and others
+that gunshi's `getAgentProfile()` detects), `--help` is concise: one line per
+command or option with its type, choices, and default, then the examples, and
+no ANSI codes. Set `AI_AGENT=<name>` to turn this on for an agent that is not
+detected, `SLICEWRIGHT_AGENT=1` to force it, or `SLICEWRIGHT_AGENT=0` for the
+full help. Command output and exit codes are the same either way.
+
 Every command prints JSON on stdout. Exit codes: 0 when the command ran and
 found no error; 1 when a finding is an error (`inspect`, `compare`, `frame`,
 `atlas`, `normalize`, `export`, `pack`, `build`, and `browser-report` for a
