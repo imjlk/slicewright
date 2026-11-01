@@ -11,7 +11,7 @@ const negativeNumber = /^-(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i;
  * after `--` are left as they are.
  *
  * @evidence docs/spec.md#command-line-arguments Joins a negative number to the number flag before it, refuses a number flag without a value, and stops at a `--` terminator.
- * @evidenceReview docs/spec.md#command-line-arguments #07def6c Reread the section with the new flag-alias paragraph; this still covers the negative-number rules, which are unchanged, and the aliases are cited by aliasedValue/readsFlagAliases. Ran green with pnpm test.
+ * @evidenceReview docs/spec.md#command-line-arguments #f21cb56 Reread the section after the help-layout and targets-object edit, checked this code against it, and ran pnpm test green.
  */
 export function joinNegativeNumbers(
   argv: readonly string[],
@@ -52,7 +52,7 @@ export interface AliasedFlags {
  * both names is refused, since one of the values would be silently dropped.
  *
  * @evidence docs/spec.md#command-line-arguments Reads a flag under either of its two names, keeps the original's default, and refuses both names at once.
- * @evidenceReview docs/spec.md#command-line-arguments #07def6c Checked against the flag-alias paragraph of the section (either name, original default kept, both refused) and ran readsFlagAliases green with pnpm test.
+ * @evidenceReview docs/spec.md#command-line-arguments #f21cb56 Reread the section after the help-layout and targets-object edit, checked this code against it, and ran pnpm test green.
  */
 export function aliasedValue<T>(flags: AliasedFlags, name: string, alias: string): T {
   const named = flags.explicit?.[name] === true;

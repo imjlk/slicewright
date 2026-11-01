@@ -33,8 +33,15 @@ stdout; `inspect`, `compare`, `frame`, `atlas`, `normalize`, `export`,
 `pack`, and `build` exit 1 when a finding is an error (for `export`, a layout
 the target cannot represent), `browser-report` exits 1 for a failing report,
 and every command exits 2 on bad input. `prompt`, `preview`, `key`, `resize`,
-and `targets` never exit 1: read their JSON. Output folders are created as
-needed. `--help` works on each command and ends with examples.
+`targets`, and `commands` never exit 1: read their JSON. Output folders are
+created as needed. `--help` works on each command and ends with examples.
+
+Before building a command line you are unsure of, run
+`slicewright commands <command>` (or `slicewright commands` for all of them).
+It prints JSON with every option's type, default, choices, whether it is
+required or negatable (`--no-crop`), its second names, the command's exit
+codes, and its examples, read from the installed CLI itself, so it is right
+for the version npx runs even where this skill lags behind.
 
 ## Workflow
 
@@ -126,14 +133,16 @@ needed. `--help` works on each command and ends with examples.
    relative to the directory you run from, as if the game were served from
    there; run it from the game's served root or pass `--image-ref`. Prefix
    `--name` (`ui-button`) so CSS class names do not collide in a page. It
-   prints how to use them; `slicewright targets` lists what each target
-   can represent. Phaser and CSS are verified in the real engine. `unity`
+   prints how to use them; `slicewright targets` prints `{"targets": [...]}`
+   with what each target can represent. Phaser and CSS are verified in the real engine. `unity`
    (spriteBorder values, no files, never `.meta`), `defold` (`slice9` values),
    and `godot` (a `StyleBoxTexture` `.tres`; pass `--image-ref res://…`) are
    experimental: they follow the documented formats but are untested in the
    engine, so check them there before shipping.
 8. **Pack a set.** `slicewright pack ui/dialog.json ui/button.json ui/bar.json
-   --out ui/ui.png` puts every piece in one image and atlas, so the game loads
+   --out ui/ui.png` takes the atlas JSON beside each piece, so normalize every
+   piece with `--target phaser` or `--atlas <file>.json` first (a PNG alone
+   cannot be packed). It puts every piece in one image and atlas, so the game loads
    them with one `this.load.atlas`; it prints a `nineslice` call per frame,
    with tiling flags. Add `--css` for one stylesheet with a class per piece.
    Once the settings per piece are settled, write them into a manifest

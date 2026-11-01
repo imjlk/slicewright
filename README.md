@@ -49,21 +49,34 @@ npx -y slicewright key generated.png --out keyed.png
 npx -y slicewright normalize keyed.png --width 480 --out ui/panel.png --name panel --target phaser,css
 npx -y slicewright preview ui/panel.png --out panel-sheet.png
 npx -y slicewright atlas ui/panel.json
+npx -y slicewright key generated-button.png --out keyed-button.png
+npx -y slicewright normalize keyed-button.png --width 240 --out ui/button.png --name button --target phaser
 npx -y slicewright pack ui/panel.json ui/button.json --out ui/ui.png --css
 ```
 
-Run `npx -y slicewright --help` for every command, and `--help` after a
+`pack` takes the atlas JSON that `normalize --target phaser` (or `--atlas`)
+writes beside each piece. Run `npx -y slicewright --help` for every command, and `--help` after a
 command for its options and examples. Output folders are created as needed. Install it in a project with
 `npm install --save-dev slicewright` to pin the version; the same functions are
 importable as a library (`import { inspectRaster } from 'slicewright'`).
 
 From a clone, follow [Development](#development), then `node dist/cli.js`.
 
+Under an AI coding agent (Claude Code, Codex, Cursor, Gemini CLI, and others
+that gunshi's `getAgentProfile()` detects), `--help` is concise: one line per
+command or option with its type, choices, and default, then the examples, and
+no ANSI codes. Set `AI_AGENT=<name>` to turn this on for an agent that is not
+detected, `SLICEWRIGHT_AGENT=1` to force it, or `SLICEWRIGHT_AGENT=0` for the
+full help. Command output and exit codes are the same either way.
+
 Every command prints JSON on stdout. Exit codes: 0 when the command ran and
 found no error; 1 when a finding is an error (`inspect`, `compare`, `frame`,
 `atlas`, `normalize`, `export`, `pack`, `build`, and `browser-report` for a
 failing report); 2 for bad arguments or unreadable input. `prompt`, `preview`,
-`key`, `resize`, and `targets` exit 0 or 2.
+`key`, `resize`, `targets`, and `commands` exit 0 or 2. `slicewright commands`
+prints every command's arguments, options (type, default, choices, required,
+negatable, aliases), exit codes, and examples as JSON, read from the same
+definitions the parser runs; `slicewright commands <name>` prints one.
 
 ### Browser E2E verification
 

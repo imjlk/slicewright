@@ -381,7 +381,7 @@ export function pickAxisSpan(
  * @evidence docs/spec.md#vertical-three-slice Keeps the width when columns never match but rows do, or when the mode asks for it.
  * @evidenceReview docs/spec.md#vertical-three-slice #072e9af Checked this code against the section line by line and ran detectsVerticalThreeSlices green with pnpm test.
  * @evidence docs/spec.md#multiple-stretch-regions Builds a multi-region layout when asked and an axis has more than one long run.
- * @evidenceReview docs/spec.md#multiple-stretch-regions #00b2534 Re-read the section after the normalize-reports-layout and insetsSource edit, checked this code against it, and ran readsBackMultiRegionLayouts green with pnpm test.
+ * @evidenceReview docs/spec.md#multiple-stretch-regions #25c1980 Reread the section after the insetsSource-in-every-report edit, checked this code against it, and ran pnpm test green.
  */
 export function detectLayout(
   raster: Raster,
@@ -475,7 +475,7 @@ export function detectLayout(
  * only when an axis has more than one such run and does not tile.
  *
  * @evidence docs/spec.md#multiple-stretch-regions Keeps every long uniform run as a stretch segment, leaves tiled axes single, and records the counts.
- * @evidenceReview docs/spec.md#multiple-stretch-regions #00b2534 Re-read the section after the normalize-reports-layout and insetsSource edit, checked this code against it, and ran readsBackMultiRegionLayouts green with pnpm test.
+ * @evidenceReview docs/spec.md#multiple-stretch-regions #25c1980 Reread the section after the insetsSource-in-every-report edit, checked this code against it, and ran pnpm test green.
  */
 export function multiRegionLayout(
   raster: Raster,
@@ -533,7 +533,7 @@ export function multiRegionLayout(
  * stretch segment must be uniform.
  *
  * @evidence docs/spec.md#multiple-stretch-regions Verifies a given layout against the image size and the uniformity of each stretch segment instead of detecting one.
- * @evidenceReview docs/spec.md#multiple-stretch-regions #00b2534 Re-read the section after the normalize-reports-layout and insetsSource edit, checked this code against it, and ran readsBackMultiRegionLayouts green with pnpm test.
+ * @evidenceReview docs/spec.md#multiple-stretch-regions #25c1980 Reread the section after the insetsSource-in-every-report edit, checked this code against it, and ran pnpm test green.
  */
 export function verifyGivenLayout(
   raster: Raster,

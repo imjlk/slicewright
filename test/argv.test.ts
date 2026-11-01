@@ -6,7 +6,7 @@ import { aliasedValue, joinNegativeNumbers } from '../src/argv.js';
 
 /**
  * @evidence docs/spec.md#command-line-arguments Joins negative integers, decimals, and exponents to number flags only, and leaves joined values, other flags, and arguments after -- alone.
- * @evidenceReview docs/spec.md#command-line-arguments #07def6c Reread the section with the new flag-alias paragraph; this still covers the negative-number rules, which are unchanged, and the aliases are cited by aliasedValue/readsFlagAliases. Ran green with pnpm test.
+ * @evidenceReview docs/spec.md#command-line-arguments #f21cb56 Reread the section after the help-layout and targets-object edit, checked this test's assertions against it, and ran pnpm test green.
  */
 export function joinsNegativeNumbers(): void {
   const flags = new Set(['--tolerance', '--spacing', '--zoom']);
@@ -50,7 +50,7 @@ void test('command-line arguments', joinsNegativeNumbers);
 
 /**
  * @evidence docs/spec.md#command-line-arguments Reads either name of an aliased flag, keeps the original name's default when neither is typed, and refuses both names at once.
- * @evidenceReview docs/spec.md#command-line-arguments #07def6c Checked against the flag-alias paragraph of the section (either name, original default kept, both refused) and ran readsFlagAliases green with pnpm test.
+ * @evidenceReview docs/spec.md#command-line-arguments #f21cb56 Reread the section after the help-layout and targets-object edit, checked this test's assertions against it, and ran pnpm test green.
  */
 export function readsFlagAliases(): void {
   const values = { kind: 'states', as: undefined };

@@ -37,6 +37,11 @@ export interface PixelGrid {
    * upscaled by it or any of its divisors, or be at its native size.
    */
   readonly candidate?: number;
+  /**
+   * When a given scale fits the boundaries poorly (below 0.85 on an axis):
+   * the whole scales from 2 to 32 that fit both axes exactly, largest first.
+   */
+  readonly fittingScales?: readonly number[];
 }
 
 /** Adjacent lines differing by more than this (premultiplied, alpha included) are a boundary. */
@@ -71,7 +76,7 @@ export const offGridWarning = 0.1;
  * fit is the scale. Cells are then compared with their center pixel.
  *
  * @evidence docs/spec.md#pixel-grid Finds boundaries between lines, fits the largest period they agree on per axis, fills a sparse axis from the other axis's whole scale, leaves two sparse axes undetermined with a candidate scale, places a given scale, and measures off-grid pixels against each cell's center.
- * @evidenceReview docs/spec.md#pixel-grid #cf46969 Reread the section with the sparse-axis, differing-lines, candidate and given-scale rules and checked this code against it line by line; ran detectsPixelGrid and judgesSparsePixelGrid green with pnpm test.
+ * @evidenceReview docs/spec.md#pixel-grid #e6fc6fc Reread the section after the scale-mismatch warning edit, checked this code against it, and ran pnpm test green.
  */
 export function detectPixelGrid(
   raster: Raster,
@@ -86,6 +91,7 @@ export function detectPixelGrid(
   let x: PixelGridAxis;
   let y: PixelGridAxis;
   let candidate: number | undefined;
+  let fittingScales: number[] | undefined;
   if (options.scale !== undefined) {
     const scale = options.scale;
     if (!Number.isFinite(scale) || scale < 1 || scale > area.width || scale > area.height) {
@@ -95,6 +101,9 @@ export function detectPixelGrid(
     }
     x = givenAxis(edgesX, area.x, scale);
     y = givenAxis(edgesY, area.y, scale);
+    if (Math.min(x.fit, y.fit) < minimumFit) {
+      fittingScales = wholeFits(edgesX, edgesY, area);
+    }
   } else {
     const spacingX = spacingScale(edgesX, area.x, area.width);
     const spacingY = spacingScale(edgesY, area.y, area.height);
@@ -115,7 +124,22 @@ export function detectPixelGrid(
       height: cellCenters(y, area.y, area.height).length,
     },
     ...(candidate === undefined ? {} : { candidate }),
+    ...(fittingScales === undefined ? {} : { fittingScales }),
   };
+}
+
+/** Whole scales from 2 to 32 every boundary on both axes lies on, largest first. */
+function wholeFits(edgesX: readonly number[], edgesY: readonly number[], area: Rect): number[] {
+  const fits: number[] = [];
+  const largest = Math.min(maximumScale, area.width, area.height);
+  for (let scale = largest; scale >= minimumScale; scale -= 1) {
+    const fitsAxis = (edges: readonly number[]): boolean =>
+      edges.length === 0 || phaseAgreement(edges, scale).fit >= exactFit;
+    if (fitsAxis(edgesX) && fitsAxis(edgesY)) {
+      fits.push(scale);
+    }
+  }
+  return fits;
 }
 
 /**
@@ -123,7 +147,7 @@ export function detectPixelGrid(
  * so a fractional or offset grid still lands each art pixel exactly.
  *
  * @evidence docs/spec.md#pixel-grid Samples each cell's center pixel to rebuild the art at one pixel per cell.
- * @evidenceReview docs/spec.md#pixel-grid #cf46969 Reread the section with the sparse-axis, differing-lines, candidate and given-scale rules and checked this code against it line by line; ran detectsPixelGrid and judgesSparsePixelGrid green with pnpm test.
+ * @evidenceReview docs/spec.md#pixel-grid #e6fc6fc Reread the section after the scale-mismatch warning edit, checked this code against it, and ran pnpm test green.
  */
 export function snapToPixelGrid(raster: Raster, grid: PixelGrid): Raster {
   const xs = cellCenters(grid.x, 0, raster.width);
@@ -143,7 +167,7 @@ export function snapToPixelGrid(raster: Raster, grid: PixelGrid): Raster {
  * cells that are not one flat color.
  *
  * @evidence docs/spec.md#pixel-grid Reports an upscaled grid with its snap command, off-grid pixels as a warning, no grid as a note, and an undetermined grid with its candidate scales.
- * @evidenceReview docs/spec.md#pixel-grid #cf46969 Reread the section with the sparse-axis, differing-lines, candidate and given-scale rules and checked this code against it line by line; ran detectsPixelGrid and judgesSparsePixelGrid green with pnpm test.
+ * @evidenceReview docs/spec.md#pixel-grid #e6fc6fc Reread the section after the scale-mismatch warning edit, checked this code against it, and ran pnpm test green.
  */
 export function pixelGridFindings(grid: PixelGrid): Finding[] {
   const findings: Finding[] = [];
@@ -188,6 +212,19 @@ export function pixelGridFindings(grid: PixelGrid): Finding[] {
     }`,
     details: { ...details, basis },
   });
+  if (grid.fittingScales !== undefined) {
+    const fits = grid.fittingScales;
+    findings.push({
+      code: 'pixel.scale-mismatch',
+      severity: 'warning',
+      message: `The color edges do not line up with a ${round(grid.x.scale)}-pixel grid (fit ${round(grid.x.fit)} across, ${round(grid.y.fit)} down, below ${minimumFit}), so snapping at that scale drops or doubles art pixels. ${
+        fits.length === 0
+          ? 'No whole scale from 2 to 32 fits every edge; check the scale, or leave out --pixel-scale to let --pixel-art search.'
+          : `Every edge lies on a grid of ${scaleList(fits)}; give --pixel-scale ${String(fits[0])} if that is the art's scale.`
+      }`,
+      details: { ...details, basis, fittingScales: fits },
+    });
+  }
   if (grid.offGrid > offGridWarning) {
     findings.push({
       code: 'pixel.off-grid',
@@ -403,6 +440,14 @@ function scaleChoices(scale: number): string {
   return choices.length === 1
     ? String(scale)
     : `${choices.slice(0, -1).join(', ')} or ${String(choices.at(-1))}`;
+}
+
+/** "6, 3 or 2": the first few of `scales`, as given. */
+function scaleList(scales: readonly number[]): string {
+  const shown = scales.slice(0, 4);
+  return shown.length === 1
+    ? String(shown[0])
+    : `${shown.slice(0, -1).join(', ')} or ${String(shown.at(-1))}`;
 }
 
 function gcd(a: number, b: number): number {

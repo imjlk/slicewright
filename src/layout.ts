@@ -1,5 +1,7 @@
 import typia from 'typia';
 
+import { friendlyShapeIssues } from './friendly-errors.js';
+
 import type { TileAxes } from './inspect.js';
 import type { SliceInsets } from './slices.js';
 
@@ -195,27 +197,28 @@ export function contentLimits(layout: SliceLayout): SliceInsets {
 }
 
 /**
- * Reads a SliceLayout or a report containing `layout` from parsed JSON.
- * The normalize CLI includes `layout` for multi-region results; its single-region
- * reports expose insets and content padding instead. Validated with typia, so
- * every axis and any layout content padding is complete.
+ * Reads a SliceLayout or a report containing `layout` from parsed JSON, such
+ * as the reports normalize and inspect print. Validated with typia, so every
+ * axis and any layout content padding is complete; a bad layout is explained
+ * path by path.
  */
 export function readLayoutJson(json: unknown): SliceLayout {
-  const layout =
-    json !== null && typeof json === 'object' && 'layout' in json
-      ? (json as { readonly layout: unknown }).layout
-      : json;
+  const wrapped = json !== null && typeof json === 'object' && 'layout' in json;
+  const layout = wrapped ? (json as { readonly layout: unknown }).layout : json;
   const result = typia.validate<SliceLayout>(layout);
   if (!result.success) {
-    const problems = result.errors
-      .slice(0, 3)
-      .map((error) => `${error.path} should be ${error.expected}`)
-      .join('; ');
+    const shown = 3;
+    const problems = friendlyShapeIssues(
+      result.errors.slice(0, shown).map((error) => ({
+        path: error.path,
+        expected: error.expected,
+        value: error.value,
+      })),
+      wrapped ? 'layout' : '',
+    );
+    const more = result.errors.length - shown;
     throw new RangeError(
-      'No valid layout: pass a SliceLayout object or a report containing "layout". ' +
-        'For a single-region normalize report, use its insets with --insets, ' +
-        'repeat --mode and --tile when applicable, and use its contentPadding ' +
-        `with --padding if needed. ${problems}.`,
+      `No valid layout: give a SliceLayout with "x" and "y" axes, or a report with a "layout" field such as normalize and inspect print. ${problems.join(' ')}${more > 0 ? ` (${more} more)` : ''}`,
     );
   }
   return result.data;

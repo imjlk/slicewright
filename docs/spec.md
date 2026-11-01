@@ -123,7 +123,9 @@ A rebuilt multi-region texture is too small for detection to find its regions
 again, so normalization reports the full `layout` for every result, single- or
 multi-region, and the report can be given back as a layout file as it is.
 Given back as a layout file, a layout replaces detection and insets, and the
-report's `insetsSource` is `layout`: each axis
+report's `insetsSource` is `layout` (every report that describes a layout,
+including preview, frame, export, and normalize, says where its insets came
+from: `detected`, `given`, or `layout`): each axis
 must cover the image in order (a `layout.size` error otherwise), every stretch
 segment must be uniform (a `stretch.<axis>.nonuniform` error otherwise), and the
 insets are the outermost flexible lines. The layout's `content` padding, when
@@ -262,7 +264,10 @@ boundary and every boundary is on a whole pixel, is reported as the candidate sc
 may be upscaled by it or any divisor, or be at its native size. A known
 scale (`--pixel-scale`, from 1 to the content size, implying pixel art)
 skips the search and only places the grid at the boundaries' mean phase, or
-at the content's start when there are none. When either axis has a grid, the
+at the content's start when there are none. When the boundaries fit a known
+scale below 0.85 on either axis, a `pixel.scale-mismatch` warning lists the
+whole scales from 32 down to 2 that every boundary on both axes fits at 0.99 or
+better, largest first, or says that none does. When either axis has a grid, the
 share of visible pixels differing by more than 24 from the center pixels of
 their cell and its neighbors (a fractional grid rounds its boundaries) is the
 off-grid share. Inspection with pixel art reports
@@ -382,7 +387,8 @@ cross the maximum width (2048 px by default); a cell wider than that sits alone
 in its row. The caller can choose cells, which keep this order, and zoom every
 cell by a whole number from 1 to 8, repeating each pixel, so small art stays
 inspectable in an image viewer. Asking for a cell the layout cannot show (wide
-when the width never resizes, tall when the height never does) is an error, and
+when the width never resizes, tall when the height never does, diagnostics
+when no finding marks a place) is an error saying why each is missing, and
 so is a sheet over 16384 px on a side or 64 megapixels, which is refused before
 anything renders. Rendering samples the nearest source pixel. Fixed
 segments keep their size and the flexible segments share the rest in proportion
@@ -611,7 +617,11 @@ copies its pixels exactly, and its stylesheet findings are reported. When a
 piece fails its inspection or export, nothing is packed and the build fails;
 otherwise the build fails exactly when the pack fails. Watching builds once,
 then again whenever the manifest or a piece's input changes, reading the
-manifest anew each time, and keeps watching after a failed build. A piece in a
+manifest anew each time, and keeps watching after a failed build. A piece's
+input that does not exist is a build error naming the piece before anything is
+written. The build report gives every file path relative to the manifest's
+directory, as the manifest gives them, keeping a path on another drive
+absolute. A piece in a
 directory that does not exist yet is watched through its nearest existing
 ancestor until the directory appears, and an event that names no file rebuilds
 only when a watched file's modification time changed. A watched file that
@@ -687,6 +697,14 @@ PNGs are states or a set). The original name keeps its default when neither is
 given; giving both names of one flag is a usage error rather than one of the
 values being silently dropped.
 
+Help lists a command's own options first and `--help` and `--version` last,
+gives a negated flag such as `--no-crop` its own description, and shows
+examples for the program and for every command. The program's help lists the
+commands without a row for itself.
+
+The `targets` command prints an object whose `targets` field lists every
+target, so the report can grow fields as the other commands' reports do.
+
 ## Error messages
 
 A usage error names the fix rather than the parser's wording. A missing
@@ -701,8 +719,15 @@ edit), where swapping two neighboring letters is one edit, ignoring letter
 case. A build manifest reports every problem at once, each with its path:
 an unknown key with the closest allowed key at that place and the list of
 allowed keys, a missing required key, a value outside its choices with the
-choices, and any other mismatch with the expected type in words. Errors that
-are not parser or manifest-shape errors keep their own messages.
+choices, and any other mismatch with the expected type in words. A layout file
+that is neither a layout nor a report holding one says what it should be and
+lists its first three problems the same way. An input file that does not exist
+is named as such (`<path> does not exist.`): a build names the piece
+(`pieces[0].input`), a layout file names `--layout`, and an atlas whose image
+is missing names its `meta.image`. A target name that is not a target suggests
+the closest one, on the command line and in a manifest, and a flag with a
+second name is named as it was given. Errors that are not parser,
+manifest-shape, or missing-file errors keep their own messages.
 
 ## Output files
 
@@ -716,6 +741,26 @@ Windows drives have no relative path, so rather than write an absolute or
 broken reference the command refuses with a usage error asking for
 `--image-ref`, before writing anything, and a packed stylesheet gives that
 frame no class, with a `pack.css-skipped` warning.
+
+## Command catalog
+
+`slicewright commands` prints, as JSON, every command with its usage line,
+positional arguments (required as the parser treats them: a single one unless it
+is marked optional or has a default, a repeated one only when marked), options,
+the exit codes it can end with, and its example command lines; `slicewright
+commands <name>` prints only that command, and an unknown name is a usage error
+that suggests the closest command. The catalog is built from the same command
+definitions the argument parser runs, so it cannot drift from the CLI. Each
+option lists its flag (`--tolerance`), its key, type (`string`, `number`,
+`boolean`, `enum`), whether it is required (by the parser or, like `prompt
+--kind` and `--style`, by the command itself), its default (`null` when it has
+none), its choices (`null` unless it is an enum), its description, whether
+`--no-<key>` turns it off, its one-letter short form, and its second names: a
+flag such as `--keep-below` names the flag it stands for in `aliasOf`, and that
+flag lists it in `aliases`. The top level gives the program version, the meaning
+of exit codes 0, 1, and 2, and the rule that stdout carries JSON only. Exit code
+1 is listed only for the commands where a finding or a failing report can
+produce it.
 
 ## Generation prompts
 
@@ -753,6 +798,23 @@ findings and codes about how the art is sliced, packed, or exported, not how
 it is drawn, add nothing. The lines are appended to the prompt under
 "Corrections from the previous attempt:" and listed as `corrections`, empty
 when nothing applies.
+
+## Agent mode
+
+When an AI coding agent runs the CLI, `--help` is concise and plain. Detection is
+gunshi's `getAgentProfile()`, which reads the environment the agent sets (for
+example Claude Code, Codex, Cursor, or Gemini CLI), and a non-empty
+`AI_AGENT=<name>` turns it on for any other agent. `SLICEWRIGHT_AGENT=1` (or
+`true`) turns agent mode on and `SLICEWRIGHT_AGENT=0` (or `false`) turns it off
+whatever was detected; any other value leaves detection in charge. In agent mode
+the program's help is its version and description, a usage line, one line per
+command, and a note that stdout is JSON only with exit codes 0, 1, and 2. A
+command's help is its description, a usage line, one line per positional
+argument, one line per option with its value type or enum choices, whether it is
+required, its default, and `--[no-]<key>` for a negatable flag, then its example
+command lines and the same note; it has no banner and no `-h`/`-v` rows. Help and
+error messages on stderr carry no ANSI escape codes in agent mode. Command
+output, the JSON on stdout, and exit codes are the same in both modes.
 
 ## Browser UI verification
 
