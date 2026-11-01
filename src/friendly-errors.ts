@@ -48,6 +48,14 @@ function editDistance(a: string, b: string): number {
   return at(a.length, b.length);
 }
 
+// Why not @gunshi/plugin-suggestion: it only decorates gunshi's validation-error
+// renderer, which this CLI turns off (renderValidationErrors: null) because that
+// renderer prints to stdout, and stdout carries JSON only. It also covers just
+// unknown long options and commands, with plain Levenshtein within 2 edits and
+// its own wording, while didYouMean above also serves enum choices, targets, and
+// manifest keys with one rule (a third of the length, swaps as one edit). The
+// suggestions here therefore stay in this module.
+
 /** What the CLI knows about the command a parse error came from. */
 export interface CommandHelp {
   /** The subcommand, such as `normalize`; undefined for the bare program. */
@@ -114,7 +122,40 @@ function friendlyCliError(error: unknown, help: CommandHelp): string {
       return `Unknown option ${raw}${help.command === undefined ? '' : ` for ${help.command}`}.${guess === undefined ? '' : ` Did you mean ${guess}?`} ${seeHelp}`;
     }
     default:
-      return error.message;
+      return friendlyNewParseError(error.code as string, values, flag, help) ?? error.message;
+  }
+}
+
+/**
+ * Codes the parser of gunshi 1.0 (`args-tokens` 1.0) adds; 0.37 reports these
+ * cases as a type, choice, or required error instead, so this is reached only
+ * after that upgrade.
+ */
+function friendlyNewParseError(
+  code: string,
+  values: Record<string, unknown>,
+  flag: string,
+  help: CommandHelp,
+): string | undefined {
+  const seeHelp = `Run \`slicewright${help.command === undefined ? '' : ` ${help.command}`} --help\` for the options.`;
+  switch (code) {
+    // `--out` with nothing after it.
+    case 'err:arg:missing-value': {
+      const choices = Array.isArray(values['choiceValues'])
+        ? values['choiceValues'].map(String)
+        : [];
+      return choices.length > 0
+        ? `${flag} needs one of ${choices.join(', ')}. ${seeHelp}`
+        : `${help.command ?? 'slicewright'} needs ${flag} <value>. ${seeHelp}`;
+    }
+    // `--no-crop=false`: a negated flag takes no value.
+    case 'err:arg:unexpected-value': {
+      const raw = String(values['rawName'] ?? flag);
+      const actual = values['actual'];
+      return `${raw} takes no value${typeof actual === 'string' ? `; drop "=${actual}"` : ''}. ${seeHelp}`;
+    }
+    default:
+      return undefined;
   }
 }
 

@@ -14,14 +14,16 @@ export function namesOneMinimumNode(): void {
   const minimum = /^>=(\d+)\.0\.0$/u.exec(engines)?.[1];
   ok(minimum, `engines.node should be >=N.0.0, got ${engines}`);
   strictEqual(minimum, '22');
-  const skill = read('skills/slicewright/SKILL.md');
-  match(skill, new RegExp(`Requires Node\\.js ${minimum} or newer`, 'u'));
-  match(skill, new RegExp(`below ${minimum}\\.`, 'u'));
+  for (const path of ['skills/slicewright/SKILL.md', 'skills/slicewright-browser/SKILL.md']) {
+    const skill = read(path);
+    match(skill, new RegExp(`Requires Node\\.js ${minimum} or newer`, 'u'), path);
+    match(skill, new RegExp(`below ${minimum}\\.`, 'u'), path);
+  }
   for (const doc of [
     'README.md',
     'docs/browser.md',
     'docs/playwright.md',
-    'skills/slicewright/references/browser-testing.md',
+    'skills/slicewright-browser/references/browser-testing.md',
     'examples/baseline-workflow/README.md',
   ]) {
     for (const [, major] of read(doc).matchAll(/Node(?:\.js)? (\d+)(?:\+| or newer)/gu)) {

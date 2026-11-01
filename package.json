@@ -62,6 +62,7 @@
     "build": "pnpm clean && ttsc -p tsconfig.build.json",
     "examples": "ttsx tools/make-examples.ts",
     "schema": "ttsx tools/manifest-schema.ts",
+    "docs:commands": "ttsx tools/command-reference.ts",
     "engine:check": "ttsx tools/engine-check.ts",
     "browser:check": "ttsx tools/browser-check.ts",
     "playwright:check": "ttsx tools/playwright-check.ts",
