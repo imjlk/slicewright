@@ -16,6 +16,7 @@ COMMANDS:
   build                            Normalize, export, and pack every piece a manifest lists
   commands                         Print every command with its options, exit codes, and examples as JSON
   compare                          Check that the states of one element, or the pieces of a matching set, agree
+  complete                         Generate shell completion script
   export                           Export the slice layout for one or more engine targets
   frame                            Write a one-frame Phaser JSON Hash atlas with scale9Borders
   inspect                          Detect or check slice insets and report what breaks when stretched
@@ -33,6 +34,7 @@ For more info, run any command with the `--help` flag:
   slicewright build --help
   slicewright commands --help
   slicewright compare --help
+  slicewright complete --help
   slicewright export --help
   slicewright frame --help
   slicewright inspect --help

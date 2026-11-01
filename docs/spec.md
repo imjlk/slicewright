@@ -826,6 +826,26 @@ command lines and the same note; it has no banner and no `-h`/`-v` rows. Help an
 error messages on stderr carry no ANSI escape codes in agent mode. Command
 output, the JSON on stdout, and exit codes are the same in both modes.
 
+## Shell completion
+
+`slicewright complete <shell>` prints a completion script for `bash`, `zsh`,
+`fish`, or `powershell` on stdout; it is the one command whose stdout is not
+JSON. The script runs the same Node binary and CLI file that printed it and asks
+`slicewright complete -- <words>` for candidates, one `value<TAB>description`
+line each, then a `:<directive>` line. Commands and options complete with their
+descriptions. An enum option completes its choices, `--target` completes the
+target names after any already in its comma-separated list, and `commands`
+completes command names. Arguments that name a file complete paths relative to
+the word typed so far: directories with a trailing `/`, and files with the
+argument's extension (`.png` for images, `.json` for atlases, layouts, reports,
+and manifests, both for `pack` inputs); `browser-report <input>` and `export
+--out-dir` complete directories only. A symbolic link counts as what it points
+to. Hidden entries appear only when the typed name starts with a
+dot. Other arguments, such as numbers, get no candidates. `complete` without a
+shell, with an unknown shell, or with more than one word is a usage error (exit
+2) that lists the shells. Completion is for people at a shell: `complete` is not
+in the command catalog or the agent-mode help.
+
 ## Browser UI verification
 
 The optional `slicewright/browser` library entry point works with a consumer's

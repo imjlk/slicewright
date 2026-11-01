@@ -78,6 +78,37 @@ prints every command's arguments, options (type, default, choices, required,
 negatable, aliases), exit codes, and examples as JSON, read from the same
 definitions the parser runs; `slicewright commands <name>` prints one.
 
+### Shell completion
+
+`slicewright complete <shell>` prints a completion script for bash, zsh, fish,
+or PowerShell. Commands, options, enum choices, `--target` names, and image or
+JSON paths complete with Tab. The script calls the Node binary and CLI file that
+printed it, so generate it from a global install (`npm install -g slicewright`),
+not from `npx`, and generate it again after upgrading Node or slicewright.
+
+```bash
+# bash (needs the bash-completion package)
+mkdir -p ~/.local/share/bash-completion/completions
+slicewright complete bash > ~/.local/share/bash-completion/completions/slicewright
+
+# zsh: a directory on $fpath, before compinit runs in ~/.zshrc
+mkdir -p ~/.zsh/completions
+slicewright complete zsh > ~/.zsh/completions/_slicewright
+# ~/.zshrc: fpath=(~/.zsh/completions $fpath); autoload -Uz compinit && compinit
+
+# fish
+slicewright complete fish > ~/.config/fish/completions/slicewright.fish
+```
+
+```powershell
+# PowerShell: load it from your profile
+slicewright complete powershell > "$HOME\slicewright-completion.ps1"
+Add-Content $PROFILE '. "$HOME\slicewright-completion.ps1"'
+```
+
+Open a new shell afterwards. `complete` prints a script, not JSON, and is not
+listed in `slicewright commands`.
+
 ### Browser E2E verification
 
 The optional `slicewright/browser` entry point brings the same interaction and
