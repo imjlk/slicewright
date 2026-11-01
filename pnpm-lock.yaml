@@ -9,14 +9,14 @@ importers:
   .:
     dependencies:
       '@gunshi/plugin-completion':
-        specifier: 0.37.3
-        version: 0.37.3(@gunshi/plugin-i18n@0.37.3)
+        specifier: 1.0.0-rc.1
+        version: 1.0.0-rc.1(@gunshi/plugin-i18n@1.0.0-rc.1)
       fast-png:
         specifier: 8.0.0
         version: 8.0.0
       gunshi:
-        specifier: 0.37.3
-        version: 0.37.3
+        specifier: 1.0.0-rc.1
+        version: 1.0.0-rc.1
       typia:
         specifier: 15.1.0
         version: 15.1.0(ttsc@0.30.4)
@@ -63,23 +63,23 @@ packages:
       commander:
         optional: true
 
-  '@gunshi/plugin-completion@0.37.3':
-    resolution: {integrity: sha512-gifbK4T29fJpiOH7+HuWiWfMdRx9dgCC48hT9JVrIJrYCFoeCv26H6DusqJjdUPfsexWL8YIOi/tDnG1tvfZGA==}
+  '@gunshi/plugin-completion@1.0.0-rc.1':
+    resolution: {integrity: sha512-JxsNeEjAK9ntS+xuM8Hw9dAw2FOo18SVV7VinukyaNBipGMlC16sz4nP6vnpCgybZ0VZGEf63KgTvZZTxZe0qQ==}
     engines: {node: '>= 22'}
     peerDependencies:
-      '@gunshi/plugin-i18n': 0.37.3
+      '@gunshi/plugin-i18n': 1.0.0-rc.1
 
-  '@gunshi/plugin-i18n@0.37.3':
-    resolution: {integrity: sha512-gR2RT7BfC6YY1D/0oY+4bQbQUHJYm1pyn1sV8TWBj4ZcdIW/1ue6ZdaCQ8HhofxZqRu61bUkfrn+tE8hKETmKA==}
+  '@gunshi/plugin-i18n@1.0.0-rc.1':
+    resolution: {integrity: sha512-KIsUtwcjT+ecGd4Q0KU4AogKNHorYX96jfbeNSIu4ezSZ79DH2x3MXmjB0YQDYpL92inaLbj1mg8qbDWKZVNAQ==}
     engines: {node: '>= 22'}
     peerDependencies:
-      '@gunshi/plugin-global': 0.37.3
+      '@gunshi/plugin-global': 1.0.0-rc.1
     peerDependenciesMeta:
       '@gunshi/plugin-global':
         optional: true
 
-  '@gunshi/plugin@0.37.3':
-    resolution: {integrity: sha512-f/P3qigd7P9BW/R4siYzR2WPJ1TPNmKvnN4ZuAQc0GFDn+wtfRGk/Osus9QJVUKR+s0qrrPweP91WI2X3Lq8WA==}
+  '@gunshi/plugin@1.0.0-rc.1':
+    resolution: {integrity: sha512-zVR8mHRsUmjxU/2g3Tr+sMgJMwTFfjZDY+KK9OXYtauPdj0E6QFmkbcUoc/LUwOVXjR+QPjfC4OYSnFMuu/2bQ==}
     engines: {node: '>= 22'}
 
   '@hono/node-server@2.1.4':
@@ -466,8 +466,8 @@ packages:
     resolution: {integrity: sha512-ZUKRh6/kUFoAiTAtTYPZJ3hw9wNxx+BIBOijnlG9PnrJsCcSjs1wyyD6vJpaYtgnzDrKYRSqf3OO6Rfa93xsRg==}
     engines: {node: '>= 0.4'}
 
-  gunshi@0.37.3:
-    resolution: {integrity: sha512-uwm23bguqDcleEetknuQnF5okLcgmQPM3iv4aWVHTPDbiSs9shh02F079NCY0mWkrIRjHqNhgmzW6k0FCXhy1g==}
+  gunshi@1.0.0-rc.1:
+    resolution: {integrity: sha512-/nSFKVrJHKg9O4ppBl+lOSLDQWmvJ5fG3ldVsdJX8KMtUV2uYwlx/a8OaOWuvniuV28bZDjsB8p6YFtDxSlMcw==}
     engines: {node: '>= 22'}
 
   has-symbols@1.1.0:
@@ -730,21 +730,21 @@ snapshots:
 
   '@bomb.sh/tab@0.0.22': {}
 
-  '@gunshi/plugin-completion@0.37.3(@gunshi/plugin-i18n@0.37.3)':
+  '@gunshi/plugin-completion@1.0.0-rc.1(@gunshi/plugin-i18n@1.0.0-rc.1)':
     dependencies:
       '@bomb.sh/tab': 0.0.22
-      '@gunshi/plugin': 0.37.3
-      '@gunshi/plugin-i18n': 0.37.3
+      '@gunshi/plugin': 1.0.0-rc.1
+      '@gunshi/plugin-i18n': 1.0.0-rc.1
     transitivePeerDependencies:
       - cac
       - citty
       - commander
 
-  '@gunshi/plugin-i18n@0.37.3':
+  '@gunshi/plugin-i18n@1.0.0-rc.1':
     dependencies:
-      '@gunshi/plugin': 0.37.3
+      '@gunshi/plugin': 1.0.0-rc.1
 
-  '@gunshi/plugin@0.37.3': {}
+  '@gunshi/plugin@1.0.0-rc.1': {}
 
   '@hono/node-server@2.1.4(hono@4.13.13)':
     dependencies:
@@ -1094,7 +1094,7 @@ snapshots:
 
   gopd@1.2.0: {}
 
-  gunshi@0.37.3: {}
+  gunshi@1.0.0-rc.1: {}
 
   has-symbols@1.1.0: {}
 

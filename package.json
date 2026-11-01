@@ -72,9 +72,9 @@
     "sampo:release:dry-run": "sampo release --dry-run"
   },
   "dependencies": {
-    "@gunshi/plugin-completion": "0.37.3",
+    "@gunshi/plugin-completion": "1.0.0-rc.1",
     "fast-png": "8.0.0",
-    "gunshi": "0.37.3",
+    "gunshi": "1.0.0-rc.1",
     "typia": "15.1.0"
   },
   "peerDependencies": {

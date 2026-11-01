@@ -11,22 +11,22 @@ USAGE:
   slicewright <command> [options]
 
 COMMANDS:
-  atlas                            Check the nine-slice frames of a Phaser JSON Hash or JSON Array atlas, or the slices of an Aseprite sheet
-  browser-report                   Create an offline HTML viewer from browser artifacts
-  build                            Normalize, export, and pack every piece a manifest lists
-  commands                         Print every command with its options, exit codes, and examples as JSON
-  compare                          Check that the states of one element, or the pieces of a matching set, agree
-  complete                         Generate shell completion script
-  export                           Export the slice layout for one or more engine targets
-  frame                            Write a one-frame Phaser JSON Hash atlas with scale9Borders
-  inspect                          Detect or check slice insets and report what breaks when stretched
-  key                              Remove a green or magenta background and despill the edge
-  normalize                        Crop, resize, pick insets at the final size, and optionally rebuild a minimal texture
-  pack                             Pack the frames of several atlases into one image and JSON Hash atlas
-  preview                          Render the art at several stretched sizes on one PNG
-  prompt                           Plan a generation prompt for stretchable UI art
-  resize                           Resize art to its in-game size
-  targets                          List export targets and what each can represent
+  atlas <input>                                      Check the nine-slice frames of a Phaser JSON Hash or JSON Array atlas, or the slices of an Aseprite sheet
+  browser-report <input>                             Create an offline HTML viewer from browser artifacts
+  build <manifest>                                   Normalize, export, and pack every piece a manifest lists
+  commands [<command>]                               Print every command with its options, exit codes, and examples as JSON
+  compare <inputs> [<inputs> ...]                    Check that the states of one element, or the pieces of a matching set, agree
+  complete                                           Generate shell completion script
+  export <input>                                     Export the slice layout for one or more engine targets
+  frame <input>                                      Write a one-frame Phaser JSON Hash atlas with scale9Borders
+  inspect <input>                                    Detect or check slice insets and report what breaks when stretched
+  key <input>                                        Remove a green or magenta background and despill the edge
+  normalize <input>                                  Crop, resize, pick insets at the final size, and optionally rebuild a minimal texture
+  pack <inputs> [<inputs> ...]                       Pack the frames of several atlases into one image and JSON Hash atlas
+  preview <input>                                    Render the art at several stretched sizes on one PNG
+  prompt                                             Plan a generation prompt for stretchable UI art
+  resize <input>                                     Resize art to its in-game size
+  targets                                            List export targets and what each can represent
 
 For more info, run any command with the `--help` flag:
   slicewright atlas --help
@@ -125,7 +125,7 @@ OPTIONS:
   --pixel-art                              Find the grid of upscaled pixel art and report detail off the grid
   --pixel-scale <pixel-scale>              Image pixels per art pixel when known, for flat art with too few edges to tell; implies --pixel-art
   --tolerance [tolerance]                  Largest premultiplied channel difference, 0-255, that still matches (default: 4)
-  --outlier-ratio <outlier-ratio>          Fraction of pixels per line allowed to exceed the tolerance (default: 0)
+  --outlier-ratio [outlier-ratio]          Fraction of pixels per line allowed to exceed the tolerance (default: 0)
   --noise [noise]                          auto raises the tolerance to the noise floor of generated art (default: auto, choices: auto | off)
   -h, --help                               Display this help message
   -v, --version                            Display this version
@@ -154,7 +154,7 @@ OPTIONS:
   --mode [mode]                            Slice mode: three keeps the height, three-vertical keeps the width (default: auto, choices: auto | nine | three | three-vertical)
   --tile <tile>                            Treat these axes as tiled instead of stretched (choices: x | y | xy)
   --tolerance [tolerance]                  Largest premultiplied channel difference, 0-255, that still matches (default: 4)
-  --outlier-ratio <outlier-ratio>          Fraction of pixels per line allowed to exceed the tolerance (default: 0)
+  --outlier-ratio [outlier-ratio]          Fraction of pixels per line allowed to exceed the tolerance (default: 0)
   --noise [noise]                          auto raises the tolerance to the noise floor of generated art (default: auto, choices: auto | off)
   -h, --help                               Display this help message
   -v, --version                            Display this version
@@ -191,7 +191,7 @@ OPTIONS:
   --pixel-art                              Find the grid of upscaled pixel art and report detail off the grid
   --pixel-scale <pixel-scale>              Image pixels per art pixel when known, for flat art with too few edges to tell; implies --pixel-art
   --tolerance [tolerance]                  Largest premultiplied channel difference, 0-255, that still matches (default: 4)
-  --outlier-ratio <outlier-ratio>          Fraction of pixels per line allowed to exceed the tolerance (default: 0)
+  --outlier-ratio [outlier-ratio]          Fraction of pixels per line allowed to exceed the tolerance (default: 0)
   --noise [noise]                          auto raises the tolerance to the noise floor of generated art (default: auto, choices: auto | off)
   -h, --help                               Display this help message
   -v, --version                            Display this version
@@ -226,7 +226,7 @@ OPTIONS:
   --pixel-art                              Find the grid of upscaled pixel art and report detail off the grid
   --pixel-scale <pixel-scale>              Image pixels per art pixel when known, for flat art with too few edges to tell; implies --pixel-art
   --tolerance [tolerance]                  Largest premultiplied channel difference, 0-255, that still matches (default: 4)
-  --outlier-ratio <outlier-ratio>          Fraction of pixels per line allowed to exceed the tolerance (default: 0)
+  --outlier-ratio [outlier-ratio]          Fraction of pixels per line allowed to exceed the tolerance (default: 0)
   --noise [noise]                          auto raises the tolerance to the noise floor of generated art (default: auto, choices: auto | off)
   -h, --help                               Display this help message
   -v, --version                            Display this version
@@ -251,7 +251,7 @@ OPTIONS:
   --frame <frame>                          Check only this frame
   --slice <slice>                          Check only this Aseprite slice
   --tolerance [tolerance]                  Largest premultiplied channel difference, 0-255, that still matches (default: 4)
-  --outlier-ratio <outlier-ratio>          Fraction of pixels per line allowed to exceed the tolerance (default: 0)
+  --outlier-ratio [outlier-ratio]          Fraction of pixels per line allowed to exceed the tolerance (default: 0)
   --noise [noise]                          auto raises the tolerance to the noise floor of generated art (default: auto, choices: auto | off)
   -h, --help                               Display this help message
   -v, --version                            Display this version
@@ -349,7 +349,7 @@ OPTIONS:
   --pixel-art                              Find the grid of upscaled pixel art, snap the size to it, and resize nearest
   --pixel-scale <pixel-scale>              Image pixels per art pixel when known, for flat art with too few edges to tell; implies --pixel-art
   --tolerance [tolerance]                  Largest premultiplied channel difference, 0-255, that still matches (default: 4)
-  --outlier-ratio <outlier-ratio>          Fraction of pixels per line allowed to exceed the tolerance (default: 0)
+  --outlier-ratio [outlier-ratio]          Fraction of pixels per line allowed to exceed the tolerance (default: 0)
   --noise [noise]                          auto raises the tolerance to the noise floor of generated art (default: auto, choices: auto | off)
   -h, --help                               Display this help message
   -v, --version                            Display this version
@@ -378,7 +378,7 @@ OPTIONS:
   --extrude [extrude]                      Pixels of each frame's edge repeated outward (default: 1)
   --css                                    Also write one stylesheet with a border-image class per frame, using each frame's own image
   --tolerance [tolerance]                  Largest premultiplied channel difference, 0-255, that still matches (default: 4)
-  --outlier-ratio <outlier-ratio>          Fraction of pixels per line allowed to exceed the tolerance (default: 0)
+  --outlier-ratio [outlier-ratio]          Fraction of pixels per line allowed to exceed the tolerance (default: 0)
   --noise [noise]                          auto raises the tolerance to the noise floor of generated art (default: auto, choices: auto | off)
   -h, --help                               Display this help message
   -v, --version                            Display this version
@@ -434,7 +434,7 @@ OPTIONS:
   --pixel-art                              Find the grid of upscaled pixel art and report detail off the grid
   --pixel-scale <pixel-scale>              Image pixels per art pixel when known, for flat art with too few edges to tell; implies --pixel-art
   --tolerance [tolerance]                  Largest premultiplied channel difference, 0-255, that still matches (default: 4)
-  --outlier-ratio <outlier-ratio>          Fraction of pixels per line allowed to exceed the tolerance (default: 0)
+  --outlier-ratio [outlier-ratio]          Fraction of pixels per line allowed to exceed the tolerance (default: 0)
   --noise [noise]                          auto raises the tolerance to the noise floor of generated art (default: auto, choices: auto | off)
   -h, --help                               Display this help message
   -v, --version                            Display this version
