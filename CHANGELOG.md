@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.1 — 2026-11-01
+
+### Patch changes
+
+- [120e34c](https://github.com/imjlk/slicewright/commit/120e34cac7a714f104f4af3c267fb5e222a3b1e8) Upgrade `gunshi` and `@gunshi/plugin-completion` to `1.0.0-rc.1`. The program's `--help` now shows each command's arguments (for example `inspect <input>`), and options given before the command name (`--tolerance 3 inspect x.png`) are parsed instead of rejected. Shell completion also offers `--help`, `--version`, and `--no-<flag>`. A flag with no value and a value given to a negated flag get readable messages. — Thanks @imjlk!
+
 ## 0.7.0 — 2026-11-01
 
 ### Minor changes
