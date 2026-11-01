@@ -828,8 +828,9 @@ target names after any already in its comma-separated list, and `commands`
 completes command names. Arguments that name a file complete paths relative to
 the word typed so far: directories with a trailing `/`, and files with the
 argument's extension (`.png` for images, `.json` for atlases, layouts, reports,
-and manifests); `browser-report <input>` and `export --out-dir` complete
-directories only. Hidden entries appear only when the typed name starts with a
+and manifests, both for `pack` inputs); `browser-report <input>` and `export
+--out-dir` complete directories only. A symbolic link counts as what it points
+to. Hidden entries appear only when the typed name starts with a
 dot. Other arguments, such as numbers, get no candidates. `complete` without a
 shell, with an unknown shell, or with more than one word is a usage error (exit
 2) that lists the shells. Completion is for people at a shell: `complete` is not

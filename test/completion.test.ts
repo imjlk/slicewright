@@ -1,5 +1,5 @@
 import { deepStrictEqual, ok, strictEqual } from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -41,7 +41,7 @@ async function candidates(words: readonly string[]): Promise<string[]> {
 
 /**
  * @evidence docs/spec.md#shell-completion Checks the script for every shell, command and option completion, enum choices, comma-separated targets, command names, png/json/directory paths with hidden entries, and the usage errors for a missing, unknown, or extra shell.
- * @evidenceReview docs/spec.md#shell-completion #eaca858 Read the section's rules for scripts, candidates, paths, and usage errors; this checks each one through the CLI in process. Ran green with pnpm test.
+ * @evidenceReview docs/spec.md#shell-completion #ce35ff1 Reread the section after adding pack PNG inputs and symbolic links; for scripts, candidates, paths, links, and usage errors this checks each one through the CLI in process. Ran green with pnpm test.
  */
 export async function shellCompletionWorks(): Promise<void> {
   // A script for every shell names the program and asks `complete --` for candidates.
@@ -100,9 +100,12 @@ export async function shellCompletionWorks(): Promise<void> {
     process.chdir(dir);
     deepStrictEqual(await candidates(['inspect', '']), ['button.png', 'ui/']);
     deepStrictEqual(await candidates(['inspect', 'ui/']), ['ui/panel.png']);
-    deepStrictEqual(await candidates(['pack', 'ui/']), ['ui/panel.json']);
+    deepStrictEqual(await candidates(['pack', 'ui/']), ['ui/panel.json', 'ui/panel.png']);
+    // A linked directory completes as a directory (junctions need no privilege on Windows).
+    symlinkSync(join(dir, 'ui'), join(dir, 'linked'), 'junction');
+    deepStrictEqual(await candidates(['export', 'x.png', '--out-dir', 'l']), ['linked/']);
     deepStrictEqual(await candidates(['inspect', '.']), ['.hidden.png']);
-    deepStrictEqual(await candidates(['export', 'x.png', '--out-dir', '']), ['ui/']);
+    deepStrictEqual(await candidates(['export', 'x.png', '--out-dir', '']), ['linked/', 'ui/']);
     deepStrictEqual(pathCandidates('missing/', { files: [] }), []);
   } finally {
     process.chdir(cwd);

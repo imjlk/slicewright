@@ -1365,7 +1365,7 @@ export const shellCompletion = completionConfig({
     key: { input: png, out: png },
     resize: { input: png, out: png, 'match-outline': png },
     normalize: { input: png, out: png, atlas: json, ...layoutPaths },
-    pack: { inputs: json, out: png },
+    pack: { inputs: { files: ['.json', '.png'] }, out: png },
     build: { manifest: json },
     export: { input: png, 'out-dir': 'directory', ...layoutPaths },
   },

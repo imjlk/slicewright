@@ -5,7 +5,8 @@
  * enum choices, export targets, command names, and file paths for the
  * arguments that take one.
  */
-import { readdirSync } from 'node:fs';
+import { readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 
 /** One candidate the plugin prints: the value and an optional description. */
 export interface Candidate {
@@ -66,7 +67,16 @@ export function pathCandidates(word: string, kind: PathKind): Candidate[] {
     if (!entry.name.startsWith(base) || (entry.name.startsWith('.') && !base.startsWith('.'))) {
       continue;
     }
-    if (entry.isDirectory()) {
+    // A symbolic link counts as what it points to; a broken one as a file.
+    let directory = entry.isDirectory();
+    if (entry.isSymbolicLink()) {
+      try {
+        directory = statSync(join(dir === '' ? '.' : dir, entry.name)).isDirectory();
+      } catch {
+        directory = false;
+      }
+    }
+    if (directory) {
       out.push({ value: `${dir}${entry.name}/` });
     } else if (
       kind !== 'directory' &&
@@ -95,7 +105,7 @@ export function listCandidates(word: string, names: readonly string[]): Candidat
  * names, and paths. Arguments not covered get no candidates.
  *
  * @evidence docs/spec.md#shell-completion Completes enum choices, comma-separated targets, command names, and file or directory paths by argument.
- * @evidenceReview docs/spec.md#shell-completion #eaca858 Read the section's rules for choices, targets, command names, and paths, and ran the completion tests with pnpm test.
+ * @evidenceReview docs/spec.md#shell-completion #ce35ff1 Reread the section after adding pack PNG inputs and symbolic links; checked choices, targets, command names, and paths, and ran the completion tests with pnpm test.
  */
 export function completionConfig(sources: CompletionSources): Record<string, CommandCompletion> {
   const config: Record<string, CommandCompletion> = {};
