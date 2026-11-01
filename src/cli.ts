@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { readFileSync, realpathSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { cli, define } from 'gunshi';
 
@@ -1178,7 +1179,8 @@ const version = (
   ) as { version: string }
 ).version;
 
-const main = define({
+/** The program's own command, run without a subcommand. */
+export const main = define({
   name: 'slicewright',
   description: 'Prompt, inspect, and preview nine-slice and three-slice UI art. Every command prints JSON.',
   run: () => {
@@ -1187,7 +1189,8 @@ const main = define({
   },
 });
 
-const subCommands = {
+/** Every subcommand by name; `commands`, help, and docs read their definitions from here. */
+export const subCommands = {
   'browser-report': browserReport,
   prompt,
   inspect,
@@ -1219,23 +1222,45 @@ if (clashes.length > 0) {
   );
 }
 
-try {
-  await cli(joinNegativeNumbers(process.argv.slice(2), numberFlags), main, {
-    name: 'slicewright',
-    version,
-    subCommands,
-    // stdout carries JSON only: no banner, no validation text; errors go to stderr.
-    renderHeader: null,
-    renderValidationErrors: null,
-    // Unknown or misspelled flags are errors, not silently ignored.
-    strict: true,
-  });
-} catch (error) {
-  const named = process.argv.slice(2).find((arg) => !arg.startsWith('-'));
-  const messages = friendlyCliErrors(error, {
-    command: named !== undefined && Object.hasOwn(subCommands, named) ? named : undefined,
-    commands: Object.keys(subCommands),
-  });
-  process.stderr.write(messages.map((message) => `slicewright: ${message}\n`).join(''));
-  process.exitCode = usageFailed;
+/** How the program runs its commands; shared by the CLI and the generated command reference. */
+export const cliOptions = {
+  name: 'slicewright',
+  version,
+  subCommands,
+  // stdout carries JSON only: no banner, no validation text; errors go to stderr.
+  renderHeader: null,
+  renderValidationErrors: null,
+  // Unknown or misspelled flags are errors, not silently ignored.
+  strict: true,
+} as const;
+
+async function runCli(argv: readonly string[]): Promise<void> {
+  try {
+    await cli(joinNegativeNumbers(argv, numberFlags), main, cliOptions);
+  } catch (error) {
+    const named = argv.find((arg) => !arg.startsWith('-'));
+    const messages = friendlyCliErrors(error, {
+      command: named !== undefined && Object.hasOwn(subCommands, named) ? named : undefined,
+      commands: Object.keys(subCommands),
+    });
+    process.stderr.write(messages.map((message) => `slicewright: ${message}\n`).join(''));
+    process.exitCode = usageFailed;
+  }
+}
+
+/** True when Node started this file as the program, not when a test imports it. */
+function startedAsProgram(): boolean {
+  const entry = process.argv[1];
+  if (entry === undefined) {
+    return false;
+  }
+  try {
+    return realpathSync(entry) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
+if (startedAsProgram()) {
+  await runCli(process.argv.slice(2));
 }
