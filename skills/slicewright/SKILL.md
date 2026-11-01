@@ -34,8 +34,15 @@ stdout; `inspect`, `compare`, `frame`, `atlas`, `normalize`, `export`,
 `pack`, and `build` exit 1 when a finding is an error (for `export`, a layout
 the target cannot represent), `browser-report` exits 1 for a failing report,
 and every command exits 2 on bad input. `prompt`, `preview`, `key`, `resize`,
-and `targets` never exit 1: read their JSON. Output folders are created as
-needed. `--help` works on each command and ends with examples.
+`targets`, and `commands` never exit 1: read their JSON. Output folders are
+created as needed. `--help` works on each command and ends with examples.
+
+Before building a command line you are unsure of, run
+`slicewright commands <command>` (or `slicewright commands` for all of them).
+It prints JSON with every option's type, default, choices, whether it is
+required or negatable (`--no-crop`), its second names, the command's exit
+codes, and its examples, read from the installed CLI itself, so it is right
+for the version npx runs even where this skill lags behind.
 
 ## Workflow
 

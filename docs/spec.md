@@ -742,6 +742,26 @@ broken reference the command refuses with a usage error asking for
 `--image-ref`, before writing anything, and a packed stylesheet gives that
 frame no class, with a `pack.css-skipped` warning.
 
+## Command catalog
+
+`slicewright commands` prints, as JSON, every command with its usage line,
+positional arguments (required as the parser treats them: a single one unless it
+is marked optional or has a default, a repeated one only when marked), options,
+the exit codes it can end with, and its example command lines; `slicewright
+commands <name>` prints only that command, and an unknown name is a usage error
+that suggests the closest command. The catalog is built from the same command
+definitions the argument parser runs, so it cannot drift from the CLI. Each
+option lists its flag (`--tolerance`), its key, type (`string`, `number`,
+`boolean`, `enum`), whether it is required (by the parser or, like `prompt
+--kind` and `--style`, by the command itself), its default (`null` when it has
+none), its choices (`null` unless it is an enum), its description, whether
+`--no-<key>` turns it off, its one-letter short form, and its second names: a
+flag such as `--keep-below` names the flag it stands for in `aliasOf`, and that
+flag lists it in `aliases`. The top level gives the program version, the meaning
+of exit codes 0, 1, and 2, and the rule that stdout carries JSON only. Exit code
+1 is listed only for the commands where a finding or a failing report can
+produce it.
+
 ## Generation prompts
 
 A prompt plan turns a UI kind (button, panel, dialog, bar, bar fill, tooltip,
@@ -778,6 +798,23 @@ findings and codes about how the art is sliced, packed, or exported, not how
 it is drawn, add nothing. The lines are appended to the prompt under
 "Corrections from the previous attempt:" and listed as `corrections`, empty
 when nothing applies.
+
+## Agent mode
+
+When an AI coding agent runs the CLI, `--help` is concise and plain. Detection is
+gunshi's `getAgentProfile()`, which reads the environment the agent sets (for
+example Claude Code, Codex, Cursor, or Gemini CLI), and a non-empty
+`AI_AGENT=<name>` turns it on for any other agent. `SLICEWRIGHT_AGENT=1` (or
+`true`) turns agent mode on and `SLICEWRIGHT_AGENT=0` (or `false`) turns it off
+whatever was detected; any other value leaves detection in charge. In agent mode
+the program's help is its version and description, a usage line, one line per
+command, and a note that stdout is JSON only with exit codes 0, 1, and 2. A
+command's help is its description, a usage line, one line per positional
+argument, one line per option with its value type or enum choices, whether it is
+required, its default, and `--[no-]<key>` for a negatable flag, then its example
+command lines and the same note; it has no banner and no `-h`/`-v` rows. Help and
+error messages on stderr carry no ANSI escape codes in agent mode. Command
+output, the JSON on stdout, and exit codes are the same in both modes.
 
 ## Browser UI verification
 
