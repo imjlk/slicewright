@@ -754,6 +754,23 @@ it is drawn, add nothing. The lines are appended to the prompt under
 "Corrections from the previous attempt:" and listed as `corrections`, empty
 when nothing applies.
 
+## Agent mode
+
+When an AI coding agent runs the CLI, `--help` is concise and plain. Detection is
+gunshi's `getAgentProfile()`, which reads the environment the agent sets (for
+example Claude Code, Codex, Cursor, or Gemini CLI), and a non-empty
+`AI_AGENT=<name>` turns it on for any other agent. `SLICEWRIGHT_AGENT=1` (or
+`true`) turns agent mode on and `SLICEWRIGHT_AGENT=0` (or `false`) turns it off
+whatever was detected; any other value leaves detection in charge. In agent mode
+the program's help is its version and description, a usage line, one line per
+command, and a note that stdout is JSON only with exit codes 0, 1, and 2. A
+command's help is its description, a usage line, one line per positional
+argument, one line per option with its value type or enum choices, whether it is
+required, its default, and `--[no-]<key>` for a negatable flag, then its example
+command lines and the same note; it has no banner and no `-h`/`-v` rows. Help and
+error messages on stderr carry no ANSI escape codes in agent mode. Command
+output, the JSON on stdout, and exit codes are the same in both modes.
+
 ## Browser UI verification
 
 The optional `slicewright/browser` library entry point works with a consumer's
