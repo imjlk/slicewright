@@ -1,9 +1,8 @@
 ---
 name: slicewright
-description: Make and check stretchable game UI art, and verify rendered HTML/CSS or Canvas UI with explicit targets and approved visual baselines. Use for nine-slice assets, slice insets, smeared or seamed UI, atlas frames, or browser UI regression checks with Slicewright and Playwright.
+description: Make and check stretchable game UI art with the slicewright CLI. Use for nine-slice, 9-slice, scale9, or three-slice images such as buttons, panels, dialogs, health or progress bars, tooltips, speech bubbles, and frames; for generation prompts, chroma keying, slice insets, smeared corners or seamed edges, stretched previews, atlas frames, Aseprite 9-slice checks, matching UI sets, and Phaser 4 or CSS border-image export.
 license: MIT
-metadata:
-  compatibility: Requires Node.js 22 or newer and npm (runs the slicewright CLI through npx).
+compatibility: Requires Node.js 22 or newer and npm (runs the slicewright CLI through npx).
 ---
 
 # slicewright
@@ -15,10 +14,10 @@ whatever image generator this agent has (an image generation skill or tool, or
 art the user supplies) and run every result through slicewright before it
 reaches the game.
 
-For an existing browser UI, start with
-[Browser regression checks](references/browser-testing.md). That workflow uses
-the optional browser/Playwright APIs and does not require generating or slicing
-art. Keep the asset workflow below for tasks that actually involve UI images.
+This skill covers UI images. Checking an already rendered HTML/CSS or Canvas
+UI against approved baselines with `slicewright/browser` and
+`slicewright/playwright` is the separate `slicewright-browser` skill
+(`npx skills add imjlk/slicewright --skill slicewright-browser`).
 
 ## Run the CLI
 
