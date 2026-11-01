@@ -127,9 +127,8 @@ function friendlyCliError(error: unknown, help: CommandHelp): string {
 }
 
 /**
- * Codes the parser of gunshi 1.0 (`args-tokens` 1.0) adds; 0.37 reports these
- * cases as a type, choice, or required error instead, so this is reached only
- * after that upgrade.
+ * Codes the parser of gunshi 1.0 (`args-tokens` 1.0) adds; 0.37 reported these
+ * cases as a type, choice, or required error instead.
  */
 function friendlyNewParseError(
   code: string,

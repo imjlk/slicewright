@@ -42,8 +42,16 @@ export function tidyUsage(text: string, tidying: UsageTidying): string {
       if (/^\s+\[[^\]]+\]/u.test(line)) {
         continue;
       }
-      // Keep the descriptions aligned: pad where the placeholder was.
-      out.push(line.replace(optionsPlaceholder, ' '.repeat(optionsPlaceholder.length)));
+      // Drop the placeholder but keep the description column where the parser put it.
+      const row = /^(\s+)(\S(?:.*?\S)?)(\s{2,})(\S.*)$/u.exec(line);
+      if (row === null) {
+        out.push(line.replace(optionsPlaceholder, ''));
+        continue;
+      }
+      const [, indent = '', usage = '', gap = '', description = ''] = row;
+      out.push(
+        `${indent}${usage.replace(optionsPlaceholder, '').padEnd(usage.length + gap.length)}${description}`,
+      );
       continue;
     }
     if (tidying.entry && section.startsWith('For more info') && /^\s+\S+ --help$/u.test(line)) {
