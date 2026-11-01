@@ -3,12 +3,14 @@ import { readFileSync, realpathSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { cli, define } from 'gunshi';
+import { cli, define, type Plugin } from 'gunshi';
 import { getAgentProfile } from 'gunshi/agent';
+import completion from '@gunshi/plugin-completion';
 
 import { agentMode, conciseHelp, plain } from './agent-mode.js';
 import { writeBrowserReportHtml } from './browser-report.js';
 import { aliasedValue, joinNegativeNumbers } from './argv.js';
+import { completeUsageProblem, completionConfig } from './completion.js';
 import { describeCommands, type ExitCode } from './command-catalog.js';
 import { didYouMean, friendlyCliErrors } from './friendly-errors.js';
 import { defaultChromaOptions, removeChroma } from './chroma.js';
@@ -1284,6 +1286,46 @@ if (clashes.length > 0) {
   );
 }
 
+/** The word the shell is completing: the last one, without a `--flag=` in front. */
+function completionWord(): string {
+  const word = process.argv.at(-1) ?? '';
+  return word.startsWith('-') && word.includes('=') ? word.slice(word.indexOf('=') + 1) : word;
+}
+
+const png = { files: ['.png'] } as const;
+const json = { files: ['.json'] } as const;
+const anyFile = { files: [] } as const;
+const layoutPaths = { layout: json } as const;
+
+/** Candidates for every argument the shell completes; see docs/spec.md#shell-completion. */
+export const shellCompletion = completionConfig({
+  commands: subCommands,
+  paths: {
+    'browser-report': { input: 'directory', out: anyFile },
+    prompt: { from: json },
+    inspect: { input: png, ...layoutPaths },
+    compare: { inputs: png },
+    preview: { input: png, out: png, ...layoutPaths },
+    frame: { input: png, out: json, ...layoutPaths },
+    atlas: { input: json },
+    key: { input: png, out: png },
+    resize: { input: png, out: png, 'match-outline': png },
+    normalize: { input: png, out: png, atlas: json, ...layoutPaths },
+    pack: { inputs: json, out: png },
+    build: { manifest: json },
+    export: { input: png, 'out-dir': 'directory', ...layoutPaths },
+  },
+  lists: {
+    normalize: { target: Object.keys(sliceTargets) },
+    export: { target: Object.keys(sliceTargets) },
+  },
+  commandNames: { commands: 'command' },
+  word: completionWord,
+});
+
+/** Plugins the program runs with: `complete <shell>` prints a shell completion script. */
+const plugins: Plugin[] = [completion({ config: { subCommands: shellCompletion } })];
+
 /** How the program runs its commands; shared by the CLI and the generated command reference. */
 export const cliOptions = {
   name: 'slicewright',
@@ -1294,6 +1336,7 @@ export const cliOptions = {
   renderValidationErrors: null,
   // Unknown or misspelled flags are errors, not silently ignored.
   strict: true,
+  plugins,
 } as const;
 
 async function runCli(argv: readonly string[]): Promise<void> {
@@ -1306,6 +1349,10 @@ async function runCli(argv: readonly string[]): Promise<void> {
     commands: subCommands,
   };
   try {
+    const completeProblem = completeUsageProblem(argv);
+    if (completeProblem !== undefined) {
+      throw new UsageError(completeProblem);
+    }
     await cli(
       joinNegativeNumbers(argv, numberFlags),
       main,
@@ -1319,8 +1366,12 @@ async function runCli(argv: readonly string[]): Promise<void> {
   } catch (error) {
     const named = argv.find((arg) => !arg.startsWith('-'));
     const messages = friendlyCliErrors(error, {
-      command: named !== undefined && Object.hasOwn(subCommands, named) ? named : undefined,
-      commands: Object.keys(subCommands),
+      command:
+        named !== undefined && (Object.hasOwn(subCommands, named) || named === 'complete')
+          ? named
+          : undefined,
+      // `complete` comes from the completion plugin, not the command table.
+      commands: [...Object.keys(subCommands), 'complete'],
     });
     const text = messages.map((message) => `slicewright: ${message}\n`).join('');
     process.stderr.write(agent.on ? plain(text) : text);
