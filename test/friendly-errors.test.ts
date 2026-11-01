@@ -1,5 +1,6 @@
 import { deepStrictEqual, ok, strictEqual, throws } from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { test } from 'node:test';
 
 import { cli, define } from 'gunshi';
@@ -148,9 +149,11 @@ export function explainsMissingFilesAndLayouts(): void {
   } catch (error) {
     missing = error;
   }
-  strictEqual(missingFile(missing), 'no-such-dir/panel.png');
+  strictEqual(missingFile(missing), join('no-such-dir', 'panel.png'));
   strictEqual(missingFile(new Error('other')), undefined);
-  deepStrictEqual(friendlyCliErrors(missing, help), ['no-such-dir/panel.png does not exist.']);
+  deepStrictEqual(friendlyCliErrors(missing, help), [
+    `${join('no-such-dir', 'panel.png')} does not exist.`,
+  ]);
 
   deepStrictEqual(
     friendlyShapeIssues(

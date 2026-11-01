@@ -1,4 +1,5 @@
 import { isArgsValidationError, isCommandNotFoundError } from 'gunshi';
+import { isAbsolute, relative } from 'node:path';
 
 import { schemaAt, type JsonSchema } from './manifest-schema.js';
 
@@ -119,7 +120,8 @@ function friendlyCliError(error: unknown, help: CommandHelp): string {
 
 /**
  * The path of a file a read did not find (an `ENOENT` error from `node:fs`),
- * as the command was given it; undefined for any other error.
+ * relative to the working directory when it lies inside it, as a command is
+ * usually given it; undefined for any other error.
  *
  * @evidence docs/spec.md#error-messages Names the input file a read did not find instead of the system error.
  * @evidenceReview docs/spec.md#error-messages #157990f Reread the section after the missing-file, layout-file, target-typo and flag-name edit, checked this code against it, and ran pnpm test green.
@@ -129,7 +131,12 @@ export function missingFile(error: unknown): string | undefined {
     return undefined;
   }
   const { code, path } = error as Error & { code?: unknown; path?: unknown };
-  return code === 'ENOENT' && typeof path === 'string' ? path : undefined;
+  if (code !== 'ENOENT' || typeof path !== 'string') {
+    return undefined;
+  }
+  // Windows reports the resolved path; show one inside the working directory as given.
+  const inside = isAbsolute(path) ? relative(process.cwd(), path) : path;
+  return inside === '' || inside.startsWith('..') || isAbsolute(inside) ? path : inside;
 }
 
 /** One problem typia found in a manifest. */
