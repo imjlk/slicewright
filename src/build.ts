@@ -18,7 +18,12 @@ import { buildPack, type PackFilesResult } from './pack-files.js';
 import { defaultPackOptions } from './pack.js';
 import { decodePng, encodePng } from './png.js';
 import type { Raster } from './raster.js';
-import { didYouMean, friendlyManifestIssues } from './friendly-errors.js';
+import {
+  didYouMean,
+  friendlyManifestIssues,
+  InvalidJsonError,
+  parseJsonFile,
+} from './friendly-errors.js';
 import { buildManifestSchema } from './manifest-schema.js';
 import { parseInsets, type SliceInsets, type SliceMode } from './slices.js';
 import { exportForTarget, findTarget, sliceTargets } from './targets/index.js';
@@ -101,6 +106,8 @@ export interface BuildPieceReport {
     readonly target: string;
     readonly ok: boolean;
     readonly files: readonly string[];
+    /** How to use the export in the engine; Unity and Defold put their values here, not in files. */
+    readonly usage: string;
     readonly findings: readonly Finding[];
   }>;
 }
@@ -145,7 +152,7 @@ export interface BuildReport {
  * scale or a size, and every target must exist.
  *
  * @evidence docs/spec.md#build-manifest Validates the manifest shape (allowing $schema, reporting every shape problem at once), unique plain piece names, size or scale, insets syntax, and known targets before anything is built.
- * @evidenceReview docs/spec.md#build-manifest #404bba1 Reread the section after the missing-input and relative-report-path edit, checked this code against it, and ran pnpm test green.
+ * @evidenceReview docs/spec.md#build-manifest #1995b96 Reread the section after the export-usage edit (each piece export carries the target's usage text), checked this host against it, and ran pnpm test green.
  */
 export function readBuildManifest(json: unknown): BuildManifest {
   // Unknown keys are refused, so a misspelled setting is not silently ignored.
@@ -253,7 +260,13 @@ export function readBuildManifest(json: unknown): BuildManifest {
 
 /** Reads and validates a manifest file. */
 export function loadBuildManifest(path: string): BuildManifest {
-  return readBuildManifest(JSON.parse(readFileSync(path, 'utf8')));
+  let json: unknown;
+  try {
+    json = parseJsonFile(readFileSync(path, 'utf8'), path);
+  } catch (error) {
+    throw error instanceof InvalidJsonError ? new BuildManifestError(error.message) : error;
+  }
+  return readBuildManifest(json);
 }
 
 /** The files a build reads: the manifest and every piece's input, as absolute paths. */
@@ -404,6 +417,7 @@ export function runBuild(
           target,
           ok: !exported.findings.some((finding) => finding.severity === 'error'),
           files: exported.files.map((file) => write(join(piecesDir, file.path), file.contents)),
+          usage: exported.usage,
           findings: exported.findings,
         };
       });
@@ -466,7 +480,7 @@ export function runBuild(
  * absolute.
  *
  * @evidence docs/spec.md#build-manifest Reports the input, written files, and pack files relative to the manifest, like the paths in it.
- * @evidenceReview docs/spec.md#build-manifest #404bba1 Reread the section after the missing-input and relative-report-path edit, checked this code against it, and ran pnpm test green.
+ * @evidenceReview docs/spec.md#build-manifest #1995b96 Reread the section after the export-usage edit (each piece export carries the target's usage text), checked this host against it, and ran pnpm test green.
  */
 export function relativeBuildReport(report: BuildReport, baseDir: string): BuildReport {
   const from = (path: string): string => {

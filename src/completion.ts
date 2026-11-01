@@ -105,7 +105,7 @@ export function listCandidates(word: string, names: readonly string[]): Candidat
  * names, and paths. Arguments not covered get no candidates.
  *
  * @evidence docs/spec.md#shell-completion Completes enum choices, comma-separated targets, command names, and file or directory paths by argument.
- * @evidenceReview docs/spec.md#shell-completion #ce35ff1 Reread the section after adding pack PNG inputs and symbolic links; checked choices, targets, command names, and paths, and ran the completion tests with pnpm test.
+ * @evidenceReview docs/spec.md#shell-completion #097cc7f Reread the section after complete joined the catalog and agent help, checked this host against it, and ran pnpm test green.
  */
 export function completionConfig(sources: CompletionSources): Record<string, CommandCompletion> {
   const config: Record<string, CommandCompletion> = {};

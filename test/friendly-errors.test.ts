@@ -10,7 +10,9 @@ import {
   didYouMean,
   friendlyCliErrors,
   friendlyShapeIssues,
+  InvalidJsonError,
   missingFile,
+  parseJsonFile,
 } from '../src/friendly-errors.js';
 import { tidyUsage } from '../src/help.js';
 import { readLayoutJson } from '../src/layout.js';
@@ -29,8 +31,8 @@ const main = define({ name: 'slicewright', run: () => undefined });
 const commands = { normalize, inspect: normalize, targets: normalize };
 const help = { command: 'normalize', commands: Object.keys(commands) };
 
-/** The messages the CLI would print for `argv`, or none when it parses. */
-async function messages(argv: string[], command: string | undefined = 'normalize'): Promise<string[]> {
+/** The messages the CLI would print for `argv`, or none when it parses; `null` names no command. */
+async function messages(argv: string[], command: string | null = 'normalize'): Promise<string[]> {
   try {
     await cli(argv, main, {
       name: 'slicewright',
@@ -40,14 +42,14 @@ async function messages(argv: string[], command: string | undefined = 'normalize
       strict: true,
     });
   } catch (error) {
-    return friendlyCliErrors(error, { ...help, command });
+    return friendlyCliErrors(error, { ...help, command: command ?? undefined });
   }
   return [];
 }
 
 /**
  * @evidence docs/spec.md#error-messages Rewrites gunshi's missing-flag, missing-argument, choice, type, unknown-option and unknown-command errors into messages naming the fix, suggests close names by edit distance, and keeps other messages.
- * @evidenceReview docs/spec.md#error-messages #157990f Reread the section after the missing-file, layout-file, target-typo and flag-name edit, checked this test's assertions against it, and ran pnpm test green.
+ * @evidenceReview docs/spec.md#error-messages #2655dd4 Reread the section after the unknown-option, invalid-JSON, and prompt missing-flag edits, checked this host against it, and ran pnpm test green.
  */
 export async function rewritesCliErrors(): Promise<void> {
   strictEqual(didYouMean('--tolerence', ['--out', '--tolerance']), '--tolerance');
@@ -67,9 +69,23 @@ export async function rewritesCliErrors(): Promise<void> {
   ]);
   const typed = await messages(['normalize', 'a.png', '--out', 'b.png', '--tolerance', 'abc']);
   ok(typed[0]?.startsWith('--tolerance takes a number, not "abc".'), typed.join());
-  const unknown = await messages(['inspct'], undefined);
+  const unknown = await messages(['inspct'], null);
   ok(unknown[0]?.startsWith('Unknown command "inspct". Did you mean inspect?'), unknown.join());
-  ok(unknown[0]?.endsWith('Commands: normalize, inspect, targets.'));
+  ok(unknown[0]?.endsWith('Commands: normalize, inspect, targets.'), unknown.join());
+  // An unknown option takes the next word; that word is not also an unknown command or a missing argument.
+  deepStrictEqual(await messages(['--bogus', 'targets', 'x.png'], 'targets'), [
+    'Unknown option --bogus for targets. Run `slicewright targets --help` for the options.',
+  ]);
+  const swallowed = await messages(['inspect', '--bogus', 'x.png', '--out', 'y.png'], 'inspect');
+  deepStrictEqual(swallowed, [
+    'Unknown option --bogus for inspect. Run `slicewright inspect --help` for the options.',
+  ]);
+  // Without a known command, the unknown command is the mistake and stays.
+  const commandless = await messages(['--bogus', 'inspct', 'x.png'], null);
+  ok(
+    commandless.some((message) => message.startsWith('Unknown command')),
+    commandless.join('\n'),
+  );
   const several = await messages(['normalize', 'a.png', '--filter', 'x', '--bogus']);
   strictEqual(several.length, 3, several.join('\n'));
   // Errors that are not the parser's keep their message.
@@ -77,11 +93,19 @@ export async function rewritesCliErrors(): Promise<void> {
     'compare needs at least two PNGs.',
   ]);
   deepStrictEqual(friendlyCliErrors('plain', help), ['plain']);
+  // A JSON file that does not parse is named with the parser's reason.
+  deepStrictEqual(parseJsonFile('{"a": 1}', 'x.json'), { a: 1 });
+  throws(
+    () => parseJsonFile('{"a": ', '--layout x.json'),
+    (error: unknown) =>
+      error instanceof InvalidJsonError &&
+      /^--layout x\.json is not valid JSON \(.+\)\.$/u.test(error.message),
+  );
 }
 
 /**
  * @evidence docs/spec.md#error-messages Reports every manifest problem at once with its path: an unknown key with the closest allowed key, a missing key, a value outside its choices, and other mismatches in words.
- * @evidenceReview docs/spec.md#error-messages #157990f Reread the section after the missing-file, layout-file, target-typo and flag-name edit, checked this test's assertions against it, and ran pnpm test green.
+ * @evidenceReview docs/spec.md#error-messages #2655dd4 Reread the section after the unknown-option, invalid-JSON, and prompt missing-flag edits, checked this host against it, and ran pnpm test green.
  */
 export function explainsManifestErrors(): void {
   const problems = (json: unknown): string => {
@@ -140,7 +164,7 @@ void test('friendly manifest errors', explainsManifestErrors);
 
 /**
  * @evidence docs/spec.md#error-messages Names a missing input file instead of the system error, and explains a bad layout file with what it should be and its first problems in words.
- * @evidenceReview docs/spec.md#error-messages #157990f Reread the section after the missing-file, layout-file, target-typo and flag-name edit, checked this test's assertions against it, and ran pnpm test green.
+ * @evidenceReview docs/spec.md#error-messages #2655dd4 Reread the section after the unknown-option, invalid-JSON, and prompt missing-flag edits, checked this host against it, and ran pnpm test green.
  */
 export function explainsMissingFilesAndLayouts(): void {
   let missing: unknown;
@@ -186,7 +210,7 @@ export function explainsMissingFilesAndLayouts(): void {
 
 /**
  * @evidence docs/spec.md#command-line-arguments Drops the program's own row and the options placeholder from the command list, describes a negated flag, and moves --help and --version after a command's own options.
- * @evidenceReview docs/spec.md#command-line-arguments #f21cb56 Reread the section after the help-layout and targets-object edit, checked this test's assertions against it, and ran pnpm test green.
+ * @evidenceReview docs/spec.md#command-line-arguments #d7f096a Reread the section after the [options] usage line, (required) marker, and exit-code edit, checked this host against it, and ran pnpm test green.
  */
 export function tidiesHelp(): void {
   const entry = [
@@ -218,28 +242,50 @@ export function tidiesHelp(): void {
     '',
   ]);
   const command = [
+    'USAGE:',
+    '  slicewright normalize <OPTIONS> <input>',
+    '',
     'OPTIONS:',
     '  -h, --help             Display this help message',
     '  -v, --version          Display this version',
     '  --out <out>            Normalized PNG to write',
+    '  --outline <outline>    Outline width',
     '  --crop                 Crop first',
     '  --no-crop              Negatable of --crop',
     '',
     'EXAMPLES:',
     '  slicewright normalize a.png',
+    '',
   ].join('\n');
   deepStrictEqual(
-    tidyUsage(command, { entry: false, negated: { crop: 'Keep margins' } }).split('\n'),
+    tidyUsage(command, {
+      entry: false,
+      negated: { crop: 'Keep margins' },
+      required: ['out', 'crop'],
+      exitCodes: [
+        [0, 'ok'],
+        [2, 'usage or input failure'],
+      ],
+    }).split('\n'),
     [
+      'USAGE:',
+      '  slicewright normalize [options] <input>',
+      '',
       'OPTIONS:',
-      '  --out <out>            Normalized PNG to write',
-      '  --crop                 Crop first',
+      '  --out <out>            Normalized PNG to write (required)',
+      '  --outline <outline>    Outline width',
+      '  --crop                 Crop first (required)',
       '  --no-crop              Keep margins',
       '  -h, --help             Display this help message',
       '  -v, --version          Display this version',
       '',
       'EXAMPLES:',
       '  slicewright normalize a.png',
+      '',
+      'EXIT CODES:',
+      '  0  ok',
+      '  2  usage or input failure',
+      '',
     ],
   );
 }

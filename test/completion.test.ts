@@ -41,7 +41,7 @@ async function candidates(words: readonly string[]): Promise<string[]> {
 
 /**
  * @evidence docs/spec.md#shell-completion Checks the script for every shell, command and option completion, enum choices, comma-separated targets, command names, png/json/directory paths with hidden entries, and the usage errors for a missing, unknown, or extra shell.
- * @evidenceReview docs/spec.md#shell-completion #ce35ff1 Reread the section after adding pack PNG inputs and symbolic links; for scripts, candidates, paths, links, and usage errors this checks each one through the CLI in process. Ran green with pnpm test.
+ * @evidenceReview docs/spec.md#shell-completion #097cc7f Reread the section after complete joined the catalog and agent help, checked this host against it, and ran pnpm test green.
  */
 export async function shellCompletionWorks(): Promise<void> {
   // A script for every shell names the program and asks `complete --` for candidates.

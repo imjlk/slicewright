@@ -102,7 +102,7 @@ export interface CommandCatalog {
  * exit codes it can end with, and its examples.
  *
  * @evidence docs/spec.md#command-catalog Builds the catalog from the command definitions themselves: every argument and option with its type, default, choices, required, negatable, short and second names, plus exit codes and examples.
- * @evidenceReview docs/spec.md#command-catalog #14c5656 Reread the section with handler-required flags (prompt --kind/--style); the catalog fields, null defaults and choices, aliasOf/aliases, exit codes, and examples all come from the definitions as it describes.
+ * @evidenceReview docs/spec.md#command-catalog #01e13b8 Reread the section after complete joined the catalog with its script output note, checked this host against it, and ran pnpm test green.
  */
 export function describeCommands(source: CatalogSource, only?: string): CommandCatalog {
   const names = Object.keys(source.commands).filter((name) => only === undefined || name === only);
@@ -111,7 +111,7 @@ export function describeCommands(source: CatalogSource, only?: string): CommandC
     version: source.version,
     description: source.description,
     output:
-      'Every command prints one JSON document on stdout; with --watch, one JSON line per run. Usage errors go to stderr.',
+      'Every command but complete prints one JSON document on stdout; with --watch, one JSON line per run. complete prints a shell completion script. Usage errors go to stderr.',
     exitCodes: exitCodeMeanings,
     commands: names.map((name) =>
       describeCommand(

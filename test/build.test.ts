@@ -27,7 +27,7 @@ import { panel, shadedBar } from './fixtures.js';
 
 /**
  * @evidence docs/spec.md#build-manifest Builds a dialog and a bar from a manifest into pieces, exports, and one packed atlas, skips packing when a piece fails, and refuses manifests the shape or the rules reject.
- * @evidenceReview docs/spec.md#build-manifest #404bba1 Reread the section after the missing-input and relative-report-path edit, checked this test's assertions against it, and ran pnpm test green.
+ * @evidenceReview docs/spec.md#build-manifest #1995b96 Reread the section after the export-usage edit (each piece export carries the target's usage text), checked this host against it, and ran pnpm test green.
  */
 export function buildsManifests(): void {
   const dir = mkdtempSync(join(tmpdir(), 'slicewright-build-한글 경로-'));
@@ -434,7 +434,7 @@ export function buildsGroups(): void {
  * File symlinks need privileges on Windows, so they get their own test with an explicit skip.
  *
  * @evidence docs/spec.md#build-manifest Refuses a piece written through a dangling symlink onto the packed image, and watches where dangling input links will point; skips only when Windows denies creating the link.
- * @evidenceReview docs/spec.md#build-manifest #404bba1 Reread the section after the missing-input and relative-report-path edit, checked this test's assertions against it, and ran pnpm test green.
+ * @evidenceReview docs/spec.md#build-manifest #1995b96 Reread the section after the export-usage edit (each piece export carries the target's usage text), checked this host against it, and ran pnpm test green.
  */
 export function followsDanglingSymlinks(context: TestContext): void {
   const dir = mkdtempSync(join(tmpdir(), 'slicewright-build-link-'));
@@ -496,7 +496,7 @@ export function followsDanglingSymlinks(context: TestContext): void {
 
 /**
  * @evidence docs/spec.md#build-manifest Publishes a JSON Schema generated from the manifest type that matches the committed schema file, allows $schema, refuses unknown keys, and is exported by the package.
- * @evidenceReview docs/spec.md#build-manifest #404bba1 Reread the section after the missing-input and relative-report-path edit, checked this test's assertions against it, and ran pnpm test green.
+ * @evidenceReview docs/spec.md#build-manifest #1995b96 Reread the section after the export-usage edit (each piece export carries the target's usage text), checked this host against it, and ran pnpm test green.
  */
 export function publishesManifestSchema(): void {
   const schema = buildManifestSchema();
@@ -532,7 +532,7 @@ void test('build manifest schema', publishesManifestSchema);
 
 /**
  * @evidence docs/spec.md#build-manifest Refuses a piece whose input does not exist by naming the piece, suggests the closest target for a typo, and reports every path relative to the manifest's directory.
- * @evidenceReview docs/spec.md#build-manifest #404bba1 Reread the section after the missing-input and relative-report-path edit, checked this test's assertions against it, and ran pnpm test green.
+ * @evidenceReview docs/spec.md#build-manifest #1995b96 Reread the section after the export-usage edit (each piece export carries the target's usage text), checked this host against it, and ran pnpm test green.
  */
 export function reportsRelativePaths(): void {
   const dir = mkdtempSync(join(tmpdir(), 'slicewright-build-relative-'));
@@ -572,3 +572,40 @@ export function reportsRelativePaths(): void {
   }
 }
 void test('build report paths', reportsRelativePaths);
+
+/**
+ * @evidence docs/spec.md#build-manifest Builds a piece for the Unity and Defold targets, which write no file, and keeps each export's usage in the piece report so their border values are not lost.
+ * @evidenceReview docs/spec.md#build-manifest #1995b96 Reread the section after the export-usage edit (each piece export carries the target's usage text), checked this host against it, and ran pnpm test green.
+ */
+export function reportsExportUsage(): void {
+  const dir = mkdtempSync(join(tmpdir(), 'slicewright-build-usage-'));
+  try {
+    writeFileSync(join(dir, 'dialog.png'), encodePng(panel(80, 60, 4)));
+    const report = runBuild(
+      readBuildManifest({
+        out: 'out/ui.png',
+        pieces: [{ input: 'dialog.png', name: 'dialog', targets: ['unity', 'defold'] }],
+      }),
+      dir,
+      dir,
+    );
+    strictEqual(report.ok, true);
+    const exports = report.pieces[0]?.exports ?? [];
+    deepStrictEqual(
+      exports.map((exported) => [exported.target, exported.files.length]),
+      [
+        ['unity', 0],
+        ['defold', 0],
+      ],
+    );
+    ok(exports[0]?.usage.includes('spriteBorder'), exports[0]?.usage);
+    ok(exports[1]?.usage.includes('slice9'), exports[1]?.usage);
+    deepStrictEqual(
+      relativeBuildReport(report, dir).pieces[0]?.exports.map((exported) => exported.usage),
+      exports.map((exported) => exported.usage),
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+void test('build export usage', reportsExportUsage);

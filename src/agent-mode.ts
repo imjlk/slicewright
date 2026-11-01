@@ -26,7 +26,7 @@ export interface AgentMode {
  * leaves the detection (including `AI_AGENT=<name>`) in charge.
  *
  * @evidence docs/spec.md#agent-mode Decides agent mode from gunshi's detected profile, with SLICEWRIGHT_AGENT=1/true and 0/false overriding it either way.
- * @evidenceReview docs/spec.md#agent-mode #c7f2a40 Reread the new section; the SLICEWRIGHT_AGENT on/off values and the fall-through to detection (AI_AGENT included) match it.
+ * @evidenceReview docs/spec.md#agent-mode #041b6fe Reread the section after the handler-required options, per-command exit codes, and complete edits, checked this host against it, and ran pnpm test green.
  */
 export function agentMode(
   detected: DetectedAgent,
@@ -66,10 +66,29 @@ export interface HelpProgram {
   readonly version: string;
   readonly description: string;
   readonly commands: Readonly<Record<string, HelpCommand>>;
+  /** Flags a command's handler insists on although the parser does not, by command. */
+  readonly requiredInRun?: Readonly<Record<string, readonly string[]>> | undefined;
+  /** The exit codes each command can end with, by command; 0, 1, and 2 when not listed. */
+  readonly exits?: Readonly<Record<string, readonly number[]>> | undefined;
+  /** Commands whose stdout is not JSON, with what it is instead. */
+  readonly stdout?: Readonly<Record<string, string>> | undefined;
 }
 
-const outputNote =
-  'stdout is JSON only; errors go to stderr. Exit 0 ok, 1 an error finding, 2 usage or input failure.';
+const exitMeanings: Readonly<Record<number, string>> = {
+  0: 'ok',
+  1: 'an error finding',
+  2: 'usage or input failure',
+};
+
+/** The closing note: what stdout carries and the exit codes `commandName` can end with. */
+function outputNote(program: HelpProgram, commandName?: string): string {
+  const stdout =
+    commandName === undefined ? undefined : program.stdout?.[commandName];
+  const codes = (commandName === undefined ? undefined : program.exits?.[commandName]) ?? [0, 1, 2];
+  return `${stdout === undefined ? 'stdout is JSON only' : `stdout is ${stdout}`}; errors go to stderr. Exit ${codes
+    .map((code) => `${String(code)} ${exitMeanings[code] ?? ''}`.trim())
+    .join(', ')}.`;
+}
 
 /**
  * Short, plain help for agents, built from the command definitions: one line
@@ -77,7 +96,7 @@ const outputNote =
  * command, then its examples. No color, banner, or `-h`/`-v` rows.
  *
  * @evidence docs/spec.md#agent-mode Renders the concise agent help from the definitions: a line per command, or usage, a line per argument and option with type, default, choices, and --[no-] form, then examples, all without ANSI codes.
- * @evidenceReview docs/spec.md#agent-mode #c7f2a40 Reread the new section; the program and command help lines, choices, required/default notes, --[no-] form, examples, and the JSON/exit note match it.
+ * @evidenceReview docs/spec.md#agent-mode #041b6fe Reread the section after the handler-required options, per-command exit codes, and complete edits, checked this host against it, and ran pnpm test green.
  */
 export function conciseHelp(program: HelpProgram, commandName?: string): string {
   const command =
@@ -96,7 +115,7 @@ export function conciseHelp(program: HelpProgram, commandName?: string): string 
           (name) => `  ${name.padEnd(width)}  ${program.commands[name]?.description ?? ''}`,
         ),
         `Run ${program.name} <command> --help for its options.`,
-        outputNote,
+        outputNote(program),
       ].join('\n'),
     );
   }
@@ -121,9 +140,15 @@ export function conciseHelp(program: HelpProgram, commandName?: string): string 
         : ['Arguments:', ...positionals.map(([key, arg]) => `  <${key}>  ${arg.description ?? ''}`)]),
       ...(options.length === 0
         ? []
-        : ['Options:', ...options.map(([key, arg]) => `  ${optionLine(key, arg)}`)]),
+        : [
+            'Options:',
+            ...options.map(
+              ([key, arg]) =>
+                `  ${optionLine(key, arg, program.requiredInRun?.[commandName]?.includes(key) === true)}`,
+            ),
+          ]),
       ...(examples.length === 0 ? [] : ['Examples:', ...examples.map((line) => `  ${line}`)]),
-      outputNote,
+      outputNote(program, commandName),
     ].join('\n'),
   );
 }
@@ -132,13 +157,13 @@ export function conciseHelp(program: HelpProgram, commandName?: string): string 
  * `text` without ANSI escape codes, for output an agent reads.
  *
  * @evidence docs/spec.md#agent-mode Strips ANSI escape codes from help and stderr messages in agent mode.
- * @evidenceReview docs/spec.md#agent-mode #c7f2a40 Reread the new section; help and stderr messages pass through this in agent mode.
+ * @evidenceReview docs/spec.md#agent-mode #041b6fe Reread the section after the handler-required options, per-command exit codes, and complete edits, checked this host against it, and ran pnpm test green.
  */
 export function plain(text: string): string {
   return stripVTControlCharacters(text);
 }
 
-function optionLine(key: string, arg: HelpArg): string {
+function optionLine(key: string, arg: HelpArg, requiredInRun: boolean): string {
   const flag = arg.negatable === true ? `--[no-]${key}` : `--${key}`;
   const short = arg.short === undefined ? '' : `-${arg.short}, `;
   const value =
@@ -148,7 +173,7 @@ function optionLine(key: string, arg: HelpArg): string {
         ? ` <${arg.choices.join('|')}>`
         : ` <${arg.type}>`;
   const notes = [
-    ...(arg.required === true ? ['required'] : []),
+    ...(arg.required === true || requiredInRun ? ['required'] : []),
     ...(arg.default === undefined || arg.default === null
       ? []
       : [`default: ${String(arg.default)}`]),

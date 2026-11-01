@@ -28,7 +28,7 @@ async function stdoutOf(argv: readonly string[]): Promise<string> {
 
 /**
  * @evidence docs/spec.md#command-catalog Checks every command and every argument of the definitions against the printed catalog: type, required, default, choices, negatable, short form, second names, exit codes, and examples, and that an unknown name is refused with a suggestion.
- * @evidenceReview docs/spec.md#command-catalog #14c5656 Reread the section with handler-required flags (prompt --kind/--style); this asserts every definition field it lists (type, required, default, choices, negatable, short, second names), the exit codes, examples, one-command output, and the unknown-name suggestion. Ran green with pnpm test.
+ * @evidenceReview docs/spec.md#command-catalog #01e13b8 Reread the section after complete joined the catalog with its script output note, checked this host against it, and ran pnpm test green.
  */
 export async function catalogMatchesDefinitions(): Promise<void> {
   // slicewright commands describes every definition as it is
@@ -39,7 +39,18 @@ export async function catalogMatchesDefinitions(): Promise<void> {
     deepStrictEqual(Object.keys(catalog.exitCodes), ['0', '1', '2']);
     deepStrictEqual(
       catalog.commands.map((command) => command.name),
-      Object.keys(subCommands),
+      [...Object.keys(subCommands), 'complete'],
+    );
+    // complete, run by the completion plugin, is described too: a script, not JSON.
+    const complete = catalog.commands.find((command) => command.name === 'complete');
+    strictEqual(complete?.usage, 'slicewright complete <shell>');
+    deepStrictEqual(complete.exitCodes, [0, 2]);
+    deepStrictEqual(complete.options, []);
+    ok(complete.description.includes('not JSON'), complete.description);
+    ok(catalog.output.includes('complete prints a shell completion script'), catalog.output);
+    strictEqual(
+      (JSON.parse(await stdoutOf(['commands', 'complete'])) as CommandCatalog).commands[0]?.name,
+      'complete',
     );
     for (const [name, command] of Object.entries(subCommands)) {
       const described = catalog.commands.find((entry) => entry.name === name);
