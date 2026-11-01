@@ -51,6 +51,13 @@ export async function shellCompletionWorks(): Promise<void> {
     ok(/complete '?--'?/.test(script), shell);
   }
 
+  // complete --help names the shells.
+  ok(
+    (await stdoutOf(['complete', '--help'])).includes(
+      'slicewright complete <bash|zsh|fish|powershell>',
+    ),
+  );
+
   // Commands and options.
   deepStrictEqual(await candidates(['nor']), ['normalize']);
   ok((await candidates(['inspect', '--to'])).includes('--tolerance'));

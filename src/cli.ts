@@ -11,7 +11,7 @@ import completion from '@gunshi/plugin-completion';
 import { agentMode, conciseHelp, plain } from './agent-mode.js';
 import { writeBrowserReportHtml } from './browser-report.js';
 import { aliasedValue, joinNegativeNumbers } from './argv.js';
-import { completeUsageProblem, completionConfig } from './completion.js';
+import { completeUsageProblem, completionConfig, completionShells } from './completion.js';
 import { tidyUsage } from './help.js';
 import { describeCommands, type ExitCode } from './command-catalog.js';
 import { didYouMean, friendlyCliErrors, missingFile } from './friendly-errors.js';
@@ -1377,6 +1377,18 @@ export const shellCompletion = completionConfig({
   word: completionWord,
 });
 
+/** `complete --help`: the plugin's command declares no arguments for gunshi to list. */
+const completeHelp = `Generate shell completion script
+
+USAGE:
+  slicewright complete <${completionShells.join('|')}>
+
+The script goes to stdout. See README.md#shell-completion for where to put it.
+
+EXAMPLES:
+  slicewright complete bash > ~/.local/share/bash-completion/completions/slicewright
+`;
+
 /** Plugins the program runs with: `complete <shell>` prints a shell completion script. */
 const plugins: Plugin[] = [completion({ config: { subCommands: shellCompletion } })];
 
@@ -1389,10 +1401,12 @@ export const cliOptions = {
   renderHeader: null,
   renderValidationErrors: null,
   renderUsage: async (ctx: CommandContext) =>
-    tidyUsage(await renderUsage(ctx), {
-      entry: ctx.callMode === 'entry',
-      negated: { crop: 'Keep transparent margins instead of cropping them' },
-    }),
+    ctx.name === 'complete'
+      ? completeHelp
+      : tidyUsage(await renderUsage(ctx), {
+          entry: ctx.callMode === 'entry',
+          negated: { crop: 'Keep transparent margins instead of cropping them' },
+        }),
   // Unknown or misspelled flags are errors, not silently ignored.
   strict: true,
   plugins,
