@@ -48,7 +48,7 @@ export function convertsPngLayoutsToRgba(): void {
 
 /**
  * @evidence docs/spec.md#preview-sheet Renders the source size losslessly, keeps corners at larger sizes, tiles whole periods, and lays out the sheet cells.
- * @evidenceReview docs/spec.md#preview-sheet #c9ed895 Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#preview-sheet #2b81f78 Reread the section after the missing-diagnostics-cell wording edit, checked this test's assertions against it, and ran pnpm test green.
  */
 export function rendersSlicesAndPreviewSheets(): void {
   const source = panel(40, 30);

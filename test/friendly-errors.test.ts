@@ -1,10 +1,18 @@
 import { deepStrictEqual, ok, strictEqual, throws } from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 import { cli, define } from 'gunshi';
 
 import { BuildManifestError, readBuildManifest } from '../src/build.js';
-import { didYouMean, friendlyCliErrors } from '../src/friendly-errors.js';
+import {
+  didYouMean,
+  friendlyCliErrors,
+  friendlyShapeIssues,
+  missingFile,
+} from '../src/friendly-errors.js';
+import { tidyUsage } from '../src/help.js';
+import { readLayoutJson } from '../src/layout.js';
 
 const normalize = define({
   name: 'normalize',
@@ -38,7 +46,7 @@ async function messages(argv: string[], command: string | undefined = 'normalize
 
 /**
  * @evidence docs/spec.md#error-messages Rewrites gunshi's missing-flag, missing-argument, choice, type, unknown-option and unknown-command errors into messages naming the fix, suggests close names by edit distance, and keeps other messages.
- * @evidenceReview docs/spec.md#error-messages #ed1adaa Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#error-messages #157990f Reread the section after the missing-file, layout-file, target-typo and flag-name edit, checked this test's assertions against it, and ran pnpm test green.
  */
 export async function rewritesCliErrors(): Promise<void> {
   strictEqual(didYouMean('--tolerence', ['--out', '--tolerance']), '--tolerance');
@@ -72,7 +80,7 @@ export async function rewritesCliErrors(): Promise<void> {
 
 /**
  * @evidence docs/spec.md#error-messages Reports every manifest problem at once with its path: an unknown key with the closest allowed key, a missing key, a value outside its choices, and other mismatches in words.
- * @evidenceReview docs/spec.md#error-messages #ed1adaa Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#error-messages #157990f Reread the section after the missing-file, layout-file, target-typo and flag-name edit, checked this test's assertions against it, and ran pnpm test green.
  */
 export function explainsManifestErrors(): void {
   const problems = (json: unknown): string => {
@@ -128,3 +136,106 @@ export function explainsManifestErrors(): void {
 
 void test('friendly CLI errors', rewritesCliErrors);
 void test('friendly manifest errors', explainsManifestErrors);
+
+/**
+ * @evidence docs/spec.md#error-messages Names a missing input file instead of the system error, and explains a bad layout file with what it should be and its first problems in words.
+ * @evidenceReview docs/spec.md#error-messages #157990f Reread the section after the missing-file, layout-file, target-typo and flag-name edit, checked this test's assertions against it, and ran pnpm test green.
+ */
+export function explainsMissingFilesAndLayouts(): void {
+  let missing: unknown;
+  try {
+    readFileSync('no-such-dir/panel.png');
+  } catch (error) {
+    missing = error;
+  }
+  strictEqual(missingFile(missing), 'no-such-dir/panel.png');
+  strictEqual(missingFile(new Error('other')), undefined);
+  deepStrictEqual(friendlyCliErrors(missing, help), ['no-such-dir/panel.png does not exist.']);
+
+  deepStrictEqual(
+    friendlyShapeIssues(
+      [
+        { path: '$input.x', expected: 'AxisLayout', value: undefined },
+        {
+          path: '$input.x.segments[0].kind',
+          expected: '("fixed" | "stretch" | "tile")',
+          value: 'strech',
+        },
+      ],
+      'layout',
+    ),
+    [
+      'layout.x is required: an axis object with length and segments.',
+      'layout.x.segments[0].kind must be one of "fixed", "stretch", "tile", not "strech". Did you mean "stretch"?',
+    ],
+  );
+  throws(
+    () => readLayoutJson({ ok: true, insets: { left: 1, right: 1, top: 1, bottom: 1 } }),
+    (error: unknown) => {
+      ok(error instanceof RangeError);
+      ok(error.message.startsWith('No valid layout: give a SliceLayout'), error.message);
+      ok(!error.message.includes('--insets'), error.message);
+      ok(!error.message.includes('$input'), error.message);
+      return true;
+    },
+  );
+}
+
+/**
+ * @evidence docs/spec.md#command-line-arguments Drops the program's own row and the options placeholder from the command list, describes a negated flag, and moves --help and --version after a command's own options.
+ * @evidenceReview docs/spec.md#command-line-arguments #f21cb56 Reread the section after the help-layout and targets-object edit, checked this test's assertions against it, and ran pnpm test green.
+ */
+export function tidiesHelp(): void {
+  const entry = [
+    'USAGE:',
+    '  slicewright [COMMANDS] <OPTIONS>',
+    '',
+    'COMMANDS:',
+    '  [slicewright] <OPTIONS>       Prompt and inspect',
+    '  inspect <OPTIONS>             Inspect a PNG',
+    '',
+    'For more info, run any command with the `--help` flag:',
+    '  slicewright --help',
+    '  slicewright inspect --help',
+    '',
+  ].join('\n');
+  deepStrictEqual(tidyUsage(entry, { entry: true }).split('\n'), [
+    'USAGE:',
+    '  slicewright <command> [options]',
+    '',
+    'COMMANDS:',
+    '  inspect                       Inspect a PNG',
+    '',
+    'For more info, run any command with the `--help` flag:',
+    '  slicewright inspect --help',
+    '',
+  ]);
+  const command = [
+    'OPTIONS:',
+    '  -h, --help             Display this help message',
+    '  -v, --version          Display this version',
+    '  --out <out>            Normalized PNG to write',
+    '  --crop                 Crop first',
+    '  --no-crop              Negatable of --crop',
+    '',
+    'EXAMPLES:',
+    '  slicewright normalize a.png',
+  ].join('\n');
+  deepStrictEqual(
+    tidyUsage(command, { entry: false, negated: { crop: 'Keep margins' } }).split('\n'),
+    [
+      'OPTIONS:',
+      '  --out <out>            Normalized PNG to write',
+      '  --crop                 Crop first',
+      '  --no-crop              Keep margins',
+      '  -h, --help             Display this help message',
+      '  -v, --version          Display this version',
+      '',
+      'EXAMPLES:',
+      '  slicewright normalize a.png',
+    ],
+  );
+}
+
+void test('missing files and layout errors', explainsMissingFilesAndLayouts);
+void test('help text', tidiesHelp);

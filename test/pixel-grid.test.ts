@@ -49,7 +49,7 @@ function soften(raster: Raster): Raster {
 
 /**
  * @evidence docs/spec.md#pixel-grid Detects whole and fractional upscales, snaps them back exactly, flags blurred art as off the grid, reports only when inspection asks, and snaps before a nearest resize in normalization.
- * @evidenceReview docs/spec.md#pixel-grid #cf46969 Reread the section with the sparse-axis, differing-lines, candidate and given-scale rules, checked this test's assertions against it, and ran it green with pnpm test.
+ * @evidenceReview docs/spec.md#pixel-grid #e6fc6fc Reread the section after the scale-mismatch warning edit, checked this test's assertions against it, and ran pnpm test green.
  */
 export function detectsPixelGrid(): void {
   const source = art(16, 12);
@@ -129,7 +129,7 @@ function flatPanel(width: number, height: number): Raster {
 
 /**
  * @evidence docs/spec.md#pixel-grid Reports a flat 6x panel as undetermined with its candidate scales instead of as not pixel art, fills a sparse axis from the other axis's whole scale, and snaps exactly at a given --pixel-scale.
- * @evidenceReview docs/spec.md#pixel-grid #cf46969 Reread the section with the sparse-axis, differing-lines, candidate and given-scale rules, checked this test's assertions against it, and ran it green with pnpm test.
+ * @evidenceReview docs/spec.md#pixel-grid #e6fc6fc Reread the section after the scale-mismatch warning edit, checked this test's assertions against it, and ran pnpm test green.
  */
 export function judgesSparsePixelGrid(): void {
   const panel = flatPanel(24, 16);
@@ -226,3 +226,24 @@ function raster(target: Raster, x: number, y: number, color: readonly number[]):
 }
 
 void test('sparse pixel grid', judgesSparsePixelGrid);
+
+/**
+ * @evidence docs/spec.md#pixel-grid Warns when a given --pixel-scale fits the boundaries poorly and suggests the whole scales that fit, largest first, and stays quiet for a scale that fits.
+ * @evidenceReview docs/spec.md#pixel-grid #e6fc6fc Reread the section after the scale-mismatch warning edit, checked this test's assertions against it, and ran pnpm test green.
+ */
+export function warnsOfScaleMismatch(): void {
+  const sixfold = resizeRaster(art(24, 16, 3), 144, 96, 'nearest');
+  const wrong = detectPixelGrid(sixfold, undefined, { scale: 5 });
+  ok(wrong.fittingScales !== undefined);
+  strictEqual(wrong.fittingScales[0], 6);
+  ok(wrong.fittingScales.every((scale) => 6 % scale === 0));
+  const mismatch = pixelGridFindings(wrong).find(
+    (finding) => finding.code === 'pixel.scale-mismatch',
+  );
+  strictEqual(mismatch?.severity, 'warning');
+  ok(mismatch.message.includes('--pixel-scale 6'), mismatch.message);
+  const right = detectPixelGrid(sixfold, undefined, { scale: 6 });
+  strictEqual(right.fittingScales, undefined);
+  ok(!pixelGridFindings(right).some((finding) => finding.code === 'pixel.scale-mismatch'));
+}
+void test('pixel scale mismatch', warnsOfScaleMismatch);

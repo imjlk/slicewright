@@ -1,12 +1,14 @@
 #!/usr/bin/env node
-import { readFileSync, realpathSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import { cli, define } from 'gunshi';
+import { renderUsage } from 'gunshi/renderer';
 
 import { writeBrowserReportHtml } from './browser-report.js';
 import { aliasedValue, joinNegativeNumbers } from './argv.js';
-import { friendlyCliErrors } from './friendly-errors.js';
+import { tidyUsage } from './help.js';
+import { didYouMean, friendlyCliErrors, missingFile } from './friendly-errors.js';
 import { defaultChromaOptions, removeChroma } from './chroma.js';
 import { compareSet, defaultCompareSlack } from './compare.js';
 import {
@@ -21,7 +23,7 @@ import { normalizeRaster } from './normalize.js';
 import { outlineThickness } from './outline.js';
 import { readLayoutJson, type SliceLayout } from './layout.js';
 import { buildPack } from './pack-files.js';
-import { loadBuildManifest, runBuild, type BuildManifest } from './build.js';
+import { loadBuildManifest, relativeBuildReport, runBuild, type BuildManifest } from './build.js';
 import { watchBuild, watchRuns, type WatchRun, type WatchStatus } from './watch.js';
 import { defaultPackOptions } from './pack.js';
 import { inspectAtlas } from './phaser.js';
@@ -171,7 +173,9 @@ slicewright prompt --kind panel --style "hand-painted fantasy wood" --from repor
         .filter(Boolean)
         .join(' and ');
       throw new UsageError(
-        `prompt needs ${missing}, also with --from: the correction is added to a new plan for that kind (${uiKinds.join(', ')}) and style.`,
+        ctx.values.from === undefined
+          ? `prompt needs ${missing}: the kind of element (${uiKinds.join(', ')}) and its art direction.`
+          : `prompt needs ${missing}, also with --from: the correction is added to a new plan for that kind (${uiKinds.join(', ')}) and style.`,
       );
     }
     const plan = buildPromptPlan({
@@ -417,7 +421,13 @@ slicewright atlas sheet.json --slice dialog`,
   run: (ctx) => {
     const path = ctx.values.input;
     const json: unknown = JSON.parse(readFileSync(path, 'utf8'));
-    const imagePath = ctx.values.image ?? resolve(dirname(path), atlasImage(json, path));
+    // Shown as the atlas path was given, like every other command's paths.
+    const imagePath = ctx.values.image ?? atlasImagePath(path, atlasImage(json, path));
+    if (ctx.values.image === undefined && !existsSync(imagePath)) {
+      throw new UsageError(
+        `${imagePath} does not exist; ${path} names it as meta.image. Pass --image for another file.`,
+      );
+    }
     if (isAsepriteSheet(json)) {
       if (ctx.values.frame !== undefined) {
         throw new UsageError('--frame checks a Phaser atlas; pick an Aseprite slice with --slice.');
@@ -479,10 +489,26 @@ slicewright key generated.png --out keyed.png --key magenta`,
     },
   },
   run: (ctx) => {
+    const keep = aliasedValue<number>(ctx, 'keep', 'keep-below');
+    const drop = aliasedValue<number>(ctx, 'drop', 'drop-above');
+    // Name the thresholds as they were typed.
+    // Name each flag as it was typed; one not typed follows the other's naming.
+    const longNames =
+      ctx.explicit['keep-below'] === true ||
+      (ctx.explicit['drop-above'] === true && ctx.explicit.keep !== true);
+    const keepFlag =
+      ctx.explicit['keep-below'] === true || (longNames && ctx.explicit.keep !== true) ? '--keep-below' : '--keep';
+    const dropFlag =
+      ctx.explicit['drop-above'] === true || (longNames && ctx.explicit.drop !== true) ? '--drop-above' : '--drop';
+    if (!(keep >= 0 && drop > keep && drop <= 255)) {
+      throw new UsageError(
+        `${keepFlag} must be at least 0 and below ${dropFlag}, and ${dropFlag} at most 255; got ${keepFlag} ${keep} and ${dropFlag} ${drop}.`,
+      );
+    }
     const result = removeChroma(readPng(ctx.values.input), {
       key: ctx.values.key,
-      keep: aliasedValue<number>(ctx, 'keep', 'keep-below'),
-      drop: aliasedValue<number>(ctx, 'drop', 'drop-above'),
+      keep,
+      drop,
       despillRadius: ctx.values['despill-radius'],
     });
     writeOutputFile(ctx.values.out, encodePng(result.raster));
@@ -563,29 +589,29 @@ slicewright normalize sprite.png --out ui/sprite.png --pixel-art --keep 4`,
   args: {
     input: image,
     out: { type: 'string', required: true, description: 'Normalized PNG to write' },
+    ...sizeArgs,
+    crop: {
+      type: 'boolean',
+      negatable: true,
+      description: 'Crop transparent margins first (on by default)',
+    },
     keep: {
       type: 'number',
       description: 'Rebuild keeping this many pixels of each uniform stretch span',
     },
-    crop: {
-      type: 'boolean',
-      negatable: true,
-      description: 'Crop transparent margins first (the default); --no-crop keeps them',
+    target: {
+      type: 'string',
+      description: `Also export for these targets, comma separated: ${Object.keys(sliceTargets).join(', ')}`,
     },
     atlas: { type: 'string', description: 'Also write a one-frame atlas JSON here' },
     name: {
       type: 'string',
       description: 'Asset name for --atlas and --target; defaults to the file name',
     },
-    target: {
-      type: 'string',
-      description: `Also export for these targets, comma separated: ${Object.keys(sliceTargets).join(', ')}`,
-    },
     'image-ref': {
       type: 'string',
       description: 'How --target files refer to the image; defaults to its path from the output',
     },
-    ...sizeArgs,
     ...sliceArgs,
     'pixel-art': {
       type: 'boolean',
@@ -752,7 +778,7 @@ slicewright build ui.build.json --watch`,
     const baseDir = dirname(resolve(path));
     if (ctx.values.watch !== true) {
       const report = runBuild(buildManifest(path), baseDir, process.cwd(), [path]);
-      print({ manifest: path, ...report });
+      print({ manifest: path, ...relativeBuildReport(report, baseDir) });
       failOnErrors(report.ok);
       return;
     }
@@ -796,6 +822,9 @@ function buildManifest(path: string): BuildManifest {
   try {
     return loadBuildManifest(path);
   } catch (error) {
+    if (missingFile(error) !== undefined) {
+      throw new UsageError(`${path} does not exist.`);
+    }
     throw new UsageError(`${path}: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
@@ -818,15 +847,18 @@ const browserReport = define({
 const targets = define({
   name: 'targets',
   description: 'List export targets and what each can represent',
+  examples: `slicewright targets
+slicewright export ui/panel.png --target phaser,css --out-dir exports`,
   run: () => {
-    print(
-      Object.values(sliceTargets).map(({ id, label, status, capabilities }) => ({
+    // An object like every other command's output, so fields can be added.
+    print({
+      targets: Object.values(sliceTargets).map(({ id, label, status, capabilities }) => ({
         id,
         label,
         status,
         capabilities,
       })),
-    );
+    });
   },
 });
 
@@ -958,8 +990,9 @@ function targetList(value: string | undefined): string[] {
   }
   for (const id of ids) {
     if (findTarget(id) === undefined) {
+      const guess = didYouMean(id, Object.keys(sliceTargets));
       throw new UsageError(
-        `Unknown target "${id}". Known targets: ${Object.keys(sliceTargets).join(', ')}.`,
+        `Unknown target "${id}".${guess === undefined ? '' : ` Did you mean ${guess}?`} Known targets: ${Object.keys(sliceTargets).join(', ')}.`,
       );
     }
   }
@@ -1054,6 +1087,9 @@ function readLayout(path: string): SliceLayout {
   try {
     json = JSON.parse(readFileSync(path, 'utf8'));
   } catch (error) {
+    if (missingFile(error) !== undefined) {
+      throw new UsageError(`--layout ${path} does not exist.`);
+    }
     throw new UsageError(
       `--layout ${path}: ${error instanceof Error ? error.message : String(error)}`,
     );
@@ -1131,6 +1167,11 @@ function previewOptions(values: {
   return { cells, zoom, maxWidth };
 }
 
+/** The atlas image beside the atlas, as a path from where the atlas path was given. */
+function atlasImagePath(atlasPath: string, image: string): string {
+  return isAbsolute(image) ? image : join(dirname(atlasPath), image);
+}
+
 function atlasImage(json: unknown, path: string): string {
   if (typeof json === 'object' && json !== null && 'meta' in json) {
     const meta = (json as { meta?: { image?: unknown } }).meta;
@@ -1143,10 +1184,19 @@ function atlasImage(json: unknown, path: string): string {
 
 function summary(report: InspectReport): Pick<
   InspectReport,
-  'ok' | 'mode' | 'insets' | 'scale9Borders' | 'minSize' | 'tile' | 'contentPadding' | 'findings'
+  | 'ok'
+  | 'mode'
+  | 'insets'
+  | 'insetsSource'
+  | 'scale9Borders'
+  | 'minSize'
+  | 'tile'
+  | 'contentPadding'
+  | 'findings'
 > {
-  const { ok, mode, insets, scale9Borders, minSize, tile, contentPadding, findings } = report;
-  return { ok, mode, insets, scale9Borders, minSize, tile, contentPadding, findings };
+  const { ok, mode, insets, insetsSource, scale9Borders, minSize, tile, contentPadding, findings } =
+    report;
+  return { ok, mode, insets, insetsSource, scale9Borders, minSize, tile, contentPadding, findings };
 }
 
 function readPng(path: string | undefined): Raster {
@@ -1181,6 +1231,11 @@ const version = (
 const main = define({
   name: 'slicewright',
   description: 'Prompt, inspect, and preview nine-slice and three-slice UI art. Every command prints JSON.',
+  examples: `# Key a generated image, normalize it with a Phaser atlas, then check it
+slicewright key generated.png --out keyed.png
+slicewright normalize keyed.png --width 480 --out ui/panel.png --target phaser
+slicewright preview ui/panel.png --out panel-sheet.png
+slicewright atlas ui/panel.json`,
   run: () => {
     process.stdout.write('Run slicewright --help for the commands.\n');
     process.exitCode = usageFailed;
@@ -1227,6 +1282,11 @@ try {
     // stdout carries JSON only: no banner, no validation text; errors go to stderr.
     renderHeader: null,
     renderValidationErrors: null,
+    renderUsage: async (ctx) =>
+      tidyUsage(await renderUsage(ctx), {
+        entry: ctx.callMode === 'entry',
+        negated: { crop: 'Keep transparent margins instead of cropping them' },
+      }),
     // Unknown or misspelled flags are errors, not silently ignored.
     strict: true,
   });

@@ -49,10 +49,13 @@ npx -y slicewright key generated.png --out keyed.png
 npx -y slicewright normalize keyed.png --width 480 --out ui/panel.png --name panel --target phaser,css
 npx -y slicewright preview ui/panel.png --out panel-sheet.png
 npx -y slicewright atlas ui/panel.json
+npx -y slicewright key generated-button.png --out keyed-button.png
+npx -y slicewright normalize keyed-button.png --width 240 --out ui/button.png --name button --target phaser
 npx -y slicewright pack ui/panel.json ui/button.json --out ui/ui.png --css
 ```
 
-Run `npx -y slicewright --help` for every command, and `--help` after a
+`pack` takes the atlas JSON that `normalize --target phaser` (or `--atlas`)
+writes beside each piece. Run `npx -y slicewright --help` for every command, and `--help` after a
 command for its options and examples. Output folders are created as needed. Install it in a project with
 `npm install --save-dev slicewright` to pin the version; the same functions are
 importable as a library (`import { inspectRaster } from 'slicewright'`).
