@@ -836,8 +836,13 @@ findings after the report's own. Codes are looked up as the table's own
 entries, so a code such as `constructor` adds nothing. Each warning or error whose code has a correction adds one
 line, once, in finding order; an axis code (`.x.` or `.y.`) names the top and
 bottom edges and columns for x, the left and right edges and rows for y. Info
-findings and codes about how the art is sliced, packed, or exported, not how
-it is drawn, add nothing. The lines are appended to the prompt under
+findings add nothing, except `regions.multi`: that finding says the fixed
+detail in the middle of an edge, such as a crest or a tail, must stay out of
+the image and be drawn afterwards as its own sprite on a plain nine-slice,
+three-slice, or vertical three-slice body, matching which axes still resize,
+so it adds that one correction even though it is info. Codes
+about how the art is sliced, packed, or exported, not how it is drawn, such as
+`target.unsupported`, add nothing. The lines are appended to the prompt under
 "Corrections from the previous attempt:" and listed as `corrections`, empty
 when nothing applies.
 
