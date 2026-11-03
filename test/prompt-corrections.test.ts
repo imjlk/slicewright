@@ -9,8 +9,8 @@ import {
 } from '../src/prompt-corrections.js';
 
 /**
- * @evidence docs/spec.md#prompt-corrections Checks the report shape, build pieces, axis wording, deduplication, ignored info and export codes, and the appended prompt.
- * @evidenceReview docs/spec.md#prompt-corrections #2abf40a Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidence docs/spec.md#prompt-corrections Checks the report shape, build pieces, axis wording, deduplication, the regions.multi correction, ignored info and export codes, and the appended prompt.
+ * @evidenceReview docs/spec.md#prompt-corrections #3d98164 Reread the section. The test expects the regions.multi line, and still expects other info and target.unsupported to add nothing.
  */
 export function correctsPrompts(): void {
   const report = readFindingsReport({
@@ -22,11 +22,14 @@ export function correctsPrompts(): void {
       { code: 'stretch.y.nonuniform', severity: 'error', message: 'Again.' },
       { code: 'tile.x.auto', severity: 'info', message: 'Tiles.' },
       { code: 'target.unsupported', severity: 'error', message: 'Not here.' },
+      { code: 'regions.multi', severity: 'info', message: 'Two stretches.' },
       { code: 'alpha.interior', severity: 'info', message: 'Info only.' },
     ],
   });
   const lines = promptCorrections(report);
-  strictEqual(lines.length, 2);
+  strictEqual(lines.length, 3);
+  ok(lines[2]?.includes('keep it out of this image'));
+  ok(lines[2]?.includes('own sprite'));
   ok(lines[0]?.includes('left and right edges'));
   ok(lines[1]?.includes('adjacent columns'));
   ok(lines[1]?.includes('top and bottom edges'));
