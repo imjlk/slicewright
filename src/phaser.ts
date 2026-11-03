@@ -84,7 +84,7 @@ export interface AtlasReport {
  * `this.load.atlas(key, image, json)` and NineSlice reads its borders.
  *
  * @evidence docs/spec.md#phaser-scale9borders Emits an untrimmed, unrotated JSON Hash frame carrying scale9Borders.
- * @evidenceReview docs/spec.md#phaser-scale9borders #4aec64c Checked this code against the section line by line and ran convertsToPhaserBorders green with pnpm test.
+ * @evidenceReview docs/spec.md#phaser-scale9borders #257e889 Reread the frame writer. It still emits an untrimmed, unrotated hash frame with scale9Borders. The multi-region sentence does not change it.
  */
 export function createSingleFrameAtlas(
   name: string,

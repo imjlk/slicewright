@@ -156,7 +156,7 @@ export function rendersSlicesAndPreviewSheets(): void {
 
 /**
  * @evidence docs/spec.md#phaser-scale9borders Converts both ways, applies Phaser's three-slice rule, and writes a loadable one-frame atlas.
- * @evidenceReview docs/spec.md#phaser-scale9borders #4aec64c Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidenceReview docs/spec.md#phaser-scale9borders #257e889 Reread the border conversion and the one-frame atlas. The new multi-region exception is covered in the layout tests, not here.
  */
 export function convertsToPhaserBorders(): void {
   const insets = { left: 6, right: 8, top: 5, bottom: 7 };

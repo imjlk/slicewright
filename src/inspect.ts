@@ -22,6 +22,7 @@ import {
   type AxisLayout,
   type SliceLayout,
 } from './layout.js';
+import { multiRegionRemedy } from './multi-region.js';
 import { detectContentPadding, paddingProblem } from './padding.js';
 import { alphaAt, pixelOffset, type Raster, type Rect } from './raster.js';
 import {
@@ -381,7 +382,7 @@ export function pickAxisSpan(
  * @evidence docs/spec.md#vertical-three-slice Keeps the width when columns never match but rows do, or when the mode asks for it.
  * @evidenceReview docs/spec.md#vertical-three-slice #072e9af Checked this code against the section line by line and ran detectsVerticalThreeSlices green with pnpm test.
  * @evidence docs/spec.md#multiple-stretch-regions Builds a multi-region layout when asked and an axis has more than one long run.
- * @evidenceReview docs/spec.md#multiple-stretch-regions #25c1980 Reread the section after the insetsSource-in-every-report edit, checked this code against it, and ran pnpm test green.
+ * @evidenceReview docs/spec.md#multiple-stretch-regions #fbac3c4 Reread the section. When regions is multi, finish calls multiRegionLayout and keeps the single layout when that returns undefined.
  */
 export function detectLayout(
   raster: Raster,
@@ -470,12 +471,21 @@ export function detectLayout(
   return finish(insets, isThreeSlice(insets) ? 'three' : 'nine', tile);
 }
 
+function regionsMultiFinding(x: number, y: number): Finding {
+  return {
+    code: 'regions.multi',
+    severity: 'info',
+    message: `The layout keeps ${x} horizontal and ${y} vertical stretch regions. No target exports more than one region per axis. ${multiRegionRemedy(x, y)}`,
+    details: { x, y },
+  };
+}
+
 /**
  * Keeps every long uniform run on an axis as its own stretch segment. Used
  * only when an axis has more than one such run and does not tile.
  *
- * @evidence docs/spec.md#multiple-stretch-regions Keeps every long uniform run as a stretch segment, leaves tiled axes single, and records the counts.
- * @evidenceReview docs/spec.md#multiple-stretch-regions #25c1980 Reread the section after the insetsSource-in-every-report edit, checked this code against it, and ran pnpm test green.
+ * @evidence docs/spec.md#multiple-stretch-regions Keeps every long uniform run as a stretch segment, leaves tiled axes single, records the counts, and tells the caller to draw fixed detail as its own sprite.
+ * @evidenceReview docs/spec.md#multiple-stretch-regions #fbac3c4 Reread the section. Tiled and fixed axes are not split, each long run becomes a stretch segment, and regions.multi ends with the separate-sprite remedy.
  */
 export function multiRegionLayout(
   raster: Raster,
@@ -518,12 +528,7 @@ export function multiRegionLayout(
     x: flexibleSegments(layout.x).length,
     y: flexibleSegments(layout.y).length,
   };
-  findings.push({
-    code: 'regions.multi',
-    severity: 'info',
-    message: `The layout keeps ${regions.x} horizontal and ${regions.y} vertical stretch regions; no current target can export more than one region per axis.`,
-    details: regions,
-  });
+  findings.push(regionsMultiFinding(regions.x, regions.y));
   return { insets: { left, right, top, bottom }, mode: 'multi', tile: base.tile, layout };
 }
 
@@ -532,8 +537,8 @@ export function multiRegionLayout(
  * reports after a rebuild: its axes must match the image size, and every
  * stretch segment must be uniform.
  *
- * @evidence docs/spec.md#multiple-stretch-regions Verifies a given layout against the image size and the uniformity of each stretch segment instead of detecting one.
- * @evidenceReview docs/spec.md#multiple-stretch-regions #25c1980 Reread the section after the insetsSource-in-every-report edit, checked this code against it, and ran pnpm test green.
+ * @evidence docs/spec.md#multiple-stretch-regions Verifies a given layout against the image size and the uniformity of each stretch segment, and repeats the separate-sprite remedy for a multi-region layout.
+ * @evidenceReview docs/spec.md#multiple-stretch-regions #fbac3c4 Reread the read-back rules. A size mismatch is layout.size, a nonuniform stretch segment is an error, and a multi shape repeats the remedy.
  */
 export function verifyGivenLayout(
   raster: Raster,
@@ -589,12 +594,9 @@ export function verifyGivenLayout(
     }
   }
   if (shape === 'multi') {
-    findings.push({
-      code: 'regions.multi',
-      severity: 'info',
-      message: `The layout keeps ${flexibleSegments(layout.x).length} horizontal and ${flexibleSegments(layout.y).length} vertical stretch regions; no current target can export more than one region per axis.`,
-      details: { x: flexibleSegments(layout.x).length, y: flexibleSegments(layout.y).length },
-    });
+    findings.push(
+      regionsMultiFinding(flexibleSegments(layout.x).length, flexibleSegments(layout.y).length),
+    );
   }
   return { insets, mode, tile, layout };
 }

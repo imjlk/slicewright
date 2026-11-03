@@ -36,7 +36,7 @@ export function findTarget(id: string): SliceTarget | undefined {
  * produces its findings and no files.
  *
  * @evidence docs/spec.md#targets Looks the target up, checks capabilities, and writes files only when no error remains.
- * @evidenceReview docs/spec.md#targets #2cdaf2d Checked this code against the section line by line and ran checksTargetCapabilities green with pnpm test.
+ * @evidenceReview docs/spec.md#targets #9c26183 Reread the section. Unknown targets throw, size and padding mismatches throw, and an error finding returns no files.
  */
 export function exportForTarget(id: string, input: ExportInput): ExportResult {
   const target = findTarget(id);

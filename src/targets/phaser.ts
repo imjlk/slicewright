@@ -24,10 +24,14 @@ export const phaserTarget: SliceTarget = {
  * three-slice and keeps the height, so a layout whose height stretches as one
  * full-height span has no Phaser encoding.
  *
- * @evidence docs/spec.md#phaser-scale9borders Rejects a full-height vertical stretch span, which Phaser would read as its three-slice.
- * @evidenceReview docs/spec.md#phaser-scale9borders #4aec64c Checked this code against the section line by line and ran convertsToPhaserBorders green with pnpm test.
+ * @evidence docs/spec.md#phaser-scale9borders Rejects a full-height vertical stretch span, which Phaser would read as its three-slice, except a multi-region layout.
+ * @evidenceReview docs/spec.md#phaser-scale9borders #257e889 Reread the full-height rule and the multi exception. A multi shape returns no finding; one full-height vertical stretch still names CSS.
  */
 export function checkPhaserLayout(layout: SliceLayout): Finding[] {
+  // A multi-region export already says no target can store it, including CSS.
+  if (layoutShape(layout) === 'multi') {
+    return [];
+  }
   const vertical = flexibleSegments(layout.y);
   const fullHeight =
     vertical.length === 1 && vertical[0]?.start === 0 && vertical[0].end === layout.y.length;
@@ -48,7 +52,7 @@ export function checkPhaserLayout(layout: SliceLayout): Finding[] {
  * NineSlice reads, plus the `tileX` / `tileY` constructor flags for tiled axes.
  *
  * @evidence docs/spec.md#phaser-scale9borders Exports the atlas frame and the nineslice call with tiling flags for the Phaser target.
- * @evidenceReview docs/spec.md#phaser-scale9borders #4aec64c Checked this code against the section line by line and ran convertsToPhaserBorders green with pnpm test.
+ * @evidenceReview docs/spec.md#phaser-scale9borders #257e889 Reread the export. It still writes scale9Borders and tiling flags; a multi layout stops before this because the unsupported error returns no files.
  */
 export function exportPhaser({
   name,
