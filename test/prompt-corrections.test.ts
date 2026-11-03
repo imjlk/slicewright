@@ -10,7 +10,7 @@ import {
 
 /**
  * @evidence docs/spec.md#prompt-corrections Checks the report shape, build pieces, axis wording, deduplication, the regions.multi correction, ignored info and export codes, and the appended prompt.
- * @evidenceReview docs/spec.md#prompt-corrections #31e0ed1 Reread the section. The test expects the regions.multi line, and still expects other info and target.unsupported to add nothing.
+ * @evidenceReview docs/spec.md#prompt-corrections #3d98164 Reread the section. The test expects the regions.multi line, and still expects other info and target.unsupported to add nothing.
  */
 export function correctsPrompts(): void {
   const report = readFindingsReport({
