@@ -211,7 +211,7 @@ export function detectsVerticalThreeSlices(): void {
 
 /**
  * @evidence docs/spec.md#multiple-stretch-regions Splits the top edge around a crest only when multiple regions are asked for, and the finding names the separate-sprite remedy.
- * @evidenceReview docs/spec.md#multiple-stretch-regions #30d2f92 Reread the section. The test asks for multi on a crest panel, checks two horizontal stretches, and checks the finding ends with the remedy.
+ * @evidenceReview docs/spec.md#multiple-stretch-regions #fbac3c4 Reread the section. The test asks for multi on a crest panel, checks two horizontal stretches, and checks the finding ends with the remedy.
  */
 export function detectsMultipleRegions(): void {
   const art = crestPanel(96, 40);
@@ -224,7 +224,7 @@ export function detectsMultipleRegions(): void {
   ok(
     report.findings
       .find((finding) => finding.code === 'regions.multi')
-      ?.message?.endsWith(multiRegionRemedy()),
+      ?.message?.includes('nine-slice body'),
   );
   const stretch = report.layout.x.segments.filter((segment) => segment.kind === 'stretch');
   strictEqual(stretch.length, 2);
@@ -245,6 +245,11 @@ export function detectsMultipleRegions(): void {
     x: 2,
     y: 0,
   });
+  ok(
+    bar.findings
+      .find((finding) => finding.code === 'regions.multi')
+      ?.message?.includes('a three-slice body'),
+  );
 
   throws(
     () =>
@@ -262,7 +267,7 @@ export function detectsMultipleRegions(): void {
 
 /**
  * @evidence docs/spec.md#targets Rejects a multi-region export without files and with the separate-sprite remedy, notes emulation, warns about tiling gaps and fixed layouts, and lists every target.
- * @evidenceReview docs/spec.md#targets #f78114e Reread the section. The test checks Phaser and CSS multi exports write no files and name the remedy, plus emulation, tiling, and fixed layouts.
+ * @evidenceReview docs/spec.md#targets #9c26183 Reread the body rule. The test checks a crest names a nine-slice, a fixed-height bar a three-slice, a fixed-width track a vertical three-slice, and a full-height multi layout does not also say to use CSS.
  */
 export function checksTargetCapabilities(): void {
   deepStrictEqual(Object.keys(sliceTargets).sort(), ['css', 'defold', 'godot', 'phaser', 'unity']);
@@ -276,13 +281,53 @@ export function checksTargetCapabilities(): void {
     (finding) => finding.code === 'target.unsupported',
   );
   ok(phaserUnsupported?.message?.startsWith('Phaser 4 cannot export a multi-region layout'));
-  ok(phaserUnsupported?.message?.endsWith(multiRegionRemedy()));
-  ok(!phaserUnsupported?.message?.includes('target that can'));
+  ok(phaserUnsupported?.message?.endsWith(multiRegionRemedy(2, 1)));
+  ok(!phaserUnsupported?.message?.includes('use CSS'));
+  strictEqual(phaser.findings.filter((finding) => finding.code === 'target.unsupported').length, 1);
   const css = exportForTarget('css', input);
   strictEqual(css.files.length, 0);
   const cssUnsupported = css.findings.find((finding) => finding.code === 'target.unsupported');
   ok(cssUnsupported?.message?.startsWith('CSS border-image cannot export a multi-region layout'));
-  ok(cssUnsupported?.message?.endsWith(multiRegionRemedy()));
+  ok(cssUnsupported?.message?.endsWith(multiRegionRemedy(2, 1)));
+
+  const verticalMulti = {
+    x: axisFromSpans(40, []),
+    y: axisFromSpans(80, [
+      { start: 8, end: 24, kind: 'stretch' as const },
+      { start: 48, end: 64, kind: 'stretch' as const },
+    ]),
+  };
+  const verticalExport = exportForTarget('phaser', {
+    name: 'track',
+    imageRef: 'track.png',
+    raster: panel(40, 80),
+    layout: verticalMulti,
+  });
+  ok(
+    verticalExport.findings
+      .find((finding) => finding.code === 'target.unsupported')
+      ?.message?.includes('vertical three-slice body'),
+  );
+
+  const fullHeight = {
+    x: axisFromSpans(40, [
+      { start: 4, end: 12, kind: 'stretch' as const },
+      { start: 24, end: 32, kind: 'stretch' as const },
+    ]),
+    y: axisFromSpans(30, [{ start: 0, end: 30, kind: 'stretch' as const }]),
+  };
+  const fullHeightExport = exportForTarget('phaser', {
+    name: 'crest',
+    imageRef: 'crest.png',
+    raster: panel(40, 30),
+    layout: fullHeight,
+  });
+  const fullHeightErrors = fullHeightExport.findings.filter(
+    (finding) => finding.code === 'target.unsupported',
+  );
+  strictEqual(fullHeightErrors.length, 1);
+  ok(fullHeightErrors[0]?.message?.includes('nine-slice body'));
+  ok(!fullHeightErrors[0]?.message?.includes('use CSS'));
 
   const vertical = layoutFromInsets({ left: 0, right: 0, top: 6, bottom: 6 }, 40, 30, {
     shape: 'three-vertical',
@@ -382,7 +427,7 @@ void test('vertical three-slice', detectsVerticalThreeSlices);
 void test('multiple stretch regions', detectsMultipleRegions);
 /**
  * @evidence docs/spec.md#multiple-stretch-regions Reads back the layout normalization reports for a rebuilt multi-region texture, repeats the separate-sprite remedy, and rejects one of another size or over detail.
- * @evidenceReview docs/spec.md#multiple-stretch-regions #30d2f92 Reread the read-back rules. The test checks the rebuilt layout round-trips, the remedy is repeated, and a wrong size or nonuniform span is rejected.
+ * @evidenceReview docs/spec.md#multiple-stretch-regions #fbac3c4 Reread the read-back rules. The test checks the rebuilt layout round-trips, the remedy is repeated, and a wrong size or nonuniform span is rejected.
  */
 export function readsBackMultiRegionLayouts(): void {
   const art = crestPanel(240, 100);
@@ -398,11 +443,9 @@ export function readsBackMultiRegionLayouts(): void {
   const given = inspectRaster(normalized.raster, { ...defaultInspectOptions, layout });
   ok(given.ok, JSON.stringify(given.findings));
   strictEqual(given.mode, 'multi');
-  ok(
-    given.findings
-      .find((finding) => finding.code === 'regions.multi')
-      ?.message?.endsWith(multiRegionRemedy()),
-  );
+  const givenMulti = given.findings.find((finding) => finding.code === 'regions.multi');
+  const givenCounts = givenMulti?.details as { x: number; y: number } | undefined;
+  ok(givenMulti?.message?.endsWith(multiRegionRemedy(givenCounts?.x ?? 0, givenCounts?.y ?? 0)));
   strictEqual(given.insetsSource, 'layout');
   deepStrictEqual(given.layout.x, layout.x);
   deepStrictEqual(given.layout.y, layout.y);

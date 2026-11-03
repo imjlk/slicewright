@@ -1,5 +1,11 @@
 import type { Finding } from '../inspect.js';
-import { axisTiles, layoutInsets, layoutShape, type SliceLayout } from '../layout.js';
+import {
+  axisTiles,
+  flexibleSegments,
+  layoutInsets,
+  layoutShape,
+  type SliceLayout,
+} from '../layout.js';
 import { multiRegionRemedy } from '../multi-region.js';
 import type { SliceInsets } from '../slices.js';
 import type { ExportInput, SliceTarget } from './types.js';
@@ -11,7 +17,7 @@ import type { ExportInput, SliceTarget } from './types.js';
  * experimental target says so.
  *
  * @evidence docs/spec.md#targets Reports unsupported shapes as errors, a multi-region layout with the separate-sprite remedy, emulation as info, and tiling gaps as warnings, from the declared capabilities.
- * @evidenceReview docs/spec.md#targets #f78114e Reread the section. A multi shape names the target and ends with the remedy; other unsupported shapes still say to pick a target or re-slice.
+ * @evidenceReview docs/spec.md#targets #9c26183 Reread the body rule. A multi export names the body from the flexible counts and does not suggest another target.
  */
 export function capabilityFindings(
   target: SliceTarget,
@@ -50,7 +56,10 @@ export function capabilityFindings(
         severity: 'error',
         message:
           shape === 'multi'
-            ? `${target.label} cannot export a multi-region layout, and neither can any other target. ${multiRegionRemedy()}`
+            ? `${target.label} cannot export a multi-region layout, and neither can any other target. ${multiRegionRemedy(
+                flexibleSegments(layout.x).length,
+                flexibleSegments(layout.y).length,
+              )}`
             : `${target.label} cannot represent a ${shape} layout. Export it to a target that can, or re-slice it as a nine-slice.`,
         details: { shape },
       });

@@ -115,7 +115,9 @@ An axis with only one such run keeps the single-region result, a tiled axis and
 an axis the layout keeps fixed are never split, and a
 `regions.multi` finding records the counts and says that no target exports
 more than one region per axis, so the fixed detail, such as a crest or a tail,
-is drawn as its own sprite on a nine-slice or three-slice body. The reported
+is drawn as its own sprite. The body is a nine-slice when both axes still
+resize, a three-slice when only the width does, and a vertical three-slice
+when only the height does. The reported
 insets are the outermost flexible lines. Multiple regions are only detected,
 so asking for them together with given insets is refused. The layout renders
 in previews. Export writes no files and reports `target.unsupported`; that
@@ -438,8 +440,9 @@ those axes as tiled and packing carries the flags into its usage.
 Because Phaser reads borders spanning the full height as its own three-slice, a
 layout whose height stretches as one full-height span (zero top and bottom
 insets on a resizable axis) cannot be encoded and is a `target.unsupported`
-error for the Phaser target. The usage keeps guidance such as a fixed size in a
-JavaScript comment.
+error for the Phaser target. A multi-region layout does not get that error:
+CSS cannot export it either, so the finding is the multi-region one. The usage
+keeps guidance such as a fixed size in a JavaScript comment.
 
 ## Targets
 
@@ -452,9 +455,10 @@ target can neither represent nor emulate is a `target.unsupported` error and
 writes no files, and so is a layout that never resizes (`target.fixed`), since
 every target would stretch zero-inset art. A multi-region layout is that shape
 for every current target. Its error names the target, says that no other
-target can export it either, and tells the caller to draw the fixed detail,
-such as a crest or a tail, as its own sprite on a nine-slice or three-slice
-body, the same remedy as `regions.multi`. Any other unsupported shape says to
+target can export it either, and repeats the `regions.multi` remedy: a
+nine-slice when both axes still resize, a three-slice when only the width
+does, and a vertical three-slice when only the height does. Any other
+unsupported shape says to
 export it to a target that can, or to re-slice it as a nine-slice. Tiling the
 target cannot express is a `target.tile` warning, and so is a target whose tile
 count differs from the

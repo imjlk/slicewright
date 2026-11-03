@@ -52,7 +52,7 @@ export function isThreeSlice(insets: SliceInsets): boolean {
 
 /**
  * @evidence docs/spec.md#phaser-scale9borders Converts insets into Phaser's center rectangle.
- * @evidenceReview docs/spec.md#phaser-scale9borders #4aec64c Checked this code against the section line by line and ran convertsToPhaserBorders green with pnpm test.
+ * @evidenceReview docs/spec.md#phaser-scale9borders #257e889 Reread the center rectangle. x and y are the insets, and w and h are what remains. The multi-region sentence does not change it.
  */
 export function insetsToScale9Borders(
   insets: SliceInsets,
@@ -69,7 +69,7 @@ export function insetsToScale9Borders(
 
 /**
  * @evidence docs/spec.md#phaser-scale9borders Converts Phaser's center rectangle back into insets, as Phaser's NineSlice does.
- * @evidenceReview docs/spec.md#phaser-scale9borders #4aec64c Checked this code against the section line by line and ran convertsToPhaserBorders green with pnpm test.
+ * @evidenceReview docs/spec.md#phaser-scale9borders #257e889 Reread the reverse conversion. Left and top come from x and y, and the far sides are what the center does not cover.
  */
 export function scale9BordersToInsets(
   borders: Scale9Borders,

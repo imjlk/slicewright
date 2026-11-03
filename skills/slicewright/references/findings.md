@@ -10,8 +10,8 @@
 | `tile.x.seam`, `tile.y.seam` | A tiled span cuts its pattern or jumps where it wraps. | Use one of the `nearestLengths`, or make the texture seamless. |
 | `three-slice.auto` | Rows never repeat, so the layout keeps a fixed height. | Fine for bars. For panels, regenerate with a flat center. |
 | `three-slice.vertical.auto` | Columns never repeat but rows do, so the layout keeps its width. | Fine for vertical tracks. For panels, regenerate with plain edges. |
-| `regions.multi` | The layout has several stretch regions per axis. No target exports more than one. | Preview only. Draw the fixed detail, such as a crest or a tail, as its own sprite on a nine-slice or three-slice body. See [Layered UI](layering.md). |
-| `target.unsupported` | The target cannot represent this layout; no files were written. | For a multi-region layout, draw the fixed detail, such as a crest or a tail, as its own sprite on a nine-slice or three-slice body. For any other shape, pick a target that can, or re-slice as a nine-slice. |
+| `regions.multi` | The layout has several stretch regions per axis. No target exports more than one. | Preview only. Draw the fixed detail, such as a crest or a tail, as its own sprite. The finding names a nine-slice when both axes still resize, a three-slice when only the width does, and a vertical three-slice when only the height does. See [Layered UI](layering.md). |
+| `target.unsupported` | The target cannot represent this layout; no files were written. | For a multi-region layout, follow the body named in the finding. For any other shape, pick a target that can, or re-slice as a nine-slice. |
 | `target.emulated` | The target has no native form of this layout; the fixed axis has zero insets. | Keep that axis at its source size in the engine. |
 | `target.experimental` | The target's output is not yet rendered in its engine. | Check it in the engine before shipping. |
 | `target.tile` | The target cannot tile as asked, or counts tiles differently (CSS `round` takes the nearest count; Phaser rounds down). | Check the tiled edge at the sizes you use. |

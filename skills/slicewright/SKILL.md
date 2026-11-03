@@ -101,7 +101,8 @@ for the version npx runs even where this skill lags behind.
    `--regions multi` when fixed detail sits in the middle of an edge (a crest
    on a title plate). That layout is preview only: export fails with
    `target.unsupported`, and the finding says to draw the crest or tail as its
-   own sprite on a nine-slice or three-slice body
+   own sprite on a nine-slice, three-slice, or vertical three-slice body,
+   matching which axes still resize
    ([Layered UI](references/layering.md)). A multi-region `normalize --keep` texture is too small
    to re-detect: save the normalize JSON (every normalize report carries its
    `layout`) and pass it to `inspect`, `preview`, `frame`, or `export` with
