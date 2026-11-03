@@ -27,7 +27,8 @@ of a stretching edge, so it is drawn on top of the body. The manifest's
 
 `crest` has a crest in the middle of its top edge, so its prompt is written by
 hand: `slicewright prompt` keeps decoration in the corners. No target exports a
-multi-region layout yet, so it has no atlas or CSS. The manifest's
+multi-region layout, so it has no atlas or CSS; the finding says to draw the
+crest as its own sprite on a nine-slice body. The manifest's
 `inspections` list makes the engine check detect it with `--regions multi`
 and compare the layout and finding codes with `crest.layout.json`. When a
 detection change is intended, a failing check prints the new result as

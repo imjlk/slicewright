@@ -1,5 +1,6 @@
 import type { Finding } from '../inspect.js';
 import { axisTiles, layoutInsets, layoutShape, type SliceLayout } from '../layout.js';
+import { multiRegionRemedy } from '../multi-region.js';
 import type { SliceInsets } from '../slices.js';
 import type { ExportInput, SliceTarget } from './types.js';
 
@@ -9,8 +10,8 @@ import type { ExportInput, SliceTarget } from './types.js';
  * the target cannot express or counts differently is a warning, and an
  * experimental target says so.
  *
- * @evidence docs/spec.md#targets Reports unsupported shapes as errors, emulation as info, and tiling gaps as warnings, from the declared capabilities.
- * @evidenceReview docs/spec.md#targets #2cdaf2d Checked this code against the section line by line and ran checksTargetCapabilities green with pnpm test.
+ * @evidence docs/spec.md#targets Reports unsupported shapes as errors, a multi-region layout with the separate-sprite remedy, emulation as info, and tiling gaps as warnings, from the declared capabilities.
+ * @evidenceReview docs/spec.md#targets #f78114e Reread the section. A multi shape names the target and ends with the remedy; other unsupported shapes still say to pick a target or re-slice.
  */
 export function capabilityFindings(
   target: SliceTarget,
@@ -47,7 +48,10 @@ export function capabilityFindings(
       findings.push({
         code: 'target.unsupported',
         severity: 'error',
-        message: `${target.label} cannot represent a ${shape} layout. Export it to a target that can, or re-slice it as a nine-slice.`,
+        message:
+          shape === 'multi'
+            ? `${target.label} cannot export a multi-region layout, and neither can any other target. ${multiRegionRemedy()}`
+            : `${target.label} cannot represent a ${shape} layout. Export it to a target that can, or re-slice it as a nine-slice.`,
         details: { shape },
       });
     }

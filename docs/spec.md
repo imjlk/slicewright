@@ -113,11 +113,14 @@ stretch segment, with fixed segments between them. This refines whichever
 single layout detection found, including a three-slice or vertical three-slice.
 An axis with only one such run keeps the single-region result, a tiled axis and
 an axis the layout keeps fixed are never split, and a
-`regions.multi` finding records the counts. The reported insets are the
-outermost flexible lines. Multiple regions are only detected, so asking for them
-together with given insets is refused. No current target can export a
-multi-region layout;
-it renders in previews and reports `target.unsupported` on export.
+`regions.multi` finding records the counts and says that no target exports
+more than one region per axis, so the fixed detail, such as a crest or a tail,
+is drawn as its own sprite on a nine-slice or three-slice body. The reported
+insets are the outermost flexible lines. Multiple regions are only detected,
+so asking for them together with given insets is refused. The layout renders
+in previews. Export writes no files and reports `target.unsupported`; that
+error names the target and repeats the same remedy instead of suggesting
+another target.
 
 A rebuilt multi-region texture is too small for detection to find its regions
 again, so normalization reports the full `layout` for every result, single- or
@@ -447,8 +450,14 @@ with zero insets, so the engine would stretch it, and a `target.emulated`
 finding tells the caller to keep that axis at its source size. A shape the
 target can neither represent nor emulate is a `target.unsupported` error and
 writes no files, and so is a layout that never resizes (`target.fixed`), since
-every target would stretch zero-inset art. Tiling the target cannot express is
-a `target.tile` warning, and so is a target whose tile count differs from the
+every target would stretch zero-inset art. A multi-region layout is that shape
+for every current target. Its error names the target, says that no other
+target can export it either, and tells the caller to draw the fixed detail,
+such as a crest or a tail, as its own sprite on a nine-slice or three-slice
+body, the same remedy as `regions.multi`. Any other unsupported shape says to
+export it to a target that can, or to re-slice it as a nine-slice. Tiling the
+target cannot express is a `target.tile` warning, and so is a target whose tile
+count differs from the
 layout's rule of rounding down (CSS `round` takes the nearest whole number). Each target also
 has a status: `verified` targets are rendered in the real engine by the engine
 check, and an `experimental` target follows the documented format without being

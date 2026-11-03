@@ -2,6 +2,7 @@ import { deepStrictEqual, ok, strictEqual, throws } from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { defaultInspectOptions, inspectRaster } from '../src/inspect.js';
+import { multiRegionRemedy } from '../src/multi-region.js';
 import {
   axisFromSpans,
   layoutFromInsets,
@@ -209,8 +210,8 @@ export function detectsVerticalThreeSlices(): void {
 }
 
 /**
- * @evidence docs/spec.md#multiple-stretch-regions Splits the top edge around a crest only when multiple regions are asked for.
- * @evidenceReview docs/spec.md#multiple-stretch-regions #25c1980 Reread the section after the insetsSource-in-every-report edit, checked this test's assertions against it, and ran pnpm test green.
+ * @evidence docs/spec.md#multiple-stretch-regions Splits the top edge around a crest only when multiple regions are asked for, and the finding names the separate-sprite remedy.
+ * @evidenceReview docs/spec.md#multiple-stretch-regions #30d2f92 Reread the section. The test asks for multi on a crest panel, checks two horizontal stretches, and checks the finding ends with the remedy.
  */
 export function detectsMultipleRegions(): void {
   const art = crestPanel(96, 40);
@@ -220,6 +221,11 @@ export function detectsMultipleRegions(): void {
   const report = inspectRaster(art, { ...defaultInspectOptions, regions: 'multi' });
   strictEqual(report.mode, 'multi');
   ok(codes(report.findings).includes('regions.multi'));
+  ok(
+    report.findings
+      .find((finding) => finding.code === 'regions.multi')
+      ?.message?.endsWith(multiRegionRemedy()),
+  );
   const stretch = report.layout.x.segments.filter((segment) => segment.kind === 'stretch');
   strictEqual(stretch.length, 2);
   ok((stretch[0]?.end ?? 0) <= 43 && (stretch[1]?.start ?? 0) >= 53);
@@ -255,8 +261,8 @@ export function detectsMultipleRegions(): void {
 }
 
 /**
- * @evidence docs/spec.md#targets Rejects unsupported shapes without files, notes emulation, warns about tiling gaps and fixed layouts, and lists every target.
- * @evidenceReview docs/spec.md#targets #2cdaf2d Checked the assertions against the section and ran this test green with pnpm test.
+ * @evidence docs/spec.md#targets Rejects a multi-region export without files and with the separate-sprite remedy, notes emulation, warns about tiling gaps and fixed layouts, and lists every target.
+ * @evidenceReview docs/spec.md#targets #f78114e Reread the section. The test checks Phaser and CSS multi exports write no files and name the remedy, plus emulation, tiling, and fixed layouts.
  */
 export function checksTargetCapabilities(): void {
   deepStrictEqual(Object.keys(sliceTargets).sort(), ['css', 'defold', 'godot', 'phaser', 'unity']);
@@ -266,8 +272,17 @@ export function checksTargetCapabilities(): void {
 
   const phaser = exportForTarget('phaser', input);
   strictEqual(phaser.files.length, 0);
-  ok(codes(phaser.findings).includes('target.unsupported'));
-  strictEqual(exportForTarget('css', input).files.length, 0);
+  const phaserUnsupported = phaser.findings.find(
+    (finding) => finding.code === 'target.unsupported',
+  );
+  ok(phaserUnsupported?.message?.startsWith('Phaser 4 cannot export a multi-region layout'));
+  ok(phaserUnsupported?.message?.endsWith(multiRegionRemedy()));
+  ok(!phaserUnsupported?.message?.includes('target that can'));
+  const css = exportForTarget('css', input);
+  strictEqual(css.files.length, 0);
+  const cssUnsupported = css.findings.find((finding) => finding.code === 'target.unsupported');
+  ok(cssUnsupported?.message?.startsWith('CSS border-image cannot export a multi-region layout'));
+  ok(cssUnsupported?.message?.endsWith(multiRegionRemedy()));
 
   const vertical = layoutFromInsets({ left: 0, right: 0, top: 6, bottom: 6 }, 40, 30, {
     shape: 'three-vertical',
@@ -366,8 +381,8 @@ void test('slice layouts', describesSliceLayouts);
 void test('vertical three-slice', detectsVerticalThreeSlices);
 void test('multiple stretch regions', detectsMultipleRegions);
 /**
- * @evidence docs/spec.md#multiple-stretch-regions Reads back the layout normalization reports for a rebuilt multi-region texture, and rejects one of another size or over detail.
- * @evidenceReview docs/spec.md#multiple-stretch-regions #25c1980 Reread the section after the insetsSource-in-every-report edit, checked this test's assertions against it, and ran pnpm test green.
+ * @evidence docs/spec.md#multiple-stretch-regions Reads back the layout normalization reports for a rebuilt multi-region texture, repeats the separate-sprite remedy, and rejects one of another size or over detail.
+ * @evidenceReview docs/spec.md#multiple-stretch-regions #30d2f92 Reread the read-back rules. The test checks the rebuilt layout round-trips, the remedy is repeated, and a wrong size or nonuniform span is rejected.
  */
 export function readsBackMultiRegionLayouts(): void {
   const art = crestPanel(240, 100);
@@ -383,6 +398,11 @@ export function readsBackMultiRegionLayouts(): void {
   const given = inspectRaster(normalized.raster, { ...defaultInspectOptions, layout });
   ok(given.ok, JSON.stringify(given.findings));
   strictEqual(given.mode, 'multi');
+  ok(
+    given.findings
+      .find((finding) => finding.code === 'regions.multi')
+      ?.message?.endsWith(multiRegionRemedy()),
+  );
   strictEqual(given.insetsSource, 'layout');
   deepStrictEqual(given.layout.x, layout.x);
   deepStrictEqual(given.layout.y, layout.y);
