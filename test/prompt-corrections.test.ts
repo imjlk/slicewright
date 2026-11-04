@@ -10,7 +10,7 @@ import {
 
 /**
  * @evidence docs/spec.md#prompt-corrections Checks the report shape, build pieces, axis wording, deduplication, the regions.multi correction, ignored info and export codes, and the appended prompt.
- * @evidenceReview docs/spec.md#prompt-corrections #3d98164 Reread the section. The test expects the regions.multi line, and still expects other info and target.unsupported to add nothing.
+ * @evidenceReview docs/spec.md#prompt-corrections #090f796 Reread the count rule. The test expects all three bodies without counts, one body for a bar, a track, and a panel, and still expects other info and target.unsupported to add nothing.
  */
 export function correctsPrompts(): void {
   const report = readFindingsReport({
@@ -28,8 +28,18 @@ export function correctsPrompts(): void {
   });
   const lines = promptCorrections(report);
   strictEqual(lines.length, 3);
-  ok(lines[2]?.includes('keep it out of this image'));
-  ok(lines[2]?.includes('own sprite'));
+  ok(lines[2]?.includes('nine-slice, three-slice, or vertical three-slice'));
+  const named = (x: number, y: number) =>
+    promptCorrections(
+      readFindingsReport({
+        findings: [{ code: 'regions.multi', severity: 'info', details: { x, y } }],
+      }),
+    );
+  strictEqual(named(2, 0)[0]?.includes('plain three-slice body'), true);
+  strictEqual(named(0, 2)[0]?.includes('plain vertical three-slice body'), true);
+  strictEqual(named(2, 1)[0]?.includes('plain nine-slice body'), true);
+  strictEqual(named(2, 0).length, 1);
+  ok(!named(2, 0)[0]?.includes('or vertical'));
   ok(lines[0]?.includes('left and right edges'));
   ok(lines[1]?.includes('adjacent columns'));
   ok(lines[1]?.includes('top and bottom edges'));

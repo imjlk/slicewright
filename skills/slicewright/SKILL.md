@@ -68,7 +68,8 @@ for the version npx runs even where this skill lags behind.
    next attempt from it: `slicewright prompt --kind panel --style "<style>"
    --from report.json` adds one correction line per warning or error that the
    artist can fix (listed as `corrections`), and also for `regions.multi`, so
-   the next image leaves a crest or tail out and draws it as its own sprite.
+   the next image leaves a crest or tail out and draws it as its own sprite on
+   the body that finding named.
    `--kind` and `--style` are still
    required. For a `build` report, pick the piece with `--piece <name>`; a
    compare report is read whole.
