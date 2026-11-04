@@ -382,7 +382,7 @@ export function pickAxisSpan(
  * @evidence docs/spec.md#vertical-three-slice Keeps the width when columns never match but rows do, or when the mode asks for it.
  * @evidenceReview docs/spec.md#vertical-three-slice #072e9af Checked this code against the section line by line and ran detectsVerticalThreeSlices green with pnpm test.
  * @evidence docs/spec.md#multiple-stretch-regions Builds a multi-region layout when asked and an axis has more than one long run.
- * @evidenceReview docs/spec.md#multiple-stretch-regions #9ada837 Reread the section. When regions is multi, finish calls multiRegionLayout and keeps the single layout when that returns undefined.
+ * @evidenceReview docs/spec.md#multiple-stretch-regions #e448018 Reread the section. When regions is multi, finish calls multiRegionLayout and keeps the single layout when that returns undefined.
  */
 export function detectLayout(
   raster: Raster,
@@ -485,7 +485,7 @@ function regionsMultiFinding(x: number, y: number): Finding {
  * only when an axis has more than one such run and does not tile.
  *
  * @evidence docs/spec.md#multiple-stretch-regions Keeps every long uniform run as a stretch segment, leaves tiled axes single, records the counts, and tells the caller to draw fixed detail as its own sprite.
- * @evidenceReview docs/spec.md#multiple-stretch-regions #9ada837 Reread the section. Tiled and fixed axes are not split, each long run becomes a stretch segment, and regions.multi ends with the separate-sprite remedy.
+ * @evidenceReview docs/spec.md#multiple-stretch-regions #e448018 Reread the section. Tiled and fixed axes are not split, each long run becomes a stretch segment, and regions.multi ends with the separate-sprite remedy.
  */
 export function multiRegionLayout(
   raster: Raster,
@@ -538,7 +538,7 @@ export function multiRegionLayout(
  * stretch segment must be uniform.
  *
  * @evidence docs/spec.md#multiple-stretch-regions Verifies a given layout against the image size and the uniformity of each stretch segment, and repeats the separate-sprite remedy for a multi-region layout.
- * @evidenceReview docs/spec.md#multiple-stretch-regions #9ada837 Reread the read-back rules. A size mismatch is layout.size, a nonuniform stretch segment is an error, and a multi shape repeats the remedy.
+ * @evidenceReview docs/spec.md#multiple-stretch-regions #e448018 Reread the read-back rules. A size mismatch is layout.size, a nonuniform stretch segment is an error, and a multi shape repeats the remedy.
  */
 export function verifyGivenLayout(
   raster: Raster,

@@ -99,7 +99,7 @@ for the version npx runs even where this skill lags behind.
    the fixed parts take most of an axis). Pass
    `--insets l,r,t,b` to `inspect` to check insets chosen by hand, `--mode
    three` for horizontal-only art (repeat it on every later `inspect`,
-   `preview`, and `export` of that image, or they detect a nine-slice again), `--mode three-vertical` for vertical-only
+   `normalize`, `preview`, and `export` of that image, or they detect a nine-slice again), `--mode three-vertical` for vertical-only
    art (scroll bar tracks), `--tile x` when an edge should repeat, and
    `--regions multi` when fixed detail sits in the middle of an edge (a crest
    on a title plate). That layout is preview only: export fails with
@@ -107,7 +107,7 @@ for the version npx runs even where this skill lags behind.
    own sprite on a nine-slice, three-slice, or vertical three-slice body,
    matching which axes still resize. When that body is not a nine-slice, the
    finding also names `--mode three` or `--mode three-vertical`; repeat that
-   flag on later `inspect`, `preview`, and `export`, or they detect a
+   flag on later `inspect`, `normalize`, `preview`, and `export`, or they detect a
    nine-slice again
    ([Layered UI](references/layering.md)). A multi-region `normalize --keep` texture is too small
    to re-detect: save the normalize JSON (every normalize report carries its
