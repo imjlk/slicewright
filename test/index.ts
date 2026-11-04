@@ -9,6 +9,7 @@ import './padding.test.js';
 import './pack.test.js';
 import './build.test.js';
 import './argv.test.js';
+import './library.test.js';
 import './targets.test.js';
 import './watch.test.js';
 import './diagnostics.test.js';

@@ -11,6 +11,21 @@ The repository's graph MCP launcher uses that same environment and the
 lockfile-installed graph package. Cache relocation is a local opt-in; default
 ttsc cache management remains enabled.
 
+## Package root
+
+The package root exports the art pipeline and nothing else. A caller can load
+a PNG, remove a chroma key, resize, inspect and verify a layout, plan a prompt
+and corrections from a report, normalize, render a preview, compare pieces,
+pack frames, build from a manifest, read a Phaser or Aseprite sheet, and export
+a layout to a target. `packageRootExports()` lists those runtime names. Types
+travel with the functions and are not a second runtime list.
+
+CLI argument parsing is not on the root. `joinNegativeNumbers`,
+`aliasedValue`, and `AliasClashError` stay inside the command-line program and
+are absent from the package entry. Help, completion, agent mode, and file
+watching are absent too. Browser capture and Playwright matchers stay on
+`slicewright/browser` and `slicewright/playwright`.
+
 ## PNG input
 
 slicewright reads PNG files and works on straight-alpha RGBA, 8 bits per channel.
