@@ -1,5 +1,6 @@
 import typia from 'typia';
 
+import { multiRegionBody } from './multi-region.js';
 import type { PromptPlan } from './prompt.js';
 
 /** The part of an inspect, normalize, compare, or build report a correction reads. */
@@ -11,6 +12,8 @@ export interface ReportFinding {
   readonly code: string;
   readonly severity: 'error' | 'warning' | 'info';
   readonly message?: string;
+  /** Kept so a `regions.multi` correction can read stretch counts. Other shapes are ignored. */
+  readonly details?: unknown;
 }
 
 /**
@@ -50,9 +53,32 @@ const corrections: Readonly<Record<string, string>> = {
     'The images meant to match (states of one element, or pieces of one set) had different outline thicknesses last time: keep the outline the same thickness in every one.',
   'pixel.off-grid':
     'The pixel art was blurred or anti-aliased last time: draw crisp pixels on one consistent grid, every pixel a single flat color.',
-  'regions.multi':
-    'Fixed detail sat in the middle of an edge last time (a crest or a tail): keep it out of this image and draw it afterwards as its own sprite on a plain nine-slice, three-slice, or vertical three-slice body, matching which axes still resize.',
 };
+
+const regionsMultiFallback =
+  'Fixed detail sat in the middle of an edge last time (a crest or a tail): keep it out of this image and draw it afterwards as its own sprite on a plain nine-slice, three-slice, or vertical three-slice body, matching which axes still resize.';
+
+/** Uses recorded stretch counts when they name one body; otherwise lists all three. */
+function regionsMultiCorrection(details: unknown): string {
+  if (typeof details !== 'object' || details === null) {
+    return regionsMultiFallback;
+  }
+  const counts = details as { readonly x?: unknown; readonly y?: unknown };
+  const x = counts.x;
+  const y = counts.y;
+  const counted =
+    typeof x === 'number' &&
+    typeof y === 'number' &&
+    Number.isInteger(x) &&
+    Number.isInteger(y) &&
+    x >= 0 &&
+    y >= 0 &&
+    (x > 1 || y > 1);
+  if (!counted) {
+    return regionsMultiFallback;
+  }
+  return `Fixed detail sat in the middle of an edge last time (a crest or a tail): keep it out of this image and draw it afterwards as its own sprite on a plain ${multiRegionBody(x, y)} body.`;
+}
 
 /** A build report: each piece carries its own findings. */
 interface PiecesReport {
@@ -65,7 +91,7 @@ interface PiecesReport {
  * piece is picked by name (or is its only piece).
  *
  * @evidence docs/spec.md#prompt-corrections Accepts any report with findings, or one piece of a build report, checked with typia.
- * @evidenceReview docs/spec.md#prompt-corrections #3d98164 Reread the report-shape rules. This still accepts a findings list or one build piece via typia, and does not interpret codes.
+ * @evidenceReview docs/spec.md#prompt-corrections #090f796 Reread the report-shape rules. This still accepts a findings list or one build piece via typia, and does not interpret codes.
  */
 export function readFindingsReport(json: unknown, piece?: string): FindingsReport {
   // A compare report also lists pieces, but its own findings come first and
@@ -107,13 +133,20 @@ export function readFindingsReport(json: unknown, piece?: string): FindingsRepor
  * finding order. Info findings add none, except `regions.multi`. Codes about
  * slicing or export add none.
  *
- * @evidence docs/spec.md#prompt-corrections Maps warnings and errors to correction lines by code, axis-aware and deduplicated, and also maps regions.multi despite it being info. Unmapped export codes add none.
- * @evidenceReview docs/spec.md#prompt-corrections #3d98164 Reread the regions.multi exception. Other info is skipped, that code names a nine-slice, three-slice, or vertical three-slice, and target.unsupported still has no correction.
+ * @evidence docs/spec.md#prompt-corrections Maps warnings and errors to correction lines by code, axis-aware and deduplicated. regions.multi is included despite being info, and names one body when its details record the stretch counts. Unmapped export codes add none.
+ * @evidenceReview docs/spec.md#prompt-corrections #090f796 Reread the count rule. Recorded nonnegative integer counts with one axis above one name that body; missing or unusable counts still list all three. Other info and target.unsupported add nothing.
  */
 export function promptCorrections(report: FindingsReport): string[] {
   const lines: string[] = [];
   for (const finding of report.findings) {
-    if (finding.severity === 'info' && finding.code !== 'regions.multi') {
+    if (finding.code === 'regions.multi') {
+      const line = regionsMultiCorrection(finding.details);
+      if (!lines.includes(line)) {
+        lines.push(line);
+      }
+      continue;
+    }
+    if (finding.severity === 'info') {
       continue;
     }
     const axis = /\.(x|y)\./.exec(finding.code)?.[1];
@@ -137,7 +170,7 @@ export function promptCorrections(report: FindingsReport): string[] {
  * Appends the corrections to a plan's prompt and lists them.
  *
  * @evidence docs/spec.md#prompt-corrections Appends the corrections after the prompt under one heading line and lists them in the plan.
- * @evidenceReview docs/spec.md#prompt-corrections #3d98164 Reread the append rule. Lines still go under one heading and are listed as corrections; an empty list leaves the prompt unchanged.
+ * @evidenceReview docs/spec.md#prompt-corrections #090f796 Reread the append rule. Lines still go under one heading and are listed as corrections; an empty list leaves the prompt unchanged.
  */
 export function correctPromptPlan(
   plan: PromptPlan,
