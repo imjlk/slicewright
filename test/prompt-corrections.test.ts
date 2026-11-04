@@ -10,7 +10,7 @@ import {
 
 /**
  * @evidence docs/spec.md#prompt-corrections Checks the report shape, build pieces, axis wording, deduplication, the regions.multi correction, ignored info and export codes, and the appended prompt.
- * @evidenceReview docs/spec.md#prompt-corrections #090f796 Reread the count rule. The test expects all three bodies without counts, one body for a bar, a track, and a panel, and still expects other info and target.unsupported to add nothing.
+ * @evidenceReview docs/spec.md#prompt-corrections #d3bff44 Reread the no-flag sentence. The test expects one body from counts and checks that line does not contain --mode.
  */
 export function correctsPrompts(): void {
   const report = readFindingsReport({
@@ -40,6 +40,7 @@ export function correctsPrompts(): void {
   strictEqual(named(2, 1)[0]?.includes('plain nine-slice body'), true);
   strictEqual(named(2, 0).length, 1);
   ok(!named(2, 0)[0]?.includes('or vertical'));
+  ok(!named(2, 0)[0]?.includes('--mode'));
   ok(lines[0]?.includes('left and right edges'));
   ok(lines[1]?.includes('adjacent columns'));
   ok(lines[1]?.includes('top and bottom edges'));

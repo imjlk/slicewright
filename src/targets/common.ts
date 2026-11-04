@@ -17,7 +17,7 @@ import type { ExportInput, SliceTarget } from './types.js';
  * experimental target says so.
  *
  * @evidence docs/spec.md#targets Reports unsupported shapes as errors, a multi-region layout with the separate-sprite remedy, emulation as info, and tiling gaps as warnings, from the declared capabilities.
- * @evidenceReview docs/spec.md#targets #9c26183 Reread the body rule. A multi export names the body from the flexible counts and does not suggest another target.
+ * @evidenceReview docs/spec.md#targets #a77f7f3 Reread the repeated remedy. A multi export names the body and, when it is not a nine-slice, the --mode flag. It does not suggest another target.
  */
 export function capabilityFindings(
   target: SliceTarget,

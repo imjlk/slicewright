@@ -262,7 +262,7 @@ stretched, and tiled segments.
 | Three-slice | Ends fixed; stretches horizontally; height fixed | `--mode three`, or rows that never repeat |
 | Vertical three-slice | Ends fixed; stretches vertically; width fixed | `--mode three-vertical`, or columns that never repeat |
 | Tiled axis | A span repeats instead of stretching | `--tile x/y/xy`, or edges that repeat a pattern |
-| Multiple regions | Several stretch spans per axis around fixed detail | `--regions multi` (preview only). Draw a crest or tail as its own sprite on a nine-slice, three-slice, or vertical three-slice body, matching which axes still resize. Save any `normalize` report and pass it back with `--layout report.json` |
+| Multiple regions | Several stretch spans per axis around fixed detail | `--regions multi` (preview only). Draw a crest or tail as its own sprite on a nine-slice, three-slice, or vertical three-slice body. Repeat the finding's `--mode three` or `--mode three-vertical` on later commands when the body is not a nine-slice. Save any `normalize` report and pass it back with `--layout report.json` |
 
 | Target | Nine | Three | Vertical three | Multi | Tiling |
 | --- | --- | --- | --- | --- | --- |

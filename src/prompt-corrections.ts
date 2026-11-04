@@ -91,7 +91,7 @@ interface PiecesReport {
  * piece is picked by name (or is its only piece).
  *
  * @evidence docs/spec.md#prompt-corrections Accepts any report with findings, or one piece of a build report, checked with typia.
- * @evidenceReview docs/spec.md#prompt-corrections #090f796 Reread the report-shape rules. This still accepts a findings list or one build piece via typia, and does not interpret codes.
+ * @evidenceReview docs/spec.md#prompt-corrections #d3bff44 Reread the report-shape rules. This still accepts a findings list or one build piece via typia, and does not interpret codes.
  */
 export function readFindingsReport(json: unknown, piece?: string): FindingsReport {
   // A compare report also lists pieces, but its own findings come first and
@@ -134,7 +134,7 @@ export function readFindingsReport(json: unknown, piece?: string): FindingsRepor
  * slicing or export add none.
  *
  * @evidence docs/spec.md#prompt-corrections Maps warnings and errors to correction lines by code, axis-aware and deduplicated. regions.multi is included despite being info, and names one body when its details record the stretch counts. Unmapped export codes add none.
- * @evidenceReview docs/spec.md#prompt-corrections #090f796 Reread the count rule. Recorded nonnegative integer counts with one axis above one name that body; missing or unusable counts still list all three. Other info and target.unsupported add nothing.
+ * @evidenceReview docs/spec.md#prompt-corrections #d3bff44 Reread the count rule and the no-flag sentence. The correction names a body from counts and never mentions --mode. Other info and target.unsupported add nothing.
  */
 export function promptCorrections(report: FindingsReport): string[] {
   const lines: string[] = [];
@@ -170,7 +170,7 @@ export function promptCorrections(report: FindingsReport): string[] {
  * Appends the corrections to a plan's prompt and lists them.
  *
  * @evidence docs/spec.md#prompt-corrections Appends the corrections after the prompt under one heading line and lists them in the plan.
- * @evidenceReview docs/spec.md#prompt-corrections #090f796 Reread the append rule. Lines still go under one heading and are listed as corrections; an empty list leaves the prompt unchanged.
+ * @evidenceReview docs/spec.md#prompt-corrections #d3bff44 Reread the append rule. Lines still go under one heading and are listed as corrections; an empty list leaves the prompt unchanged.
  */
 export function correctPromptPlan(
   plan: PromptPlan,
