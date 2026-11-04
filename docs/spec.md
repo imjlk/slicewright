@@ -117,7 +117,10 @@ an axis the layout keeps fixed are never split, and a
 more than one region per axis, so the fixed detail, such as a crest or a tail,
 is drawn as its own sprite. The body is a nine-slice when both axes still
 resize, a three-slice when only the width does, and a vertical three-slice
-when only the height does. The reported
+when only the height does. A three-slice body also says to pass `--mode three`
+on later inspect, preview, and export of that body, and a vertical three-slice
+says `--mode three-vertical`, because omitting the flag detects a nine-slice
+again. A nine-slice body names no mode flag. The reported
 insets are the outermost flexible lines. Multiple regions are only detected,
 so asking for them together with given insets is refused. The layout renders
 in previews. Export writes no files and reports `target.unsupported`; that
@@ -457,7 +460,8 @@ every target would stretch zero-inset art. A multi-region layout is that shape
 for every current target. Its error names the target, says that no other
 target can export it either, and repeats the `regions.multi` remedy: a
 nine-slice when both axes still resize, a three-slice when only the width
-does, and a vertical three-slice when only the height does. Any other
+does, and a vertical three-slice when only the height does, including the
+`--mode` flag when the body is not a nine-slice. Any other
 unsupported shape says to
 export it to a target that can, or to re-slice it as a nine-slice. Tiling the
 target cannot express is a `target.tile` warning, and so is a target whose tile
@@ -843,7 +847,8 @@ finding's `details` record nonnegative integer stretch counts `x` and `y` and
 at least one is greater than one, the body is the one the finding names: a
 nine-slice when both axes still resize, a three-slice when only the width does,
 and a vertical three-slice when only the height does. Without those counts the
-correction names all three. Codes
+correction names all three. The correction does not name a CLI flag; the
+finding does. Codes
 about how the art is sliced, packed, or exported, not how it is drawn, such as
 `target.unsupported`, add nothing. The lines are appended to the prompt under
 "Corrections from the previous attempt:" and listed as `corrections`, empty

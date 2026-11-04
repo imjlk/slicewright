@@ -105,7 +105,10 @@ for the version npx runs even where this skill lags behind.
    on a title plate). That layout is preview only: export fails with
    `target.unsupported`, and the finding says to draw the crest or tail as its
    own sprite on a nine-slice, three-slice, or vertical three-slice body,
-   matching which axes still resize
+   matching which axes still resize. When that body is not a nine-slice, the
+   finding also names `--mode three` or `--mode three-vertical`; repeat that
+   flag on later `inspect`, `preview`, and `export`, or they detect a
+   nine-slice again
    ([Layered UI](references/layering.md)). A multi-region `normalize --keep` texture is too small
    to re-detect: save the normalize JSON (every normalize report carries its
    `layout`) and pass it to `inspect`, `preview`, `frame`, or `export` with

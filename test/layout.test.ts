@@ -211,7 +211,7 @@ export function detectsVerticalThreeSlices(): void {
 
 /**
  * @evidence docs/spec.md#multiple-stretch-regions Splits the top edge around a crest only when multiple regions are asked for, and the finding names the separate-sprite remedy.
- * @evidenceReview docs/spec.md#multiple-stretch-regions #fbac3c4 Reread the section. The test asks for multi on a crest panel, checks two horizontal stretches, and checks the finding ends with the remedy.
+ * @evidenceReview docs/spec.md#multiple-stretch-regions #9ada837 Reread the mode-flag rule. The crest panel names a nine-slice and no flag; the fixed-height bar names --mode three and not three-vertical.
  */
 export function detectsMultipleRegions(): void {
   const art = crestPanel(96, 40);
@@ -221,11 +221,9 @@ export function detectsMultipleRegions(): void {
   const report = inspectRaster(art, { ...defaultInspectOptions, regions: 'multi' });
   strictEqual(report.mode, 'multi');
   ok(codes(report.findings).includes('regions.multi'));
-  ok(
-    report.findings
-      .find((finding) => finding.code === 'regions.multi')
-      ?.message?.includes('nine-slice body'),
-  );
+  const panelMulti = report.findings.find((finding) => finding.code === 'regions.multi');
+  ok(panelMulti?.message?.includes('nine-slice body'));
+  ok(!panelMulti?.message?.includes('--mode'));
   const stretch = report.layout.x.segments.filter((segment) => segment.kind === 'stretch');
   strictEqual(stretch.length, 2);
   ok((stretch[0]?.end ?? 0) <= 43 && (stretch[1]?.start ?? 0) >= 53);
@@ -245,11 +243,10 @@ export function detectsMultipleRegions(): void {
     x: 2,
     y: 0,
   });
-  ok(
-    bar.findings
-      .find((finding) => finding.code === 'regions.multi')
-      ?.message?.includes('a three-slice body'),
-  );
+  const barMulti = bar.findings.find((finding) => finding.code === 'regions.multi');
+  ok(barMulti?.message?.includes('a three-slice body'));
+  ok(barMulti?.message?.includes('--mode three'));
+  ok(!barMulti?.message?.includes('--mode three-vertical'));
 
   throws(
     () =>
@@ -267,7 +264,7 @@ export function detectsMultipleRegions(): void {
 
 /**
  * @evidence docs/spec.md#targets Rejects a multi-region export without files and with the separate-sprite remedy, notes emulation, warns about tiling gaps and fixed layouts, and lists every target.
- * @evidenceReview docs/spec.md#targets #9c26183 Reread the body rule. The test checks a crest names a nine-slice, a fixed-height bar a three-slice, a fixed-width track a vertical three-slice, and a full-height multi layout does not also say to use CSS.
+ * @evidenceReview docs/spec.md#targets #a77f7f3 Reread the repeated remedy. The test checks a fixed-width track export names --mode three-vertical, and a full-height multi layout does not also say to use CSS.
  */
 export function checksTargetCapabilities(): void {
   deepStrictEqual(Object.keys(sliceTargets).sort(), ['css', 'defold', 'godot', 'phaser', 'unity']);
@@ -306,7 +303,7 @@ export function checksTargetCapabilities(): void {
   ok(
     verticalExport.findings
       .find((finding) => finding.code === 'target.unsupported')
-      ?.message?.includes('vertical three-slice body'),
+      ?.message?.includes('--mode three-vertical'),
   );
 
   const fullHeight = {
@@ -427,7 +424,7 @@ void test('vertical three-slice', detectsVerticalThreeSlices);
 void test('multiple stretch regions', detectsMultipleRegions);
 /**
  * @evidence docs/spec.md#multiple-stretch-regions Reads back the layout normalization reports for a rebuilt multi-region texture, repeats the separate-sprite remedy, and rejects one of another size or over detail.
- * @evidenceReview docs/spec.md#multiple-stretch-regions #fbac3c4 Reread the read-back rules. The test checks the rebuilt layout round-trips, the remedy is repeated, and a wrong size or nonuniform span is rejected.
+ * @evidenceReview docs/spec.md#multiple-stretch-regions #9ada837 Reread the read-back rules. The test checks the rebuilt layout round-trips, the remedy is repeated, and a wrong size or nonuniform span is rejected.
  */
 export function readsBackMultiRegionLayouts(): void {
   const art = crestPanel(240, 100);
