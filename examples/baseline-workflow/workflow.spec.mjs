@@ -25,8 +25,9 @@ for(const renderer of ['dom','canvas'])for(const variant of variants){
       // Caller-owned environment keys include the assumptions this example controls.
       // Bump system-fonts-v1 when changing the machine image/fonts used for approval.
       const environment=[process.platform,info.project.name,browser.version(),variant.width,'1200','dpr1',variant.locale,`text${variant.scale}`,'system-fonts-v1'].join('|');
-      // A cold Firefox screenshot, plus glyph edges that move between captures,
-      // can spend the 8s default before a 200ms stable window exists.
+      // Every engine gets 20s: a cold first screenshot can spend the 8s default.
+      // Windows Firefox also reuses the glyph numbers over the whole image so
+      // those edges do not reset the window. The baseline check stays regional.
       const windowsFirefox=process.platform==='win32'&&info.project.name==='firefox';
       async function verify(state){
         await expect(panel).toBeStableUI({
