@@ -118,7 +118,7 @@ more than one region per axis, so the fixed detail, such as a crest or a tail,
 is drawn as its own sprite. The body is a nine-slice when both axes still
 resize, a three-slice when only the width does, and a vertical three-slice
 when only the height does. A three-slice body also says to pass `--mode three`
-on later inspect, preview, and export of that body, and a vertical three-slice
+on later inspect, normalize, preview, and export of that body, and a vertical three-slice
 says `--mode three-vertical`, because omitting the flag detects a nine-slice
 again. A nine-slice body names no mode flag. The reported
 insets are the outermost flexible lines. Multiple regions are only detected,

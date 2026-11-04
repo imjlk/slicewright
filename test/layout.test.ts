@@ -211,7 +211,7 @@ export function detectsVerticalThreeSlices(): void {
 
 /**
  * @evidence docs/spec.md#multiple-stretch-regions Splits the top edge around a crest only when multiple regions are asked for, and the finding names the separate-sprite remedy.
- * @evidenceReview docs/spec.md#multiple-stretch-regions #9ada837 Reread the mode-flag rule. The crest panel names a nine-slice and no flag; the fixed-height bar names --mode three and not three-vertical.
+ * @evidenceReview docs/spec.md#multiple-stretch-regions #e448018 Reread the mode-flag rule. The crest panel names a nine-slice and no flag; the fixed-height bar names --mode three, includes normalize, and not three-vertical.
  */
 export function detectsMultipleRegions(): void {
   const art = crestPanel(96, 40);
@@ -246,6 +246,7 @@ export function detectsMultipleRegions(): void {
   const barMulti = bar.findings.find((finding) => finding.code === 'regions.multi');
   ok(barMulti?.message?.includes('a three-slice body'));
   ok(barMulti?.message?.includes('--mode three'));
+  ok(barMulti?.message?.includes('normalize'));
   ok(!barMulti?.message?.includes('--mode three-vertical'));
 
   throws(
@@ -304,6 +305,11 @@ export function checksTargetCapabilities(): void {
     verticalExport.findings
       .find((finding) => finding.code === 'target.unsupported')
       ?.message?.includes('--mode three-vertical'),
+  );
+  ok(
+    verticalExport.findings
+      .find((finding) => finding.code === 'target.unsupported')
+      ?.message?.includes('normalize'),
   );
 
   const fullHeight = {
@@ -424,7 +430,7 @@ void test('vertical three-slice', detectsVerticalThreeSlices);
 void test('multiple stretch regions', detectsMultipleRegions);
 /**
  * @evidence docs/spec.md#multiple-stretch-regions Reads back the layout normalization reports for a rebuilt multi-region texture, repeats the separate-sprite remedy, and rejects one of another size or over detail.
- * @evidenceReview docs/spec.md#multiple-stretch-regions #9ada837 Reread the read-back rules. The test checks the rebuilt layout round-trips, the remedy is repeated, and a wrong size or nonuniform span is rejected.
+ * @evidenceReview docs/spec.md#multiple-stretch-regions #e448018 Reread the read-back rules. The test checks the rebuilt layout round-trips, the remedy is repeated, and a wrong size or nonuniform span is rejected.
  */
 export function readsBackMultiRegionLayouts(): void {
   const art = crestPanel(240, 100);
