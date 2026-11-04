@@ -57,7 +57,10 @@ DOM and Canvas are not required to rasterize text identically.
 
 Windows Firefox runs use an explicit regional pixel policy for the approved
 text rectangles: mean error at most 0.01, p99 0 and maximum 32 for Canvas or 40
-for DOM, on the 0–255 channel scale. CI captures exhibited three changed Canvas
+for DOM, on the 0–255 channel scale. The stability wait uses that same budget,
+and its own 20 second deadline, so a cold first screenshot and those glyph
+edges do not exhaust the 8 second default before a 200 ms stable window exists.
+CI captures exhibited three changed Canvas
 glyph-edge pixels (maximum 14) and 57 changed DOM glyph-edge pixels (maximum 37,
 regional mean 0.008991), with identical measurements, alpha and outside pixels.
 The example requires exact measurements and capture bounds, exact alpha, and

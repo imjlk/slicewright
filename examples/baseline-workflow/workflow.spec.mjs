@@ -25,8 +25,15 @@ for(const renderer of ['dom','canvas'])for(const variant of variants){
       // Caller-owned environment keys include the assumptions this example controls.
       // Bump system-fonts-v1 when changing the machine image/fonts used for approval.
       const environment=[process.platform,info.project.name,browser.version(),variant.width,'1200','dpr1',variant.locale,`text${variant.scale}`,'system-fonts-v1'].join('|');
+      // A cold Firefox screenshot, plus glyph edges that move between captures,
+      // can spend the 8s default before a 200ms stable window exists.
+      const windowsFirefox=process.platform==='win32'&&info.project.name==='firefox';
       async function verify(state){
-        await expect(panel).toBeStableUI({duration:200});
+        await expect(panel).toBeStableUI({
+          duration:200,
+          timeout:20_000,
+          ...(windowsFirefox?{pixels:{mean:0.01,p99:0,max:renderer==='dom'?40:32}}:{}),
+        });
         const expectedStatus=variant.locale==='ko'?(state==='idle'?'새로운 편지가 기다려요.':'편지를 받았어요!'):
           (state==='idle'?'A new letter is waiting.':'Letter collected!');
         await expect(page.getByRole('button')).toHaveAccessibleName(variant.locale==='ko'?'편지 받기':'Take letter');
@@ -38,7 +45,7 @@ for(const renderer of ['dom','canvas'])for(const variant of variants){
           await expect(panel).toMatchUI(checks);
           await saveBrowserBaseline(info.snapshotPath(name),await panel.capture(),{approved:true,environment});
         }
-        if(process.platform==='win32'&&info.project.name==='firefox'){
+        if(windowsFirefox){
           // Reviewed native glyph variation: only approved text rectangles get a budget.
           // Keep geometry, alpha and every pixel outside these rectangles exact.
           const reference=await loadBrowserBaseline(info.snapshotPath(name),{environment});
