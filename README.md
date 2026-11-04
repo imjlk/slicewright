@@ -57,8 +57,12 @@ npx -y slicewright pack ui/panel.json ui/button.json --out ui/ui.png --css
 `pack` takes the atlas JSON that `normalize --target phaser` (or `--atlas`)
 writes beside each piece. Run `npx -y slicewright --help` for every command, and `--help` after a
 command for its options and examples. Output folders are created as needed. Install it in a project with
-`npm install --save-dev slicewright` to pin the version; the same functions are
-importable as a library (`import { inspectRaster } from 'slicewright'`).
+`npm install --save-dev slicewright` to pin the version; the art pipeline is
+importable as a library (`import { inspectRaster, exportForTarget } from 'slicewright'`).
+The root entry is that pipeline only: PNG, chroma, resize, inspect, layout,
+prompt, normalize, preview, compare, pack, build, atlases, and target export.
+CLI argument helpers are not exported. Browser and Playwright APIs stay at
+`slicewright/browser` and `slicewright/playwright`.
 
 From a clone, follow [Development](#development), then `node dist/cli.js`.
 
