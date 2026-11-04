@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.3 — 2026-11-04
+
+### Patch changes
+
+- [c00bca7](https://github.com/imjlk/slicewright/commit/c00bca7a2d929b3b46a174a00562d19ed8637606) `prompt --from` now adds a correction for a `regions.multi` finding, even though that finding is informational: keep the crest or tail out of the next image and draw it afterwards as its own sprite. Other info findings, and export codes such as `target.unsupported`, still add none. — Thanks @imjlk!
+- [5454709](https://github.com/imjlk/slicewright/commit/54547098a76dcc1fee181a83a8b064f8c6400599) `prompt --from` names one body for a `regions.multi` finding when the report records how many stretch regions each axis kept: a nine-slice, a three-slice, or a vertical three-slice. A report without those counts still lists all three. — Thanks @imjlk!
+- [8b6f9be](https://github.com/imjlk/slicewright/commit/8b6f9beb0bec26d1134e13ba1b9de45f7dc58b89) A multi-region layout's `regions.multi` finding, and the `target.unsupported` error on export, now say to draw the fixed detail, such as a crest or a tail, as its own sprite. The body is a nine-slice when both axes still resize, a three-slice when only the width does, and a vertical three-slice when only the height does. No target can export more than one stretch region per axis. — Thanks @imjlk!
+
 ## 0.7.2 — 2026-11-01
 
 ### Patch changes
