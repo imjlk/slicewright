@@ -745,11 +745,14 @@ values being silently dropped.
 Help lists a command's own options first and `--help` and `--version` last,
 gives a negated flag such as `--no-crop` its own description, and shows
 examples for the program and for every command. The program's help lists the
-commands without a row for itself. A command's usage line reads
-`slicewright <command> [options] <input>`, since options are optional to name
-the command, and an option the command needs, by the parser or by the command
-itself (`prompt --kind` and `--style`), ends with `(required)`, as in agent
-mode. Help ends with the exit codes the command can end with (every code for
+commands without a row for itself, each with the options the parser requires
+and its arguments (`normalize --out <out> <input>`). A command's usage line
+reads `slicewright <command> [options] <input>`, since options are optional to
+name the command, followed by the options the parser requires
+(`slicewright normalize [options] --out <out> <input>`). An option that takes a
+value shows it as `<name>`, and an option the command needs, by the parser or
+by the command itself (`prompt --kind` and `--style`), ends with `(required)`,
+as in agent mode. Help ends with the exit codes the command can end with (every code for
 the program), the same ones the command catalog lists.
 
 The `targets` command prints an object whose `targets` field lists every
@@ -767,7 +770,12 @@ flag error also points at the command's `--help`. An unknown option takes the
 next word as its value, so when a known command is named, an unknown option is
 the only message: the word it took is not also reported as an unknown command
 or a missing argument (`slicewright --bogus inspect x.png` says only `Unknown
-option --bogus for inspect`). A name counts as a typo of
+option --bogus for inspect`). An extra argument a command does not take is
+named as such (`slicewright inspect a.png b.png` says only `Unexpected
+argument "b.png" for inspect`) and points at the command's `--help`, instead
+of running with the words it does take. A command that takes any number of
+arguments (`pack`, `compare`) keeps them, and `complete` still names a
+missing, unknown, or extra shell itself. A name counts as a typo of
 another within an edit distance of a third of the longer name (at least one
 edit), where swapping two neighboring letters is one edit, ignoring letter
 case. A build manifest reports every problem at once, each with its path:

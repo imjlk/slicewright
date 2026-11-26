@@ -9,7 +9,7 @@ import { schemaAt, type JsonSchema } from './manifest-schema.js';
  * be a typo: at most a third of the longer word, and at least one edit.
  *
  * @evidence docs/spec.md#error-messages Suggests the closest known name within a third of its length, counting a transposition as one edit.
- * @evidenceReview docs/spec.md#error-messages #2655dd4 Reread the section after the unknown-option, invalid-JSON, and prompt missing-flag edits, checked this host against it, and ran pnpm test green.
+ * @evidenceReview docs/spec.md#error-messages #6be0420 Reread the section after the unexpected-extra-argument edit, checked this host against it, and ran pnpm test green.
  */
 export function didYouMean(input: string, candidates: Iterable<string>): string | undefined {
   let best: string | undefined;
@@ -69,8 +69,8 @@ export interface CommandHelp {
  * the flag, what it takes, a likely intended name, and where to read more;
  * any other error keeps its own message.
  *
- * @evidence docs/spec.md#error-messages Rewrites a missing required flag or argument, an invalid choice or type, an unknown option and an unknown command into a message naming the fix, and keeps every other message.
- * @evidenceReview docs/spec.md#error-messages #2655dd4 Reread the section after the unknown-option, invalid-JSON, and prompt missing-flag edits, checked this host against it, and ran pnpm test green.
+ * @evidence docs/spec.md#error-messages Rewrites a missing required flag or argument, an invalid choice or type, an unknown option, an unknown command, and an unexpected extra argument into a message naming the fix, and keeps every other message.
+ * @evidenceReview docs/spec.md#error-messages #6be0420 Reread the section after the unexpected-extra-argument edit, checked this host against it, and ran pnpm test green.
  */
 export function friendlyCliErrors(error: unknown, help: CommandHelp): string[] {
   const all = error instanceof AggregateError ? (error.errors as unknown[]) : [error];
@@ -175,6 +175,11 @@ function friendlyNewParseError(
       const actual = values['actual'];
       return `${raw} takes no value${typeof actual === 'string' ? `; drop "=${actual}"` : ''}. ${seeHelp}`;
     }
+    // A word the command does not take as an argument (`inspect a.png b.png`).
+    case 'err:arg:unexpected-positional': {
+      const raw = String(values['rawName'] ?? '');
+      return `Unexpected argument "${raw}"${help.command === undefined ? '' : ` for ${help.command}`}. ${seeHelp}`;
+    }
     default:
       return undefined;
   }
@@ -188,7 +193,7 @@ export class InvalidJsonError extends Error {}
  * not valid JSON (<reason>)` rather than the parser's bare message.
  *
  * @evidence docs/spec.md#error-messages Names the JSON file that does not parse and keeps the parser's reason in parentheses.
- * @evidenceReview docs/spec.md#error-messages #2655dd4 Reread the section after the unknown-option, invalid-JSON, and prompt missing-flag edits, checked this host against it, and ran pnpm test green.
+ * @evidenceReview docs/spec.md#error-messages #6be0420 Reread the section after the unexpected-extra-argument edit, checked this host against it, and ran pnpm test green.
  */
 export function parseJsonFile(text: string, label: string): unknown {
   try {
@@ -207,7 +212,7 @@ export function parseJsonFile(text: string, label: string): unknown {
  * usually given it; undefined for any other error.
  *
  * @evidence docs/spec.md#error-messages Names the input file a read did not find instead of the system error.
- * @evidenceReview docs/spec.md#error-messages #2655dd4 Reread the section after the unknown-option, invalid-JSON, and prompt missing-flag edits, checked this host against it, and ran pnpm test green.
+ * @evidenceReview docs/spec.md#error-messages #6be0420 Reread the section after the unexpected-extra-argument edit, checked this host against it, and ran pnpm test green.
  */
 export function missingFile(error: unknown): string | undefined {
   if (!(error instanceof Error)) {
@@ -237,7 +242,7 @@ export interface ManifestIssue {
  * choices with the choices, and anything else with what was expected.
  *
  * @evidence docs/spec.md#error-messages Explains an unknown manifest key with the closest allowed key, a missing key, a value outside its choices, and any other mismatch with what was expected.
- * @evidenceReview docs/spec.md#error-messages #2655dd4 Reread the section after the unknown-option, invalid-JSON, and prompt missing-flag edits, checked this host against it, and ran pnpm test green.
+ * @evidenceReview docs/spec.md#error-messages #6be0420 Reread the section after the unexpected-extra-argument edit, checked this host against it, and ran pnpm test green.
  */
 export function friendlyManifestIssues(issues: readonly ManifestIssue[], schema: JsonSchema): string[] {
   return issues.map((issue) => {
@@ -273,7 +278,7 @@ export function friendlyManifestIssues(issues: readonly ManifestIssue[], schema:
  * otherwise.
  *
  * @evidence docs/spec.md#error-messages Explains a layout file's shape errors with each path, the choices, or the expected type in words.
- * @evidenceReview docs/spec.md#error-messages #2655dd4 Reread the section after the unknown-option, invalid-JSON, and prompt missing-flag edits, checked this host against it, and ran pnpm test green.
+ * @evidenceReview docs/spec.md#error-messages #6be0420 Reread the section after the unexpected-extra-argument edit, checked this host against it, and ran pnpm test green.
  */
 export function friendlyShapeIssues(issues: readonly ManifestIssue[], root: string): string[] {
   return issues.map((issue) => {

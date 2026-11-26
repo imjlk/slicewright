@@ -11,40 +11,25 @@ USAGE:
   slicewright <command> [options]
 
 COMMANDS:
-  atlas <input>                                      Check the nine-slice frames of a Phaser JSON Hash or JSON Array atlas, or the slices of an Aseprite sheet
-  browser-report <input>                             Create an offline HTML viewer from browser artifacts
-  build <manifest>                                   Normalize, export, and pack every piece a manifest lists
-  commands [<command>]                               Print every command with its options, exit codes, and examples as JSON
-  compare <inputs> [<inputs> ...]                    Check that the states of one element, or the pieces of a matching set, agree
-  complete                                           Generate shell completion script
-  export <input>                                     Export the slice layout for one or more engine targets
-  frame <input>                                      Write a one-frame Phaser JSON Hash atlas with scale9Borders
-  inspect <input>                                    Detect or check slice insets and report what breaks when stretched
-  key <input>                                        Remove a green or magenta background and despill the edge
-  normalize <input>                                  Crop, resize, pick insets at the final size, and optionally rebuild a minimal texture
-  pack <inputs> [<inputs> ...]                       Pack the frames of several atlases into one image and JSON Hash atlas
-  preview <input>                                    Render the art at several stretched sizes on one PNG
-  prompt                                             Plan a generation prompt for stretchable UI art
-  resize <input>                                     Resize art to its in-game size
-  targets                                            List export targets and what each can represent
+  atlas <input>                                               Check the nine-slice frames of a Phaser JSON Hash or JSON Array atlas, or the slices of an Aseprite sheet
+  browser-report --out <out> <input>                          Create an offline HTML viewer from browser artifacts
+  build <manifest>                                            Normalize, export, and pack every piece a manifest lists
+  commands [<command>]                                        Print every command with its options, exit codes, and examples as JSON
+  compare <inputs> [<inputs> ...]                             Check that the states of one element, or the pieces of a matching set, agree
+  complete [<shell>]                                          Generate shell completion script
+  export --target <target> <input>                            Export the slice layout for one or more engine targets
+  frame --name <name> <input>                                 Write a one-frame Phaser JSON Hash atlas with scale9Borders
+  inspect <input>                                             Detect or check slice insets and report what breaks when stretched
+  key --out <out> <input>                                     Remove a green or magenta background and despill the edge
+  normalize --out <out> <input>                               Crop, resize, pick insets at the final size, and optionally rebuild a minimal texture
+  pack --out <out> <inputs> [<inputs> ...]                    Pack the frames of several atlases into one image and JSON Hash atlas
+  preview --out <out> <input>                                 Render the art at several stretched sizes on one PNG
+  prompt                                                      Plan a generation prompt for stretchable UI art
+  resize --out <out> <input>                                  Resize art to its in-game size
+  targets                                                     List export targets and what each can represent
 
 For more info, run any command with the `--help` flag:
-  slicewright atlas --help
-  slicewright browser-report --help
-  slicewright build --help
-  slicewright commands --help
-  slicewright compare --help
-  slicewright complete --help
-  slicewright export --help
-  slicewright frame --help
-  slicewright inspect --help
-  slicewright key --help
-  slicewright normalize --help
-  slicewright pack --help
-  slicewright preview --help
-  slicewright prompt --help
-  slicewright resize --help
-  slicewright targets --help
+  slicewright <COMMAND> --help
 
 OPTIONS:
   -h, --help             Display this help message
@@ -69,7 +54,7 @@ EXIT CODES:
 Create an offline HTML viewer from browser artifacts
 
 USAGE:
-  slicewright browser-report [options] <input>
+  slicewright browser-report [options] --out <out> <input>
 
 ARGUMENTS:
   input           Artifact directory
@@ -99,7 +84,7 @@ USAGE:
 OPTIONS:
   --kind <kind>                      UI element kind: button, panel, dialog, bar, bar-fill, tooltip, bubble, bubble-tail, frame (choices: button | panel | dialog | bar | bar-fill | tooltip | bubble | bubble-tail | frame) (required)
   --style <style>                    Art direction in the user's words (required)
-  --background [background]          Background the generator should paint (default: transparent, choices: transparent | chroma-green | chroma-magenta)
+  --background <background>          Background the generator should paint (default: transparent, choices: transparent | chroma-green | chroma-magenta)
   --pixel-art                        Ask for crisp pixel art
   --from <from>                      Report JSON of the last attempt; adds a correction for each finding
   --piece <piece>                    With a build report for --from, the piece to correct
@@ -131,16 +116,16 @@ OPTIONS:
   --watch                                  Inspect again when the image changes; prints one JSON line per run
   --insets <insets>                        Give insets instead of detecting them: l,r,t,b or h,v or n
   --borders <borders>                      Give Phaser scale9Borders x,y,w,h instead of insets
-  --mode [mode]                            Slice mode: three keeps the height, three-vertical keeps the width (default: auto, choices: auto | nine | three | three-vertical)
+  --mode <mode>                            Slice mode: three keeps the height, three-vertical keeps the width (default: auto, choices: auto | nine | three | three-vertical)
   --padding <padding>                      Give content padding instead of detecting it: l,r,t,b or h,v or n
-  --regions [regions]                      multi keeps every long stretch run on an axis, around fixed detail (default: single, choices: single | multi)
+  --regions <regions>                      multi keeps every long stretch run on an axis, around fixed detail (default: single, choices: single | multi)
   --tile <tile>                            Treat these axes as tiled instead of stretched (choices: x | y | xy)
   --layout <layout>                        Verify this SliceLayout JSON, or a report with a layout such as normalize prints, instead of detecting
   --pixel-art                              Find the grid of upscaled pixel art and report detail off the grid
   --pixel-scale <pixel-scale>              Image pixels per art pixel when known, for flat art with too few edges to tell; implies --pixel-art
-  --tolerance [tolerance]                  Largest premultiplied channel difference, 0-255, that still matches (default: 4)
-  --outlier-ratio [outlier-ratio]          Fraction of pixels per line allowed to exceed the tolerance (default: 0)
-  --noise [noise]                          auto raises the tolerance to the noise floor of generated art (default: auto, choices: auto | off)
+  --tolerance <tolerance>                  Largest premultiplied channel difference, 0-255, that still matches (default: 4)
+  --outlier-ratio <outlier-ratio>          Fraction of pixels per line allowed to exceed the tolerance (default: 0)
+  --noise <noise>                          auto raises the tolerance to the noise floor of generated art (default: auto, choices: auto | off)
   -h, --help                               Display this help message
   -v, --version                            Display this version
 
@@ -167,14 +152,14 @@ ARGUMENTS:
   inputs           Two or more PNGs: states such as normal, hover, pressed, or a set such as dialog, button, bar
 
 OPTIONS:
-  --kind [kind]                            states share one size and slices; a set only shares its line weight (also --as) (default: states, choices: states | set)
+  --kind <kind>                            states share one size and slices; a set only shares its line weight (also --as) (default: states, choices: states | set)
   --as <as>                                Same as --kind: compare the PNGs as states or as a set (choices: states | set)
-  --slack [slack]                          Pixels insets and content padding may differ by between states (default: 1)
-  --mode [mode]                            Slice mode: three keeps the height, three-vertical keeps the width (default: auto, choices: auto | nine | three | three-vertical)
+  --slack <slack>                          Pixels insets and content padding may differ by between states (default: 1)
+  --mode <mode>                            Slice mode: three keeps the height, three-vertical keeps the width (default: auto, choices: auto | nine | three | three-vertical)
   --tile <tile>                            Treat these axes as tiled instead of stretched (choices: x | y | xy)
-  --tolerance [tolerance]                  Largest premultiplied channel difference, 0-255, that still matches (default: 4)
-  --outlier-ratio [outlier-ratio]          Fraction of pixels per line allowed to exceed the tolerance (default: 0)
-  --noise [noise]                          auto raises the tolerance to the noise floor of generated art (default: auto, choices: auto | off)
+  --tolerance <tolerance>                  Largest premultiplied channel difference, 0-255, that still matches (default: 4)
+  --outlier-ratio <outlier-ratio>          Fraction of pixels per line allowed to exceed the tolerance (default: 0)
+  --noise <noise>                          auto raises the tolerance to the noise floor of generated art (default: auto, choices: auto | off)
   -h, --help                               Display this help message
   -v, --version                            Display this version
 
@@ -194,7 +179,7 @@ EXIT CODES:
 Render the art at several stretched sizes on one PNG
 
 USAGE:
-  slicewright preview [options] <input>
+  slicewright preview [options] --out <out> <input>
 
 ARGUMENTS:
   input           PNG image
@@ -202,21 +187,21 @@ ARGUMENTS:
 OPTIONS:
   --out <out>                              Preview sheet PNG to write (required)
   --cells <cells>                          Cells to show, comma-separated: guides,source,min,wide,tall,double,diagnostics
-  --zoom [zoom]                            Scale every cell by this whole number (1-8), nearest-neighbor (default: 1)
-  --max-width [max-width]                  Wrap cells to a new row past this sheet width (default: 2048)
+  --zoom <zoom>                            Scale every cell by this whole number (1-8), nearest-neighbor (default: 1)
+  --max-width <max-width>                  Wrap cells to a new row past this sheet width (default: 2048)
   --watch                                  Render again when the image changes; prints one JSON line per run
   --insets <insets>                        Give insets instead of detecting them: l,r,t,b or h,v or n
   --borders <borders>                      Give Phaser scale9Borders x,y,w,h instead of insets
-  --mode [mode]                            Slice mode: three keeps the height, three-vertical keeps the width (default: auto, choices: auto | nine | three | three-vertical)
+  --mode <mode>                            Slice mode: three keeps the height, three-vertical keeps the width (default: auto, choices: auto | nine | three | three-vertical)
   --padding <padding>                      Give content padding instead of detecting it: l,r,t,b or h,v or n
-  --regions [regions]                      multi keeps every long stretch run on an axis, around fixed detail (default: single, choices: single | multi)
+  --regions <regions>                      multi keeps every long stretch run on an axis, around fixed detail (default: single, choices: single | multi)
   --tile <tile>                            Treat these axes as tiled instead of stretched (choices: x | y | xy)
   --layout <layout>                        Verify this SliceLayout JSON, or a report with a layout such as normalize prints, instead of detecting
   --pixel-art                              Find the grid of upscaled pixel art and report detail off the grid
   --pixel-scale <pixel-scale>              Image pixels per art pixel when known, for flat art with too few edges to tell; implies --pixel-art
-  --tolerance [tolerance]                  Largest premultiplied channel difference, 0-255, that still matches (default: 4)
-  --outlier-ratio [outlier-ratio]          Fraction of pixels per line allowed to exceed the tolerance (default: 0)
-  --noise [noise]                          auto raises the tolerance to the noise floor of generated art (default: auto, choices: auto | off)
+  --tolerance <tolerance>                  Largest premultiplied channel difference, 0-255, that still matches (default: 4)
+  --outlier-ratio <outlier-ratio>          Fraction of pixels per line allowed to exceed the tolerance (default: 0)
+  --noise <noise>                          auto raises the tolerance to the noise floor of generated art (default: auto, choices: auto | off)
   -h, --help                               Display this help message
   -v, --version                            Display this version
 
@@ -235,7 +220,7 @@ EXIT CODES:
 Write a one-frame Phaser JSON Hash atlas with scale9Borders
 
 USAGE:
-  slicewright frame [options] <input>
+  slicewright frame [options] --name <name> <input>
 
 ARGUMENTS:
   input           PNG image
@@ -246,16 +231,16 @@ OPTIONS:
   --image-ref <image-ref>                  How the atlas refers to the image; defaults to its path from the atlas
   --insets <insets>                        Give insets instead of detecting them: l,r,t,b or h,v or n
   --borders <borders>                      Give Phaser scale9Borders x,y,w,h instead of insets
-  --mode [mode]                            Slice mode: three keeps the height, three-vertical keeps the width (default: auto, choices: auto | nine | three | three-vertical)
+  --mode <mode>                            Slice mode: three keeps the height, three-vertical keeps the width (default: auto, choices: auto | nine | three | three-vertical)
   --padding <padding>                      Give content padding instead of detecting it: l,r,t,b or h,v or n
-  --regions [regions]                      multi keeps every long stretch run on an axis, around fixed detail (default: single, choices: single | multi)
+  --regions <regions>                      multi keeps every long stretch run on an axis, around fixed detail (default: single, choices: single | multi)
   --tile <tile>                            Treat these axes as tiled instead of stretched (choices: x | y | xy)
   --layout <layout>                        Verify this SliceLayout JSON, or a report with a layout such as normalize prints, instead of detecting
   --pixel-art                              Find the grid of upscaled pixel art and report detail off the grid
   --pixel-scale <pixel-scale>              Image pixels per art pixel when known, for flat art with too few edges to tell; implies --pixel-art
-  --tolerance [tolerance]                  Largest premultiplied channel difference, 0-255, that still matches (default: 4)
-  --outlier-ratio [outlier-ratio]          Fraction of pixels per line allowed to exceed the tolerance (default: 0)
-  --noise [noise]                          auto raises the tolerance to the noise floor of generated art (default: auto, choices: auto | off)
+  --tolerance <tolerance>                  Largest premultiplied channel difference, 0-255, that still matches (default: 4)
+  --outlier-ratio <outlier-ratio>          Fraction of pixels per line allowed to exceed the tolerance (default: 0)
+  --noise <noise>                          auto raises the tolerance to the noise floor of generated art (default: auto, choices: auto | off)
   -h, --help                               Display this help message
   -v, --version                            Display this version
 
@@ -283,9 +268,9 @@ OPTIONS:
   --image <image>                          Atlas image; defaults to meta.image
   --frame <frame>                          Check only this frame
   --slice <slice>                          Check only this Aseprite slice
-  --tolerance [tolerance]                  Largest premultiplied channel difference, 0-255, that still matches (default: 4)
-  --outlier-ratio [outlier-ratio]          Fraction of pixels per line allowed to exceed the tolerance (default: 0)
-  --noise [noise]                          auto raises the tolerance to the noise floor of generated art (default: auto, choices: auto | off)
+  --tolerance <tolerance>                  Largest premultiplied channel difference, 0-255, that still matches (default: 4)
+  --outlier-ratio <outlier-ratio>          Fraction of pixels per line allowed to exceed the tolerance (default: 0)
+  --noise <noise>                          auto raises the tolerance to the noise floor of generated art (default: auto, choices: auto | off)
   -h, --help                               Display this help message
   -v, --version                            Display this version
 
@@ -305,19 +290,19 @@ EXIT CODES:
 Remove a green or magenta background and despill the edge
 
 USAGE:
-  slicewright key [options] <input>
+  slicewright key [options] --out <out> <input>
 
 ARGUMENTS:
   input           PNG image
 
 OPTIONS:
   --out <out>                                Keyed PNG to write (required)
-  --key [key]                                Key color; auto reads the image border (default: auto, choices: auto | green | magenta)
-  --keep [keep]                              Key dominance at or below this stays opaque (also --keep-below) (default: 40)
+  --key <key>                                Key color; auto reads the image border (default: auto, choices: auto | green | magenta)
+  --keep <keep>                              Key dominance at or below this stays opaque (also --keep-below) (default: 40)
   --keep-below <keep-below>                  Same as --keep
-  --drop [drop]                              Key dominance at or above this is cleared (also --drop-above) (default: 120)
+  --drop <drop>                              Key dominance at or above this is cleared (also --drop-above) (default: 120)
   --drop-above <drop-above>                  Same as --drop
-  --despill-radius [despill-radius]          Despill pixels this close to transparency (default: 2)
+  --despill-radius <despill-radius>          Despill pixels this close to transparency (default: 2)
   -h, --help                                 Display this help message
   -v, --version                              Display this version
 
@@ -336,7 +321,7 @@ EXIT CODES:
 Resize art to its in-game size
 
 USAGE:
-  slicewright resize [options] <input>
+  slicewright resize [options] --out <out> <input>
 
 ARGUMENTS:
   input           PNG image
@@ -348,7 +333,7 @@ OPTIONS:
   --width <width>                          Target width in pixels
   --height <height>                        Target height in pixels
   --scale <scale>                          Target scale instead of a size
-  --filter [filter]                        area for painted art, nearest for pixel art (default: area, choices: area | nearest)
+  --filter <filter>                        area for painted art, nearest for pixel art (default: area, choices: area | nearest)
   -h, --help                               Display this help message
   -v, --version                            Display this version
 
@@ -367,7 +352,7 @@ EXIT CODES:
 Crop, resize, pick insets at the final size, and optionally rebuild a minimal texture
 
 USAGE:
-  slicewright normalize [options] <input>
+  slicewright normalize [options] --out <out> <input>
 
 ARGUMENTS:
   input           PNG image
@@ -377,7 +362,7 @@ OPTIONS:
   --width <width>                          Target width in pixels
   --height <height>                        Target height in pixels
   --scale <scale>                          Target scale instead of a size
-  --filter [filter]                        area for painted art, nearest for pixel art (default: area, choices: area | nearest)
+  --filter <filter>                        area for painted art, nearest for pixel art (default: area, choices: area | nearest)
   --crop                                   Crop transparent margins first (on by default)
   --no-crop                                Keep transparent margins instead of cropping them
   --keep <keep>                            Rebuild keeping this many pixels of each uniform stretch span
@@ -387,16 +372,16 @@ OPTIONS:
   --image-ref <image-ref>                  How --target files refer to the image; defaults to its path from the output
   --insets <insets>                        Give insets instead of detecting them: l,r,t,b or h,v or n
   --borders <borders>                      Give Phaser scale9Borders x,y,w,h instead of insets
-  --mode [mode]                            Slice mode: three keeps the height, three-vertical keeps the width (default: auto, choices: auto | nine | three | three-vertical)
+  --mode <mode>                            Slice mode: three keeps the height, three-vertical keeps the width (default: auto, choices: auto | nine | three | three-vertical)
   --padding <padding>                      Give content padding instead of detecting it: l,r,t,b or h,v or n
-  --regions [regions]                      multi keeps every long stretch run on an axis, around fixed detail (default: single, choices: single | multi)
+  --regions <regions>                      multi keeps every long stretch run on an axis, around fixed detail (default: single, choices: single | multi)
   --tile <tile>                            Treat these axes as tiled instead of stretched (choices: x | y | xy)
   --layout <layout>                        Verify this SliceLayout JSON, or a report with a layout such as normalize prints, instead of detecting
   --pixel-art                              Find the grid of upscaled pixel art, snap the size to it, and resize nearest
   --pixel-scale <pixel-scale>              Image pixels per art pixel when known, for flat art with too few edges to tell; implies --pixel-art
-  --tolerance [tolerance]                  Largest premultiplied channel difference, 0-255, that still matches (default: 4)
-  --outlier-ratio [outlier-ratio]          Fraction of pixels per line allowed to exceed the tolerance (default: 0)
-  --noise [noise]                          auto raises the tolerance to the noise floor of generated art (default: auto, choices: auto | off)
+  --tolerance <tolerance>                  Largest premultiplied channel difference, 0-255, that still matches (default: 4)
+  --outlier-ratio <outlier-ratio>          Fraction of pixels per line allowed to exceed the tolerance (default: 0)
+  --noise <noise>                          auto raises the tolerance to the noise floor of generated art (default: auto, choices: auto | off)
   -h, --help                               Display this help message
   -v, --version                            Display this version
 
@@ -417,7 +402,7 @@ EXIT CODES:
 Pack the frames of several atlases into one image and JSON Hash atlas
 
 USAGE:
-  slicewright pack [options] <inputs> [<inputs> ...]
+  slicewright pack [options] --out <out> <inputs> [<inputs> ...]
 
 ARGUMENTS:
   inputs           Atlas JSON files, such as the one-frame atlases normalize and export write, or plain PNGs
@@ -425,12 +410,12 @@ ARGUMENTS:
 OPTIONS:
   --out <out>                              Packed PNG to write; the atlas goes next to it (required)
   --name <name>                            Texture key and file name for the atlas and stylesheet; defaults to the PNG name
-  --spacing [spacing]                      Transparent pixels between frames (default: 2)
-  --extrude [extrude]                      Pixels of each frame's edge repeated outward (default: 1)
+  --spacing <spacing>                      Transparent pixels between frames (default: 2)
+  --extrude <extrude>                      Pixels of each frame's edge repeated outward (default: 1)
   --css                                    Also write one stylesheet with a border-image class per frame, using each frame's own image
-  --tolerance [tolerance]                  Largest premultiplied channel difference, 0-255, that still matches (default: 4)
-  --outlier-ratio [outlier-ratio]          Fraction of pixels per line allowed to exceed the tolerance (default: 0)
-  --noise [noise]                          auto raises the tolerance to the noise floor of generated art (default: auto, choices: auto | off)
+  --tolerance <tolerance>                  Largest premultiplied channel difference, 0-255, that still matches (default: 4)
+  --outlier-ratio <outlier-ratio>          Fraction of pixels per line allowed to exceed the tolerance (default: 0)
+  --noise <noise>                          auto raises the tolerance to the noise floor of generated art (default: auto, choices: auto | off)
   -h, --help                               Display this help message
   -v, --version                            Display this version
 
@@ -475,28 +460,28 @@ EXIT CODES:
 Export the slice layout for one or more engine targets
 
 USAGE:
-  slicewright export [options] <input>
+  slicewright export [options] --target <target> <input>
 
 ARGUMENTS:
   input           PNG image
 
 OPTIONS:
   --target <target>                        Targets, comma separated: phaser, css, unity, defold, godot (required)
-  --out-dir [out-dir]                      Directory for the exported files (default: .)
+  --out-dir <out-dir>                      Directory for the exported files (default: .)
   --image-ref <image-ref>                  How the exported files refer to the image; defaults to its path from --out-dir
   --name <name>                            Asset name; defaults to the file name
   --insets <insets>                        Give insets instead of detecting them: l,r,t,b or h,v or n
   --borders <borders>                      Give Phaser scale9Borders x,y,w,h instead of insets
-  --mode [mode]                            Slice mode: three keeps the height, three-vertical keeps the width (default: auto, choices: auto | nine | three | three-vertical)
+  --mode <mode>                            Slice mode: three keeps the height, three-vertical keeps the width (default: auto, choices: auto | nine | three | three-vertical)
   --padding <padding>                      Give content padding instead of detecting it: l,r,t,b or h,v or n
-  --regions [regions]                      multi keeps every long stretch run on an axis, around fixed detail (default: single, choices: single | multi)
+  --regions <regions>                      multi keeps every long stretch run on an axis, around fixed detail (default: single, choices: single | multi)
   --tile <tile>                            Treat these axes as tiled instead of stretched (choices: x | y | xy)
   --layout <layout>                        Verify this SliceLayout JSON, or a report with a layout such as normalize prints, instead of detecting
   --pixel-art                              Find the grid of upscaled pixel art and report detail off the grid
   --pixel-scale <pixel-scale>              Image pixels per art pixel when known, for flat art with too few edges to tell; implies --pixel-art
-  --tolerance [tolerance]                  Largest premultiplied channel difference, 0-255, that still matches (default: 4)
-  --outlier-ratio [outlier-ratio]          Fraction of pixels per line allowed to exceed the tolerance (default: 0)
-  --noise [noise]                          auto raises the tolerance to the noise floor of generated art (default: auto, choices: auto | off)
+  --tolerance <tolerance>                  Largest premultiplied channel difference, 0-255, that still matches (default: 4)
+  --outlier-ratio <outlier-ratio>          Fraction of pixels per line allowed to exceed the tolerance (default: 0)
+  --noise <noise>                          auto raises the tolerance to the noise floor of generated art (default: auto, choices: auto | off)
   -h, --help                               Display this help message
   -v, --version                            Display this version
 

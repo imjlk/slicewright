@@ -1473,8 +1473,10 @@ export const cliOptions = {
           required: requiredOptions(ctx.callMode === 'entry' ? undefined : ctx.name),
           exitCodes: exitCodeRows(ctx.callMode === 'entry' ? undefined : ctx.name),
         }),
-  // Unknown or misspelled flags are errors, not silently ignored.
+  // Unknown or misspelled flags, and extra words after a command's arguments,
+  // are errors, not silently ignored.
   strict: true,
+  strictPositionals: true,
   plugins,
 } as const;
 
