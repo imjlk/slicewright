@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import { cli, define } from 'gunshi';
 
 import { BuildManifestError, readBuildManifest } from '../src/build.js';
+import { cliOptions, main as program, subCommands } from '../src/cli.js';
 import {
   didYouMean,
   friendlyCliErrors,
@@ -40,6 +41,7 @@ async function messages(argv: string[], command: string | null = 'normalize'): P
       renderHeader: null,
       renderValidationErrors: null,
       strict: true,
+      strictPositionals: true,
     });
   } catch (error) {
     return friendlyCliErrors(error, { ...help, command: command ?? undefined });
@@ -48,8 +50,8 @@ async function messages(argv: string[], command: string | null = 'normalize'): P
 }
 
 /**
- * @evidence docs/spec.md#error-messages Rewrites gunshi's missing-flag, missing-argument, choice, type, unknown-option and unknown-command errors into messages naming the fix, suggests close names by edit distance, and keeps other messages.
- * @evidenceReview docs/spec.md#error-messages #2655dd4 Reread the section after the unknown-option, invalid-JSON, and prompt missing-flag edits, checked this host against it, and ran pnpm test green.
+ * @evidence docs/spec.md#error-messages Rewrites gunshi's missing-flag, missing-argument, choice, type, unknown-option, unknown-command, and unexpected-extra-argument errors into messages naming the fix, suggests close names by edit distance, and keeps other messages.
+ * @evidenceReview docs/spec.md#error-messages #6be0420 Reread the section after the unexpected-extra-argument edit, checked this host against it, and ran pnpm test green.
  */
 export async function rewritesCliErrors(): Promise<void> {
   strictEqual(didYouMean('--tolerence', ['--out', '--tolerance']), '--tolerance');
@@ -101,11 +103,84 @@ export async function rewritesCliErrors(): Promise<void> {
       error instanceof InvalidJsonError &&
       /^--layout x\.json is not valid JSON \(.+\)\.$/u.test(error.message),
   );
+  // An extra word is an unexpected argument, not a later missing-file error.
+  deepStrictEqual(await messages(['normalize', 'a.png', 'b.png', '--out', 'c.png']), [
+    'Unexpected argument "b.png" for normalize. Run `slicewright normalize --help` for the options.',
+  ]);
+  deepStrictEqual(await messages(['normalize', 'a.png', 'b.png', 'c.png', '--out', 'd.png']), [
+    'Unexpected argument "b.png" for normalize. Run `slicewright normalize --help` for the options.',
+    'Unexpected argument "c.png" for normalize. Run `slicewright normalize --help` for the options.',
+  ]);
+}
+
+/** Messages the real program would print for `argv`, or none when it parses. */
+async function realMessages(argv: string[]): Promise<string[]> {
+  const write = process.stdout.write.bind(process.stdout);
+  process.stdout.write = ((chunk: unknown, encoding?: unknown, callback?: unknown) => {
+    const done = typeof encoding === 'function' ? encoding : callback;
+    return typeof done === 'function' ? write(Buffer.alloc(0), done as (err?: Error | null) => void) : true;
+  }) as typeof process.stdout.write;
+  try {
+    await cli(argv, program, cliOptions);
+    return [];
+  } catch (error) {
+    const named = argv.find((arg) => !arg.startsWith('-'));
+    return friendlyCliErrors(error, {
+      command:
+        named !== undefined && (Object.hasOwn(subCommands, named) || named === 'complete')
+          ? named
+          : undefined,
+      commands: [...Object.keys(subCommands), 'complete'],
+    });
+  } finally {
+    process.stdout.write = write;
+  }
+}
+
+/**
+ * @evidence docs/spec.md#error-messages Refuses an extra argument a command does not take, keeps any-number arguments on pack and compare, keeps the optional argument on commands, and still names a missing file when the arguments are the ones the command takes.
+ * @evidenceReview docs/spec.md#error-messages #6be0420 Reread the section after the unexpected-extra-argument edit, checked this host against it, and ran pnpm test green.
+ */
+export async function refusesExtraArguments(): Promise<void> {
+  const help = 'Run `slicewright inspect --help` for the options.';
+  deepStrictEqual(await realMessages(['inspect', 'a.png', 'b.png']), [
+    `Unexpected argument "b.png" for inspect. ${help}`,
+  ]);
+  deepStrictEqual(await realMessages(['inspect', 'a.png', 'b.png', 'c.png']), [
+    `Unexpected argument "b.png" for inspect. ${help}`,
+    `Unexpected argument "c.png" for inspect. ${help}`,
+  ]);
+  // The command runs with the arguments it takes: a missing file is still named.
+  deepStrictEqual(await realMessages(['inspect', 'a.png']), ['a.png does not exist.']);
+  // A command with no positional argument refuses any word.
+  deepStrictEqual(await realMessages(['prompt', 'panel.png']), [
+    'Unexpected argument "panel.png" for prompt. Run `slicewright prompt --help` for the options.',
+  ]);
+  deepStrictEqual(await realMessages(['targets', 'extra']), [
+    'Unexpected argument "extra" for targets. Run `slicewright targets --help` for the options.',
+  ]);
+  // The optional command name on `commands` is kept; a word after it is not.
+  deepStrictEqual(await realMessages(['commands']), []);
+  deepStrictEqual(await realMessages(['commands', 'inspect']), []);
+  deepStrictEqual(await realMessages(['commands', 'inspect', 'extra']), [
+    'Unexpected argument "extra" for commands. Run `slicewright commands --help` for the options.',
+  ]);
+  // pack and compare take any number of inputs; the extra words are not a usage error.
+  const packed = await realMessages(['pack', 'a.json', 'b.json', '--out', 'out.png']);
+  ok(
+    packed.length > 0 && packed.every((message) => !message.startsWith('Unexpected argument')),
+    packed.join('\n'),
+  );
+  const compared = await realMessages(['compare', 'a.png', 'b.png']);
+  ok(
+    compared.length > 0 && compared.every((message) => !message.startsWith('Unexpected argument')),
+    compared.join('\n'),
+  );
 }
 
 /**
  * @evidence docs/spec.md#error-messages Reports every manifest problem at once with its path: an unknown key with the closest allowed key, a missing key, a value outside its choices, and other mismatches in words.
- * @evidenceReview docs/spec.md#error-messages #2655dd4 Reread the section after the unknown-option, invalid-JSON, and prompt missing-flag edits, checked this host against it, and ran pnpm test green.
+ * @evidenceReview docs/spec.md#error-messages #6be0420 Reread the section after the unexpected-extra-argument edit, checked this host against it, and ran pnpm test green.
  */
 export function explainsManifestErrors(): void {
   const problems = (json: unknown): string => {
@@ -160,11 +235,12 @@ export function explainsManifestErrors(): void {
 }
 
 void test('friendly CLI errors', rewritesCliErrors);
+void test('extra positional arguments', refusesExtraArguments);
 void test('friendly manifest errors', explainsManifestErrors);
 
 /**
  * @evidence docs/spec.md#error-messages Names a missing input file instead of the system error, and explains a bad layout file with what it should be and its first problems in words.
- * @evidenceReview docs/spec.md#error-messages #2655dd4 Reread the section after the unknown-option, invalid-JSON, and prompt missing-flag edits, checked this host against it, and ran pnpm test green.
+ * @evidenceReview docs/spec.md#error-messages #6be0420 Reread the section after the unexpected-extra-argument edit, checked this host against it, and ran pnpm test green.
  */
 export function explainsMissingFilesAndLayouts(): void {
   let missing: unknown;

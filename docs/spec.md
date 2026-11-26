@@ -770,7 +770,12 @@ flag error also points at the command's `--help`. An unknown option takes the
 next word as its value, so when a known command is named, an unknown option is
 the only message: the word it took is not also reported as an unknown command
 or a missing argument (`slicewright --bogus inspect x.png` says only `Unknown
-option --bogus for inspect`). A name counts as a typo of
+option --bogus for inspect`). An extra argument a command does not take is
+named as such (`slicewright inspect a.png b.png` says only `Unexpected
+argument "b.png" for inspect`) and points at the command's `--help`, instead
+of running with the words it does take. A command that takes any number of
+arguments (`pack`, `compare`) keeps them, and `complete` still names a
+missing, unknown, or extra shell itself. A name counts as a typo of
 another within an edit distance of a third of the longer name (at least one
 edit), where swapping two neighboring letters is one edit, ignoring letter
 case. A build manifest reports every problem at once, each with its path:
