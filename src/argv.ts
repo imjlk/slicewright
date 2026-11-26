@@ -11,7 +11,7 @@ const negativeNumber = /^-(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i;
  * after `--` are left as they are.
  *
  * @evidence docs/spec.md#command-line-arguments Joins a negative number to the number flag before it, refuses a number flag without a value, and stops at a `--` terminator.
- * @evidenceReview docs/spec.md#command-line-arguments #d7f096a Reread the section after the [options] usage line, (required) marker, and exit-code edit, checked this host against it, and ran pnpm test green.
+ * @evidenceReview docs/spec.md#command-line-arguments #f702942 Reread the section after the gunshi 1.0.0-rc.13 help edit (required options in the usage line and command list, <name> values), checked this host against it, and ran pnpm test green.
  */
 export function joinNegativeNumbers(
   argv: readonly string[],
@@ -52,7 +52,7 @@ export interface AliasedFlags {
  * both names is refused, since one of the values would be silently dropped.
  *
  * @evidence docs/spec.md#command-line-arguments Reads a flag under either of its two names, keeps the original's default, and refuses both names at once.
- * @evidenceReview docs/spec.md#command-line-arguments #d7f096a Reread the section after the [options] usage line, (required) marker, and exit-code edit, checked this host against it, and ran pnpm test green.
+ * @evidenceReview docs/spec.md#command-line-arguments #f702942 Reread the section after the gunshi 1.0.0-rc.13 help edit (required options in the usage line and command list, <name> values), checked this host against it, and ran pnpm test green.
  */
 export function aliasedValue<T>(flags: AliasedFlags, name: string, alias: string): T {
   const named = flags.explicit?.[name] === true;

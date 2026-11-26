@@ -745,11 +745,14 @@ values being silently dropped.
 Help lists a command's own options first and `--help` and `--version` last,
 gives a negated flag such as `--no-crop` its own description, and shows
 examples for the program and for every command. The program's help lists the
-commands without a row for itself. A command's usage line reads
-`slicewright <command> [options] <input>`, since options are optional to name
-the command, and an option the command needs, by the parser or by the command
-itself (`prompt --kind` and `--style`), ends with `(required)`, as in agent
-mode. Help ends with the exit codes the command can end with (every code for
+commands without a row for itself, each with the options the parser requires
+and its arguments (`normalize --out <out> <input>`). A command's usage line
+reads `slicewright <command> [options] <input>`, since options are optional to
+name the command, followed by the options the parser requires
+(`slicewright normalize [options] --out <out> <input>`). An option that takes a
+value shows it as `<name>`, and an option the command needs, by the parser or
+by the command itself (`prompt --kind` and `--style`), ends with `(required)`,
+as in agent mode. Help ends with the exit codes the command can end with (every code for
 the program), the same ones the command catalog lists.
 
 The `targets` command prints an object whose `targets` field lists every

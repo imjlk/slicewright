@@ -2,7 +2,7 @@
 export interface UsageTidying {
   /** True for the program's own help, which lists the commands. */
   readonly entry: boolean;
-  /** Descriptions for `--no-<flag>`, by flag name, instead of the parser's "Negatable of". */
+  /** Descriptions for `--no-<flag>`, by flag name, instead of the parser's "Negate --<flag>". */
   readonly negated?: Readonly<Record<string, string>>;
   /** Option keys the command needs, marked `(required)` in its option rows. */
   readonly required?: readonly string[];
@@ -10,18 +10,19 @@ export interface UsageTidying {
   readonly exitCodes?: ReadonlyArray<readonly [code: number, meaning: string]>;
 }
 
-const optionsPlaceholder = ' <OPTIONS>';
+const optionsPlaceholder = ' [OPTIONS]';
 
 /**
- * Tidies the argument parser's help text: the program's help drops its own
- * `[slicewright] <OPTIONS>` row and the `<OPTIONS>` after every command, a
+ * Tidies the argument parser's help text: the program's help reads
+ * `<command> [options]` and drops the `[OPTIONS]` after every command, a
  * command's usage line reads `[options]` since no option is needed to name
- * the command, required options say `(required)`, negated flags get their own
- * description, `--help` and `--version` move to the end of the options so a
- * command's own options come first, and the exit codes close the help.
+ * the command (required options stay named after it), required options say
+ * `(required)`, negated flags get their own description, `--help` and
+ * `--version` move to the end of the options so a command's own options come
+ * first, and the exit codes close the help.
  *
  * @evidence docs/spec.md#command-line-arguments Lists commands without the program's own row, describes negated flags, and puts a command's own options before --help and --version.
- * @evidenceReview docs/spec.md#command-line-arguments #d7f096a Reread the section after the [options] usage line, (required) marker, and exit-code edit, checked this host against it, and ran pnpm test green.
+ * @evidenceReview docs/spec.md#command-line-arguments #f702942 Reread the section after the gunshi 1.0.0-rc.13 help edit (required options in the usage line and command list, <name> values), checked this host against it, and ran pnpm test green.
  */
 export function tidyUsage(text: string, tidying: UsageTidying): string {
   const lines = text.split('\n');
@@ -43,7 +44,7 @@ export function tidyUsage(text: string, tidying: UsageTidying): string {
     if (section === 'USAGE') {
       out.push(
         tidying.entry
-          ? line.replace(/\[COMMANDS\] <OPTIONS>/u, '<command> [options]')
+          ? line.replace(/\[COMMANDS\] \[OPTIONS\]/u, '<command> [options]')
           : line.replace(optionsPlaceholder, ' [options]'),
       );
       continue;
@@ -76,7 +77,7 @@ export function tidyUsage(text: string, tidying: UsageTidying): string {
       if (line === '') {
         flush();
       }
-      const negated = /^(\s+--no-([\w-]+)\s+)Negatable of --[\w-]+$/u.exec(line);
+      const negated = /^(\s+--no-([\w-]+)\s+)Negate --[\w-]+$/u.exec(line);
       const description = negated === null ? undefined : tidying.negated?.[negated[2] ?? ''];
       const flag = /^\s+(?:-\w, )?--([\w-]+)[\s=]/u.exec(line)?.[1];
       const required =

@@ -210,22 +210,22 @@ export function explainsMissingFilesAndLayouts(): void {
 
 /**
  * @evidence docs/spec.md#command-line-arguments Drops the program's own row and the options placeholder from the command list, describes a negated flag, and moves --help and --version after a command's own options.
- * @evidenceReview docs/spec.md#command-line-arguments #d7f096a Reread the section after the [options] usage line, (required) marker, and exit-code edit, checked this host against it, and ran pnpm test green.
+ * @evidenceReview docs/spec.md#command-line-arguments #f702942 Reread the section after the gunshi 1.0.0-rc.13 help edit (required options in the usage line and command list, <name> values), checked this host against it, and ran pnpm test green.
  */
 export function tidiesHelp(): void {
   const entry = [
     'USAGE:',
-    '  slicewright [COMMANDS] <OPTIONS>',
+    '  slicewright [COMMANDS] [OPTIONS]',
     '',
     'COMMANDS:',
-    '  [slicewright] <OPTIONS>       Prompt and inspect',
-    '  inspect <OPTIONS>             Inspect a PNG',
-    '  pack <OPTIONS> <inputs>       Pack atlases',
-    '  targets                       List targets',
+    '  [slicewright] [OPTIONS]                Prompt and inspect',
+    '  inspect [OPTIONS] <input>              Inspect a PNG',
+    '  pack [OPTIONS] --out <out> <inputs>    Pack atlases',
+    '  targets                                List targets',
     '',
     'For more info, run any command with the `--help` flag:',
     '  slicewright --help',
-    '  slicewright inspect --help',
+    '  slicewright <COMMAND> --help',
     '',
   ].join('\n');
   deepStrictEqual(tidyUsage(entry, { entry: true }).split('\n'), [
@@ -233,17 +233,17 @@ export function tidiesHelp(): void {
     '  slicewright <command> [options]',
     '',
     'COMMANDS:',
-    '  inspect                       Inspect a PNG',
-    '  pack <inputs>                 Pack atlases',
-    '  targets                       List targets',
+    '  inspect <input>                        Inspect a PNG',
+    '  pack --out <out> <inputs>              Pack atlases',
+    '  targets                                List targets',
     '',
     'For more info, run any command with the `--help` flag:',
-    '  slicewright inspect --help',
+    '  slicewright <COMMAND> --help',
     '',
   ]);
   const command = [
     'USAGE:',
-    '  slicewright normalize <OPTIONS> <input>',
+    '  slicewright normalize [OPTIONS] --out <out> <input>',
     '',
     'OPTIONS:',
     '  -h, --help             Display this help message',
@@ -251,7 +251,7 @@ export function tidiesHelp(): void {
     '  --out <out>            Normalized PNG to write',
     '  --outline <outline>    Outline width',
     '  --crop                 Crop first',
-    '  --no-crop              Negatable of --crop',
+    '  --no-crop              Negate --crop',
     '',
     'EXAMPLES:',
     '  slicewright normalize a.png',
@@ -269,7 +269,7 @@ export function tidiesHelp(): void {
     }).split('\n'),
     [
       'USAGE:',
-      '  slicewright normalize [options] <input>',
+      '  slicewright normalize [options] --out <out> <input>',
       '',
       'OPTIONS:',
       '  --out <out>            Normalized PNG to write (required)',
