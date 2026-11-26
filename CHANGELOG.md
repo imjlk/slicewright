@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.0 — 2026-11-04
+
+### Minor changes
+
+- [5d9dc6d](https://github.com/imjlk/slicewright/commit/5d9dc6d08fc2d3ea6f9950aac4e4b7d141239cf5) The package root no longer re-exports every module. It exports the art pipeline (PNG, chroma, resize, inspect, layout, prompt, normalize, preview, compare, pack, build, Phaser and Aseprite sheets, and target export) and not the CLI argument helpers. `slicewright/browser` and `slicewright/playwright` are unchanged. — Thanks @imjlk!
+
+### Patch changes
+
+- [acd07a9](https://github.com/imjlk/slicewright/commit/acd07a90e1ace5044f279619ca1d8fad773b3817) A multi-region finding that names `--mode three` or `--mode three-vertical` now includes `normalize` with inspect, preview, and export. Normalizing the replacement body without that flag detects a nine-slice again. — Thanks @imjlk!
+- [8ac0a6b](https://github.com/imjlk/slicewright/commit/8ac0a6b14196c4cec0fde51fe78b6cd1327bd511) A multi-region finding, and the export error that repeats it, now names `--mode three` or `--mode three-vertical` when the replacement body does not resize on both axes. Later inspect, preview, and export need that flag, or they detect a nine-slice again. The `prompt --from` correction still does not mention a CLI flag. — Thanks @imjlk!
+
 ## 0.7.3 — 2026-11-04
 
 ### Patch changes
